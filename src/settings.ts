@@ -90,6 +90,7 @@ export class SettingsTab extends PluginSettingTab {
    */
   buildDom () {
     this.containerEl.empty()
+    this.dropdowns = [];
 
     new Setting(this.containerEl)
       .setName('Separate desktop/mobile configuration')
