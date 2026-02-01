@@ -342,12 +342,7 @@ export default class LazyPlugin extends Plugin {
         }
       }
 
-      if (typeof this.obsidianCommands.addCommand === 'function') {
-        this.obsidianCommands.addCommand(cmd)
-      } else {
-        this.addCommand(cmd)
-      }
-
+      this.obsidianCommands.addCommand(cmd)
       this.registeredWrappers.add(commandId)
     })
   }
