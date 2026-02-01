@@ -51,6 +51,18 @@ export default class LazyPlugin extends Plugin {
     await this.initializeCommandCache()
   }
 
+  async onunload () {
+    // Remove registered command wrappers
+    this.registeredWrappers.forEach(commandId => this.removeCommandWrapper(commandId))
+    this.registeredWrappers.clear()
+
+    // Clear in-memory caches
+    this.commandCache.clear()
+    this.pluginCommandIndex.clear()
+    this.inFlightPlugins.clear()
+    this.enabledPluginsFromDisk.clear()
+  }
+
   async loadSettings () {
     this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData())
     // Object.assign only works 1 level deep, so need to clone the sub-level as well
