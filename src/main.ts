@@ -29,6 +29,10 @@ export default class LazyPlugin extends Plugin {
   registeredWrappers = new Set<string>()
   inFlightPlugins = new Set<string>()
   enabledPluginsFromDisk = new Set<string>()
+  startupPolicyLock: Promise<void> | null = null
+  startupPolicyPending = false
+  startupPolicyDebounceTimer: number | null = null
+  startupPolicyDebounceMs = 100
 
   get obsidianPlugins () {
     return (this.app as unknown as { plugins: any }).plugins
@@ -254,18 +258,53 @@ export default class LazyPlugin extends Plugin {
   }
 
   async applyStartupPolicy () {
-    const desiredEnabled = new Set<string>()
-    this.manifests.forEach(plugin => {
-      if (this.getPluginMode(plugin.id) === 'keepEnabled') {
-        desiredEnabled.add(plugin.id)
+    if (this.startupPolicyLock) {
+      this.startupPolicyPending = true
+      await this.startupPolicyLock
+      if (this.startupPolicyPending) {
+        this.startupPolicyPending = false
+        await this.applyStartupPolicy()
       }
-    })
-    desiredEnabled.add(lazyPluginId)
+      return
+    }
 
-    await this.writeCommunityPluginsFile([...desiredEnabled].sort((a, b) => a.localeCompare(b)))
+    const run = async () => {
+      if (this.startupPolicyDebounceTimer) {
+        window.clearTimeout(this.startupPolicyDebounceTimer)
+      }
 
-    for (const plugin of this.manifests) {
-      await this.applyPluginState(plugin.id)
+      await new Promise<void>(resolve => {
+        this.startupPolicyDebounceTimer = window.setTimeout(() => {
+          this.startupPolicyDebounceTimer = null
+          resolve()
+        }, this.startupPolicyDebounceMs)
+      })
+
+      const desiredEnabled = new Set<string>()
+      this.manifests.forEach(plugin => {
+        if (this.getPluginMode(plugin.id) === 'keepEnabled') {
+          desiredEnabled.add(plugin.id)
+        }
+      })
+      desiredEnabled.add(lazyPluginId)
+
+      await this.writeCommunityPluginsFile([...desiredEnabled].sort((a, b) => a.localeCompare(b)))
+
+      for (const plugin of this.manifests) {
+        await this.applyPluginState(plugin.id)
+      }
+    }
+
+    this.startupPolicyLock = run()
+    try {
+      await this.startupPolicyLock
+    } finally {
+      this.startupPolicyLock = null
+    }
+
+    if (this.startupPolicyPending) {
+      this.startupPolicyPending = false
+      await this.applyStartupPolicy()
     }
   }
 
@@ -534,6 +573,7 @@ export default class LazyPlugin extends Plugin {
 
   async persistCommandCache () {
     const cache: CommandCache = {}
+    const versions: Record<string, string> = {}
     this.manifests.forEach(plugin => {
       const commands = Array.from(this.commandCache.values())
         .filter(command => command.pluginId === plugin.id)
@@ -544,10 +584,12 @@ export default class LazyPlugin extends Plugin {
         }))
       if (commands.length) {
         cache[plugin.id] = commands
+        versions[plugin.id] = plugin.version ?? ''
       }
     })
 
     this.data.commandCache = cache
+    this.data.commandCacheVersions = versions
     this.data.commandCacheUpdatedAt = Date.now()
     await this.saveSettings()
   }
@@ -555,7 +597,15 @@ export default class LazyPlugin extends Plugin {
   isCommandCacheValid (pluginId: string): boolean {
     if (!this.pluginCommandIndex.has(pluginId)) return false
     const cached = this.data.commandCache?.[pluginId]
-    return Array.isArray(cached) && cached.length > 0
+    if (!Array.isArray(cached) || cached.length === 0) return false
+
+    const manifest = this.manifests.find(plugin => plugin.id === pluginId)
+    if (!manifest) return false
+
+    const cachedVersion = this.data.commandCacheVersions?.[pluginId]
+    if (!cachedVersion) return false
+
+    return cachedVersion === (manifest.version ?? '')
   }
 
 }

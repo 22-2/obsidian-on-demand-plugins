@@ -28,6 +28,7 @@ export interface LazySettings {
   desktop: DeviceSettings;
   mobile?: DeviceSettings;
   commandCache?: CommandCache;
+  commandCacheVersions?: CommandCacheVersions;
   commandCacheUpdatedAt?: number;
 }
 
@@ -44,6 +45,7 @@ export interface CachedCommandEntry {
 }
 
 export type CommandCache = Record<string, CachedCommandEntry[]>
+export type CommandCacheVersions = Record<string, string>
 
 export type PluginMode = 'disabled' | 'lazy' | 'keepEnabled'
 
