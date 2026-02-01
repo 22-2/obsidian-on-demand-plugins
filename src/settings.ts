@@ -3,6 +3,7 @@ import LazyPlugin from './main'
 
 export interface PluginSettings {
   mode?: PluginMode;
+  userConfigured?: boolean;
 }
 
 // Settings per device (desktop/mobile)
@@ -26,6 +27,8 @@ export interface LazySettings {
   showConsoleLog: boolean;
   desktop: DeviceSettings;
   mobile?: DeviceSettings;
+  commandCache?: CommandCache;
+  commandCacheUpdatedAt?: number;
 }
 
 export const DEFAULT_SETTINGS: LazySettings = {
@@ -33,6 +36,14 @@ export const DEFAULT_SETTINGS: LazySettings = {
   showConsoleLog: false,
   desktop: DEFAULT_DEVICE_SETTINGS
 }
+
+export interface CachedCommandEntry {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
+export type CommandCache = Record<string, CachedCommandEntry[]>
 
 export type PluginMode = 'disabled' | 'lazy' | 'keepEnabled'
 
@@ -132,7 +143,7 @@ export class SettingsTab extends PluginSettingTab {
         dropdown.onChange(async (value: PluginMode) => {
           // Update all plugins and save the config, but don't reload the plugins (would slow the UI down)
           this.lazyPlugin.manifests.forEach(plugin => {
-            this.pluginSettings[plugin.id] = { mode: value }
+            this.pluginSettings[plugin.id] = { mode: value, userConfigured: true }
           })
           // Update all the dropdowns
           this.dropdowns.forEach(dropdown => dropdown.setValue(value))

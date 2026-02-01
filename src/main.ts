@@ -1,7 +1,9 @@
-import { Platform, Plugin, PluginManifest } from 'obsidian'
+import { Editor, MarkdownView, Platform, Plugin, PluginManifest } from 'obsidian'
 import {
   DEFAULT_DEVICE_SETTINGS,
   DEFAULT_SETTINGS,
+  CommandCache,
+  CachedCommandEntry,
   DeviceSettings,
   LazySettings,
   PluginMode,
@@ -25,6 +27,8 @@ export default class LazyPlugin extends Plugin {
   commandCache = new Map<string, CachedCommand>()
   pluginCommandIndex = new Map<string, Set<string>>()
   registeredWrappers = new Set<string>()
+  inFlightPlugins = new Set<string>()
+  enabledPluginsFromDisk = new Set<string>()
 
   get obsidianPlugins () {
     return (this.app as unknown as { plugins: any }).plugins
@@ -36,11 +40,14 @@ export default class LazyPlugin extends Plugin {
 
   async onload () {
     await this.loadSettings()
+    await this.loadEnabledPluginsFromDisk()
     this.updateManifests()
 
+    await this.migrateSettings()
     await this.setInitialPluginsConfiguration()
     this.addSettingTab(new SettingsTab(this.app, this))
 
+    await this.loadCachedCommandsFromData()
     await this.initializeCommandCache()
   }
 
@@ -64,7 +71,6 @@ export default class LazyPlugin extends Plugin {
       this.device = 'desktop/global'
     }
 
-    await this.migrateSettings()
   }
 
   async saveSettings () {
@@ -109,9 +115,22 @@ export default class LazyPlugin extends Plugin {
   async setInitialPluginsConfiguration () {
     let hasChanges = false
     for (const plugin of this.manifests) {
-      if (this.settings.plugins?.[plugin.id]?.mode === undefined) {
+      const current = this.settings.plugins?.[plugin.id]
+      if (!current || current.mode === undefined) {
         // There is no existing setting for this plugin, so create one
-        this.settings.plugins[plugin.id] = { mode: this.getDefaultModeForPlugin(plugin.id) }
+        this.settings.plugins[plugin.id] = {
+          mode: this.getDefaultModeForPlugin(plugin.id),
+          userConfigured: false
+        }
+        hasChanges = true
+        continue
+      }
+
+      if (!current.userConfigured && current.mode === 'disabled' && this.isPluginEnabledOnDisk(plugin.id)) {
+        this.settings.plugins[plugin.id] = {
+          mode: 'keepEnabled',
+          userConfigured: false
+        }
         hasChanges = true
       }
     }
@@ -125,7 +144,7 @@ export default class LazyPlugin extends Plugin {
    * Update an individual plugin's configuration in the settings file
    */
   async updatePluginSettings (pluginId: string, mode: PluginMode) {
-    this.settings.plugins[pluginId] = { mode }
+    this.settings.plugins[pluginId] = { mode, userConfigured: true }
     await this.saveSettings()
     await this.applyPluginState(pluginId)
   }
@@ -148,40 +167,41 @@ export default class LazyPlugin extends Plugin {
   }
 
   getDefaultModeForPlugin (pluginId: string): PluginMode {
-    if (this.obsidianPlugins.enabledPlugins.has(pluginId)) {
+    if (this.isPluginEnabledOnDisk(pluginId)) {
       return 'keepEnabled'
     }
 
     return this.settings.defaultMode ?? 'disabled'
   }
 
+  isPluginEnabledOnDisk (pluginId: string): boolean {
+    return this.enabledPluginsFromDisk.has(pluginId) || this.obsidianPlugins.enabledPlugins.has(pluginId)
+  }
+
   async initializeCommandCache () {
-    await this.enableAllPluginsTemporarily()
-    this.cacheAllPluginCommands()
+    await this.refreshCommandCache()
     await this.applyStartupPolicy()
     this.registerCachedCommands()
   }
 
-  async enableAllPluginsTemporarily () {
+  async refreshCommandCache () {
+    let updated = false
     for (const plugin of this.manifests) {
-      if (!this.obsidianPlugins.enabledPlugins.has(plugin.id)) {
-        await this.obsidianPlugins.enablePlugin(plugin.id)
+      const mode = this.getPluginMode(plugin.id)
+      if (mode === 'lazy') {
+        if (this.isCommandCacheValid(plugin.id)) continue
+        updated = (await this.refreshCommandsForPlugin(plugin.id)) || updated
       }
     }
-  }
 
-  cacheAllPluginCommands () {
-    this.commandCache.clear()
-    this.pluginCommandIndex.clear()
-
-    for (const plugin of this.manifests) {
-      this.cacheCommandsForPlugin(plugin.id)
+    if (updated) {
+      await this.persistCommandCache()
     }
   }
 
-  cacheCommandsForPlugin (pluginId: string) {
-    const commands = this.getCommandsForPlugin(pluginId)
-    if (!commands.length) return
+  async refreshCommandsForPlugin (pluginId: string): Promise<boolean> {
+    const commands = await this.getCommandsForPlugin(pluginId)
+    if (!commands.length) return false
 
     const ids = new Set<string>()
     commands.forEach(command => {
@@ -190,11 +210,17 @@ export default class LazyPlugin extends Plugin {
     })
 
     this.pluginCommandIndex.set(pluginId, ids)
+    return true
   }
 
-  getCommandsForPlugin (pluginId: string): CachedCommand[] {
+  async getCommandsForPlugin (pluginId: string): Promise<CachedCommand[]> {
+    const wasEnabled = this.obsidianPlugins.enabledPlugins.has(pluginId)
+    if (!wasEnabled) {
+      await this.obsidianPlugins.enablePlugin(pluginId)
+    }
+
     const commands = Object.values(this.obsidianCommands.commands) as CachedCommand[]
-    return commands
+    const pluginCommands = commands
       .filter(command => this.getCommandPluginId(command.id) === pluginId)
       .map(command => ({
         id: command.id,
@@ -202,6 +228,12 @@ export default class LazyPlugin extends Plugin {
         icon: command.icon,
         pluginId
       }))
+
+    if (!wasEnabled && this.getPluginMode(pluginId) !== 'keepEnabled') {
+      await this.obsidianPlugins.disablePlugin(pluginId)
+    }
+
+    return pluginCommands
   }
 
   getCommandPluginId (commandId: string): string | null {
@@ -218,7 +250,7 @@ export default class LazyPlugin extends Plugin {
     })
     desiredEnabled.add(lazyPluginId)
 
-    await this.writeCommunityPluginsFile([...desiredEnabled])
+    await this.writeCommunityPluginsFile([...desiredEnabled].sort((a, b) => a.localeCompare(b)))
 
     for (const plugin of this.manifests) {
       await this.applyPluginState(plugin.id)
@@ -265,18 +297,9 @@ export default class LazyPlugin extends Plugin {
   }
 
   async ensureCommandsCached (pluginId: string) {
-    if (this.pluginCommandIndex.has(pluginId)) return
-
-    const wasEnabled = this.obsidianPlugins.enabledPlugins.has(pluginId)
-    if (!wasEnabled) {
-      await this.obsidianPlugins.enablePlugin(pluginId)
-    }
-
-    this.cacheCommandsForPlugin(pluginId)
-
-    if (!wasEnabled) {
-      await this.obsidianPlugins.disablePlugin(pluginId)
-    }
+    if (this.isCommandCacheValid(pluginId)) return
+    await this.refreshCommandsForPlugin(pluginId)
+    await this.persistCommandCache()
   }
 
   registerCachedCommands () {
@@ -298,14 +321,20 @@ export default class LazyPlugin extends Plugin {
       const cached = this.commandCache.get(commandId)
       if (!cached) return
 
-      this.addCommand({
-        id: cached.id,
+      const cmd = {
+        id: commandId,
         name: cached.name,
         icon: cached.icon,
         callback: async () => {
-          await this.runLazyCommand(cached)
+          await this.runLazyCommand(commandId)
         }
-      })
+      }
+
+      if (typeof this.obsidianCommands.addCommand === 'function') {
+        this.obsidianCommands.addCommand(cmd)
+      } else {
+        this.addCommand(cmd)
+      }
 
       this.registeredWrappers.add(commandId)
     })
@@ -328,27 +357,161 @@ export default class LazyPlugin extends Plugin {
     this.registeredWrappers.delete(commandId)
   }
 
-  async runLazyCommand (command: CachedCommand) {
-    const isLoaded = this.obsidianPlugins.plugins?.[command.pluginId]?._loaded
-    if (!this.obsidianPlugins.enabledPlugins.has(command.pluginId) || !isLoaded) {
-      this.removeCommandWrapper(command.id)
-      await this.obsidianPlugins.enablePlugin(command.pluginId)
-      await this.waitForCommand(command.id)
-    }
+  async runLazyCommand (commandId: string) {
+    const cached = this.commandCache.get(commandId)
+    if (!cached) return
 
-    await this.obsidianCommands.executeCommand(command.id)
+    if (this.inFlightPlugins.has(cached.pluginId)) return
+    this.inFlightPlugins.add(cached.pluginId)
+
+    try {
+      const isLoaded = this.obsidianPlugins.plugins?.[cached.pluginId]?._loaded
+      if (!this.obsidianPlugins.enabledPlugins.has(cached.pluginId) || !isLoaded) {
+        this.removeCachedCommandsForPlugin(cached.pluginId)
+        await this.obsidianPlugins.enablePlugin(cached.pluginId)
+        const ready = await this.waitForCommand(cached.id)
+        if (!ready) return
+      }
+
+      if (this.data.showConsoleLog) {
+        console.log(`Executing lazy command: ${cached.id}`)
+      }
+
+      await new Promise<void>(resolve => {
+        queueMicrotask(() => {
+          const executed = this.executeCommandDirect(cached.id)
+          if (!executed && this.data.showConsoleLog) {
+            console.warn(`Lazy command did not execute: ${cached.id}`)
+          }
+          resolve()
+        })
+      })
+    } catch (error) {
+      if (this.data.showConsoleLog) {
+        console.error(`Error executing lazy command ${commandId}:`, error)
+      }
+    } finally {
+      this.inFlightPlugins.delete(cached.pluginId)
+    }
   }
 
-  async waitForCommand (commandId: string, timeoutMs = 5000) {
+  async waitForCommand (commandId: string, timeoutMs = 8000): Promise<boolean> {
     const start = Date.now()
     while (Date.now() - start < timeoutMs) {
-      if (this.obsidianCommands.commands[commandId]) return
+      const cmd = this.obsidianCommands.commands[commandId]
+      if (cmd && (cmd.callback || cmd.checkCallback || cmd.editorCallback || cmd.editorCheckCallback)) return true
       await this.sleep(50)
     }
+    return false
   }
 
   async sleep (ms: number) {
     await new Promise(resolve => setTimeout(resolve, ms))
+  }
+
+  executeCommandDirect (commandId: string): boolean {
+    const command = this.obsidianCommands.commands[commandId] as {
+      callback?: () => void
+      checkCallback?: (checking: boolean) => boolean | void
+      editorCallback?: (editor: Editor, ctx?: unknown) => void
+      editorCheckCallback?: (checking: boolean, editor: Editor, ctx?: unknown) => boolean | void
+    } | undefined
+
+    if (!command) return false
+
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView)
+    const editor = view?.editor
+    const file = view?.file
+
+    if (editor && command.editorCheckCallback) {
+      const ok = command.editorCheckCallback(true, editor, file)
+      return ok !== false
+    }
+
+    if (editor && command.editorCallback) {
+      command.editorCallback(editor, file)
+      return true
+    }
+
+    if (command.checkCallback) {
+      const ok = command.checkCallback(true)
+      return ok !== false
+    }
+
+    if (command.callback) {
+      command.callback()
+      return true
+    }
+
+    return false
+  }
+
+  async loadCachedCommandsFromData () {
+    if (!this.data.commandCache) return
+
+    this.commandCache.clear()
+    this.pluginCommandIndex.clear()
+
+    Object.entries(this.data.commandCache).forEach(([pluginId, commands]) => {
+      const ids = new Set<string>()
+      commands.forEach(command => {
+        const cached: CachedCommand = {
+          id: command.id,
+          name: command.name,
+          icon: command.icon,
+          pluginId
+        }
+        this.commandCache.set(cached.id, cached)
+        ids.add(cached.id)
+      })
+      this.pluginCommandIndex.set(pluginId, ids)
+    })
+  }
+
+  async loadEnabledPluginsFromDisk () {
+    const adapter = this.app.vault.adapter
+    const path = '.obsidian/community-plugins.json'
+    this.enabledPluginsFromDisk.clear()
+
+    try {
+      const raw = await adapter.read(path)
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        parsed.forEach(id => {
+          if (typeof id === 'string') this.enabledPluginsFromDisk.add(id)
+        })
+      }
+    } catch (error) {
+      if (this.data?.showConsoleLog) {
+        console.warn('Failed to read community-plugins.json', error)
+      }
+    }
+  }
+
+  async persistCommandCache () {
+    const cache: CommandCache = {}
+    this.manifests.forEach(plugin => {
+      const commands = Array.from(this.commandCache.values())
+        .filter(command => command.pluginId === plugin.id)
+        .map(command => ({
+          id: command.id,
+          name: command.name,
+          icon: command.icon
+        }))
+      if (commands.length) {
+        cache[plugin.id] = commands
+      }
+    })
+
+    this.data.commandCache = cache
+    this.data.commandCacheUpdatedAt = Date.now()
+    await this.saveSettings()
+  }
+
+  isCommandCacheValid (pluginId: string): boolean {
+    if (!this.pluginCommandIndex.has(pluginId)) return false
+    const cached = this.data.commandCache?.[pluginId]
+    return Array.isArray(cached) && cached.length > 0
   }
 
 }
