@@ -4,18 +4,35 @@ import {
   DEFAULT_SETTINGS,
   DeviceSettings,
   LazySettings,
-  LoadingMethod,
+  PluginMode,
   SettingsTab
 } from './settings'
 
 const lazyPluginId = require('../manifest.json').id
+
+interface CachedCommand {
+  id: string
+  name: string
+  icon?: string
+  pluginId: string
+}
 
 export default class LazyPlugin extends Plugin {
   data: LazySettings
   settings: DeviceSettings
   device = 'desktop/global'
   manifests: PluginManifest[]
-  pendingTimeouts: NodeJS.Timeout[] = []
+  commandCache = new Map<string, CachedCommand>()
+  pluginCommandIndex = new Map<string, Set<string>>()
+  registeredWrappers = new Set<string>()
+
+  get obsidianPlugins () {
+    return (this.app as unknown as { plugins: any }).plugins
+  }
+
+  get obsidianCommands () {
+    return (this.app as unknown as { commands: any }).commands
+  }
 
   async onload () {
     await this.loadSettings()
@@ -24,68 +41,7 @@ export default class LazyPlugin extends Plugin {
     await this.setInitialPluginsConfiguration()
     this.addSettingTab(new SettingsTab(this.app, this))
 
-    // Iterate over the installed plugins and load them with the specified delay
-    this.manifests.forEach(plugin => this.setPluginStartup(plugin.id))
-  }
-
-  /**
-   * Configure and load a plugin based on its startup settings.
-   */
-  async setPluginStartup (pluginId: string) {
-    const obsidian = this.app.plugins
-
-    const startupType = this.getPluginStartup(pluginId)
-    const isActiveOnStartup = obsidian.enabledPlugins.has(pluginId)
-    const isRunning = obsidian.plugins?.[pluginId]?._loaded
-
-    switch (startupType) {
-      // For disabled plugins
-      case LoadingMethod.disabled:
-        await obsidian.disablePluginAndSave(pluginId)
-        break
-      // For instant-start plugins
-      case LoadingMethod.instant:
-        if (!isActiveOnStartup && !isRunning) await obsidian.enablePluginAndSave(pluginId)
-        break
-      // For plugins with a delay
-      case LoadingMethod.short:
-      case LoadingMethod.long:
-        if (isActiveOnStartup) {
-          // Disable and save so that it won't auto-start next time
-          await obsidian.disablePluginAndSave(pluginId)
-          // Immediately re-enable, since the plugin is already active and in-use
-          await obsidian.enablePlugin(pluginId)
-        } else if (!isRunning) {
-          // Start with a delay
-          const seconds = startupType === LoadingMethod.short ? this.settings.shortDelaySeconds : this.settings.longDelaySeconds
-          // Add a short additional delay to each plugin, for two purposes:
-          // 1. Have them load in a consistent order, which helps them appear in the sidebar in the same order
-          // 2. Stagger them slightly so there's not a big slowdown when they all fire at once
-          const stagger = isNaN(this.settings.delayBetweenPlugins) ? 40 : this.settings.delayBetweenPlugins
-          const delay = this.manifests.findIndex(x => x.id === pluginId) * stagger
-          const timeout = setTimeout(async () => {
-            if (!obsidian.plugins?.[pluginId]?._loaded) {
-              if (this.data.showConsoleLog) {
-                console.log(`Starting ${pluginId} after a ${startupType} delay`)
-              }
-              await obsidian.enablePlugin(pluginId)
-            }
-          }, seconds * 1000 + delay)
-          // Store the timeout so we can cancel it later if needed during plugin unload
-          this.pendingTimeouts.push(timeout)
-        }
-        break
-    }
-  }
-
-  /**
-   * Get the startup type for a given pluginId, falling back to Obsidian's current
-   * loading method (enabled/disabled) if no configuration is found for this plugin.
-   */
-  getPluginStartup (pluginId: string): LoadingMethod {
-    return this.settings.plugins?.[pluginId]?.startupType ||
-      this.settings.defaultStartupType ||
-      (this.app.plugins.enabledPlugins.has(pluginId) ? LoadingMethod.instant : LoadingMethod.disabled)
+    await this.initializeCommandCache()
   }
 
   async loadSettings () {
@@ -107,10 +63,42 @@ export default class LazyPlugin extends Plugin {
       this.settings = this.data.desktop
       this.device = 'desktop/global'
     }
+
+    await this.migrateSettings()
   }
 
   async saveSettings () {
     await this.saveData(this.data)
+  }
+
+  async migrateSettings () {
+    let hasChanges = false
+    const settings = this.settings as DeviceSettings & { defaultKeepEnabled?: boolean }
+
+    if (!settings.plugins) {
+      settings.plugins = {}
+      hasChanges = true
+    }
+
+    if (settings.defaultMode === undefined && settings.defaultKeepEnabled !== undefined) {
+      settings.defaultMode = settings.defaultKeepEnabled ? 'keepEnabled' : 'disabled'
+      delete settings.defaultKeepEnabled
+      hasChanges = true
+    }
+
+    Object.entries(settings.plugins).forEach(([pluginId, pluginSettings]) => {
+      const legacy = pluginSettings as { keepEnabled?: boolean, mode?: PluginMode }
+      if (legacy.mode === undefined && legacy.keepEnabled !== undefined) {
+        legacy.mode = legacy.keepEnabled ? 'keepEnabled' : 'disabled'
+        delete legacy.keepEnabled
+        settings.plugins[pluginId] = legacy
+        hasChanges = true
+      }
+    })
+
+    if (hasChanges) {
+      await this.saveSettings()
+    }
   }
 
   /**
@@ -119,67 +107,248 @@ export default class LazyPlugin extends Plugin {
    * Settings page.
    */
   async setInitialPluginsConfiguration () {
+    let hasChanges = false
     for (const plugin of this.manifests) {
-      if (!this.settings.plugins?.[plugin.id]?.startupType) {
+      if (this.settings.plugins?.[plugin.id]?.mode === undefined) {
         // There is no existing setting for this plugin, so create one
-        await this.updatePluginSettings(plugin.id, this.getPluginStartup(plugin.id))
+        this.settings.plugins[plugin.id] = { mode: this.getDefaultModeForPlugin(plugin.id) }
+        hasChanges = true
       }
+    }
+
+    if (hasChanges) {
+      await this.saveSettings()
     }
   }
 
   /**
    * Update an individual plugin's configuration in the settings file
    */
-  async updatePluginSettings (pluginId: string, startupType: LoadingMethod) {
-    this.settings.plugins[pluginId] = { startupType }
+  async updatePluginSettings (pluginId: string, mode: PluginMode) {
+    this.settings.plugins[pluginId] = { mode }
     await this.saveSettings()
+    await this.applyPluginState(pluginId)
   }
 
   updateManifests () {
     // Get the list of installed plugins
-    this.manifests = Object.values(this.app.plugins.manifests)
-      .filter(plugin =>
+    const manifests = Object.values(this.obsidianPlugins.manifests) as PluginManifest[]
+    this.manifests = manifests
+      .filter((plugin: PluginManifest) =>
         // Filter out the Lazy Loader plugin
         plugin.id !== lazyPluginId &&
         // Filter out desktop-only plugins from mobile
         !(Platform.isMobile && plugin.isDesktopOnly))
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a: PluginManifest, b: PluginManifest) => a.name.localeCompare(b.name))
   }
 
-  /*
-   * Originally this was set up so that when the plugin unloaded, it would enablePluginAndSave()
-   * the other plugins based on their Lazy Loader startup config.
-   *
-   * The problem with that is that the onunload() function is called during plugin *update* also,
-   * which means that every time you get an update for this plugin, it would cause:
-   *
-   * a) A slowdown across the vault for the next 1-2 restarts.
-   * b) The possibility of plugins being loaded twice / duplicated.
-   *
-   * Since across all users, updating the plugin is common, and uninstalling the plugin is less
-   * common, I decided to remove this function.
-   *
-   * I apologise to the people who have to manually re-enable their plugins once they uninstall this one :(
-   *
-   * --------------------
-   *
-   * When the Lazy Loader plugin is disabled / deleted from Obsidian, iterate over
-   * the configured plugins and re-enable any that are set to be delayed.
-   *
-   * This will cause a short slowdown as each plugin has to be disabled and then
-   * re-enabled to save its new startup state.
-   *
-  async onunload () {
-    // Clear any pending timeouts
-    this.pendingTimeouts.forEach(timeout => clearTimeout(timeout))
-    // Iterate over the configured plugins
+  getPluginMode (pluginId: string): PluginMode {
+    return this.settings.plugins?.[pluginId]?.mode ??
+      this.getDefaultModeForPlugin(pluginId)
+  }
+
+  getDefaultModeForPlugin (pluginId: string): PluginMode {
+    if (this.obsidianPlugins.enabledPlugins.has(pluginId)) {
+      return 'keepEnabled'
+    }
+
+    return this.settings.defaultMode ?? 'disabled'
+  }
+
+  async initializeCommandCache () {
+    await this.enableAllPluginsTemporarily()
+    this.cacheAllPluginCommands()
+    await this.applyStartupPolicy()
+    this.registerCachedCommands()
+  }
+
+  async enableAllPluginsTemporarily () {
     for (const plugin of this.manifests) {
-      const startupType = this.settings.plugins?.[plugin.id]?.startupType
-      if (startupType !== LoadingMethod.disabled) {
-        await this.app.plugins.disablePlugin(plugin.id)
-        await this.app.plugins.enablePluginAndSave(plugin.id)
-        console.log(`Set ${plugin.id} back to instant start`)
+      if (!this.obsidianPlugins.enabledPlugins.has(plugin.id)) {
+        await this.obsidianPlugins.enablePlugin(plugin.id)
       }
     }
-  } */
+  }
+
+  cacheAllPluginCommands () {
+    this.commandCache.clear()
+    this.pluginCommandIndex.clear()
+
+    for (const plugin of this.manifests) {
+      this.cacheCommandsForPlugin(plugin.id)
+    }
+  }
+
+  cacheCommandsForPlugin (pluginId: string) {
+    const commands = this.getCommandsForPlugin(pluginId)
+    if (!commands.length) return
+
+    const ids = new Set<string>()
+    commands.forEach(command => {
+      this.commandCache.set(command.id, command)
+      ids.add(command.id)
+    })
+
+    this.pluginCommandIndex.set(pluginId, ids)
+  }
+
+  getCommandsForPlugin (pluginId: string): CachedCommand[] {
+    const commands = Object.values(this.obsidianCommands.commands) as CachedCommand[]
+    return commands
+      .filter(command => this.getCommandPluginId(command.id) === pluginId)
+      .map(command => ({
+        id: command.id,
+        name: command.name,
+        icon: command.icon,
+        pluginId
+      }))
+  }
+
+  getCommandPluginId (commandId: string): string | null {
+    const [prefix] = commandId.split(':')
+    return this.manifests.some(plugin => plugin.id === prefix) ? prefix : null
+  }
+
+  async applyStartupPolicy () {
+    const desiredEnabled = new Set<string>()
+    this.manifests.forEach(plugin => {
+      if (this.getPluginMode(plugin.id) === 'keepEnabled') {
+        desiredEnabled.add(plugin.id)
+      }
+    })
+    desiredEnabled.add(lazyPluginId)
+
+    await this.writeCommunityPluginsFile([...desiredEnabled])
+
+    for (const plugin of this.manifests) {
+      await this.applyPluginState(plugin.id)
+    }
+  }
+
+  async applyPluginState (pluginId: string) {
+    const mode = this.getPluginMode(pluginId)
+    if (mode === 'keepEnabled') {
+      if (!this.obsidianPlugins.enabledPlugins.has(pluginId)) {
+        await this.obsidianPlugins.enablePlugin(pluginId)
+      }
+      this.removeCachedCommandsForPlugin(pluginId)
+      return
+    }
+
+    if (mode === 'lazy') {
+      await this.ensureCommandsCached(pluginId)
+      if (this.obsidianPlugins.enabledPlugins.has(pluginId)) {
+        await this.obsidianPlugins.disablePlugin(pluginId)
+      }
+      this.registerCachedCommandsForPlugin(pluginId)
+      return
+    }
+
+    if (this.obsidianPlugins.enabledPlugins.has(pluginId)) {
+      await this.obsidianPlugins.disablePlugin(pluginId)
+    }
+    this.removeCachedCommandsForPlugin(pluginId)
+  }
+
+  async writeCommunityPluginsFile (enabledPlugins: string[]) {
+    const adapter = this.app.vault.adapter
+    const path = '.obsidian/community-plugins.json'
+    const content = JSON.stringify(enabledPlugins, null, '\t')
+
+    try {
+      await adapter.write(path, content)
+    } catch (error) {
+      if (this.data?.showConsoleLog) {
+        console.error('Failed to write community-plugins.json', error)
+      }
+    }
+  }
+
+  async ensureCommandsCached (pluginId: string) {
+    if (this.pluginCommandIndex.has(pluginId)) return
+
+    const wasEnabled = this.obsidianPlugins.enabledPlugins.has(pluginId)
+    if (!wasEnabled) {
+      await this.obsidianPlugins.enablePlugin(pluginId)
+    }
+
+    this.cacheCommandsForPlugin(pluginId)
+
+    if (!wasEnabled) {
+      await this.obsidianPlugins.disablePlugin(pluginId)
+    }
+  }
+
+  registerCachedCommands () {
+    for (const plugin of this.manifests) {
+      if (this.getPluginMode(plugin.id) === 'lazy') {
+        this.registerCachedCommandsForPlugin(plugin.id)
+      }
+    }
+  }
+
+  registerCachedCommandsForPlugin (pluginId: string) {
+    const commandIds = this.pluginCommandIndex.get(pluginId)
+    if (!commandIds) return
+
+    commandIds.forEach(commandId => {
+      if (this.registeredWrappers.has(commandId)) return
+      if (this.obsidianCommands.commands[commandId]) return
+
+      const cached = this.commandCache.get(commandId)
+      if (!cached) return
+
+      this.addCommand({
+        id: cached.id,
+        name: cached.name,
+        icon: cached.icon,
+        callback: async () => {
+          await this.runLazyCommand(cached)
+        }
+      })
+
+      this.registeredWrappers.add(commandId)
+    })
+  }
+
+  removeCachedCommandsForPlugin (pluginId: string) {
+    const commandIds = this.pluginCommandIndex.get(pluginId)
+    if (!commandIds) return
+
+    commandIds.forEach(commandId => this.removeCommandWrapper(commandId))
+  }
+
+  removeCommandWrapper (commandId: string) {
+    const commands = this.obsidianCommands as unknown as { removeCommand?: (id: string) => void, commands?: Record<string, unknown> }
+    if (typeof commands.removeCommand === 'function') {
+      commands.removeCommand(commandId)
+    } else if (commands.commands && commands.commands[commandId]) {
+      delete commands.commands[commandId]
+    }
+    this.registeredWrappers.delete(commandId)
+  }
+
+  async runLazyCommand (command: CachedCommand) {
+    const isLoaded = this.obsidianPlugins.plugins?.[command.pluginId]?._loaded
+    if (!this.obsidianPlugins.enabledPlugins.has(command.pluginId) || !isLoaded) {
+      this.removeCommandWrapper(command.id)
+      await this.obsidianPlugins.enablePlugin(command.pluginId)
+      await this.waitForCommand(command.id)
+    }
+
+    await this.obsidianCommands.executeCommand(command.id)
+  }
+
+  async waitForCommand (commandId: string, timeoutMs = 5000) {
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      if (this.obsidianCommands.commands[commandId]) return
+      await this.sleep(50)
+    }
+  }
+
+  async sleep (ms: number) {
+    await new Promise(resolve => setTimeout(resolve, ms))
+  }
+
 }
