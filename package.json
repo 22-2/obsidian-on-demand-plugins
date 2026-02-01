@@ -1,7 +1,7 @@
 {
-	"name": "lazy-plugins",
+	"name": "on-demand-plugins",
 	"version": "1.0.21",
-	"description": "Load plugins with a delay on startup, so that you can get your app startup down into the sub-second loading time.",
+	"description": "Lazy load plugins by caching their commands. Plugins are enabled on-demand when triggered, reducing startup time.",
 	"main": "main.js",
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
