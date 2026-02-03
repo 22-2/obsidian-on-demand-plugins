@@ -60,6 +60,7 @@ export default class LazyPlugin extends Plugin {
 
     this.startupPolicyService = new StartupPolicyService({
       app: this.app,
+      obsidianPlugins: this.obsidianPlugins,
       getManifests: () => this.manifests,
       getPluginMode: (pluginId) => this.getPluginMode(pluginId),
       applyPluginState: (pluginId) => this.applyPluginState(pluginId),
@@ -75,6 +76,7 @@ export default class LazyPlugin extends Plugin {
       },
       ensurePluginLoaded: (pluginId) =>
         this.lazyRunner.ensurePluginLoaded(pluginId),
+      refreshCommandCache: () => this.commandCacheService.refreshCommandCache(),
     });
 
     await this.migrateSettings();
