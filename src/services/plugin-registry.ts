@@ -1,6 +1,5 @@
 import { App, Platform, PluginManifest } from "obsidian";
 import { lazyPluginId } from "../constants";
-import "obsidian-typings"
 
 export class PluginRegistry {
     manifests: PluginManifest[] = [];
