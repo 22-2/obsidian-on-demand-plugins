@@ -1,5 +1,6 @@
 import { App, Platform, PluginManifest } from "obsidian";
 import { lazyPluginId } from "../constants";
+import "obsidian-typings"
 
 export class PluginRegistry {
     manifests: PluginManifest[] = [];
@@ -12,6 +13,11 @@ export class PluginRegistry {
             enabledPlugins: Set<string>;
         },
     ) {}
+
+    getCommunityPluginsConfigFilePath(): string {
+        // @ts-expect-error
+        return this.app.vault.getConfigFile("community-plugins");
+    }
 
     updateManifests() {
         const manifests = Object.values(this.obsidianPlugins.manifests);
@@ -37,7 +43,7 @@ export class PluginRegistry {
 
     async loadEnabledPluginsFromDisk(showConsoleLog?: boolean) {
         const adapter = this.app.vault.adapter;
-        const path = ".obsidian/community-plugins.json";
+        const path = this.getCommunityPluginsConfigFilePath();
         this.enabledPluginsFromDisk.clear();
 
         try {
@@ -61,7 +67,7 @@ export class PluginRegistry {
         showConsoleLog?: boolean,
     ) {
         const adapter = this.app.vault.adapter;
-        const path = ".obsidian/community-plugins.json";
+        const path = this.getCommunityPluginsConfigFilePath();
         const content = JSON.stringify(enabledPlugins, null, "\t");
 
         try {
