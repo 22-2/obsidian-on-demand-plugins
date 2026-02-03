@@ -133,6 +133,7 @@ export default class OnDemandPlugin extends Plugin {
     async initializeLazyViewForLeaf(leaf: WorkspaceLeaf) {
         // Avoid loading lazy-on-view plugins during layout restoration.
         if (!this.app.workspace.layoutReady) return;
+        if (!leaf) return;
         if (!isLeafVisible(leaf)) return;
         // if (!checkViewIsGone(leaf)) return;
         
