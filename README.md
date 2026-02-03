@@ -1,6 +1,6 @@
-# 🦥 Lazy Loader for Obsidian
+# 🦥 Lazy Loader
 
-Lazy load plugins by caching their commands. Plugins are enabled on-demand when you trigger their commands (or open specific views), keeping Obsidian startup fast.
+Lazy load plugins by caching their commands. Plugins are enabled on-demand when you trigger their commands (or open specific views), keeping startup fast.
 
 **Important note #1**: It may take up to 2 restarts of Obsidian to see the full speed increase, if it's the first time you're using the plugin. This will only be an issue on the first install.
 
