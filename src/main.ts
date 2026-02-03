@@ -183,7 +183,7 @@ export default class OnDemandPlugin extends Plugin {
         }
     }
 
-    async onunload() {
+    onunload() {
         this.commandCacheService?.clear();
         this.lazyRunner?.clear();
         this.registry?.clear();
