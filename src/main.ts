@@ -22,6 +22,7 @@ export default class OnDemandPlugin extends Plugin {
     settings: DeviceSettings;
     device = "desktop/global";
     manifests: PluginManifest[] = [];
+    private layoutReady = false;
 
     private settingsService!: SettingsService;
     private registry!: PluginRegistry;
@@ -114,10 +115,13 @@ export default class OnDemandPlugin extends Plugin {
         this.patchSetViewState();
         this.registerActiveLeafReload();
     }
-
+    
     private registerActiveLeafReload() {
         this.registerEvent(
-            this.app.workspace.on("active-leaf-change", this.initializeLazyViewForLeaf.bind(this)),
+            this.app.workspace.on(
+                "active-leaf-change",
+                this.initializeLazyViewForLeaf.bind(this),
+            ),
         );
 
         // Initial load
@@ -127,8 +131,10 @@ export default class OnDemandPlugin extends Plugin {
     }
     
     async initializeLazyViewForLeaf(leaf: WorkspaceLeaf) {
+        // Avoid loading lazy-on-view plugins during layout restoration.
+        if (!this.app.workspace.layoutReady) return;
         if (!isLeafVisible(leaf)) return;
-        if (checkViewIsGone(leaf)) return;
+        // if (!checkViewIsGone(leaf)) return;
         
         const pluginId = this.getPluginIdForViewType(leaf.view.getViewType());
         if (!pluginId) return;
@@ -217,6 +223,7 @@ export default class OnDemandPlugin extends Plugin {
     }
     async checkViewTypeForLazyLoading(viewType: string) {
         if (!viewType) return;
+        if (!this.layoutReady) return;
 
         const lazyOnViews = this.settings.lazyOnViews || {};
         for (const [pluginId, viewTypes] of Object.entries(lazyOnViews)) {
