@@ -122,7 +122,7 @@ export default class OnDemandPlugin extends Plugin {
 
         // Initial load
         this.app.workspace.onLayoutReady(() => this.app.workspace.iterateAllLeaves((leaf) => {
-            this.initializeLazyViewForLeaf(leaf);
+            void this.initializeLazyViewForLeaf(leaf);
         }));
     }
     

@@ -1,4 +1,4 @@
-import { App, Platform, PluginManifest } from "obsidian";
+import { App, Platform, PluginManifest, normalizePath } from "obsidian";
 import log from "loglevel";
 import { ON_DEMAND_PLUGIN_ID } from "../constants";
 
@@ -17,8 +17,7 @@ export class PluginRegistry {
     ) {}
 
     getCommunityPluginsConfigFilePath(): string {
-        // @ts-expect-error
-        return this.app.vault.getConfigFile("community-plugins");
+        return normalizePath(this.app.vault.configDir + "/community-plugins.json");
     }
 
     updateManifests() {
