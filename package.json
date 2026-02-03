@@ -11,7 +11,7 @@
 		"format": "pnpm exec prettier --editorconfig --write src"
 	},
 	"keywords": [],
-	"author": "",
+    "author": "22-2",
 	"license": "MIT",
 	"dependencies": {
 		"loglevel": "^1.9.2",
