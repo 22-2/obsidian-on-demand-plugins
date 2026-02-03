@@ -95,7 +95,6 @@ export default class LazyPlugin extends Plugin {
         });
 
         await this.migrateSettings();
-        await this.setInitialPluginsConfiguration();
         this.addSettingTab(new SettingsTab(this.app, this));
 
         this.commandCacheService.loadFromData();

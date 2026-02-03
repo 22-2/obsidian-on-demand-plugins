@@ -98,6 +98,10 @@ export class SettingsTab extends PluginSettingTab {
         // but since the plugin has already been loaded, the new settings do not show up.
         await this.lazyPlugin.loadSettings();
         this.pluginSettings = this.lazyPlugin.settings.plugins;
+        
+        // Set initial configuration for any newly installed plugins
+        await this.lazyPlugin.setInitialPluginsConfiguration();
+        
         this.pendingPluginIds.clear();
 
         this.buildDom();
