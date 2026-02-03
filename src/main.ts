@@ -1,44 +1,22 @@
-import {
-  Editor,
-  MarkdownView,
-  Platform,
-  Plugin,
-  PluginManifest,
-} from "obsidian";
-import { ProgressDialog } from "./progress";
-import {
-  CommandCache,
-  DEFAULT_DEVICE_SETTINGS,
-  DEFAULT_SETTINGS,
-  DeviceSettings,
-  LazySettings,
-  PluginMode,
-  SettingsTab,
-} from "./settings";
-
-const lazyPluginId = require("../manifest.json").id;
-
-interface CachedCommand {
-  id: string;
-  name: string;
-  icon?: string;
-  pluginId: string;
-}
+import { Plugin, PluginManifest } from "obsidian";
+import { CommandCacheService } from "./services/command-cache-service";
+import { LazyCommandRunner } from "./services/lazy-command-runner";
+import { PluginRegistry } from "./services/plugin-registry";
+import { SettingsService } from "./services/settings-service";
+import { StartupPolicyService } from "./services/startup-policy-service";
+import { DeviceSettings, LazySettings, PluginMode, SettingsTab } from "./settings";
 
 export default class LazyPlugin extends Plugin {
   data: LazySettings;
   settings: DeviceSettings;
   device = "desktop/global";
-  manifests: PluginManifest[];
-  commandCache = new Map<string, CachedCommand>();
-  pluginCommandIndex = new Map<string, Set<string>>();
-  registeredWrappers = new Set<string>();
-  inFlightPlugins = new Set<string>();
-  enabledPluginsFromDisk = new Set<string>();
-  startupPolicyLock: Promise<void> | null = null;
-  startupPolicyPending = false;
-  startupPolicyDebounceTimer: number | null = null;
-  startupPolicyDebounceMs = 100;
+  manifests: PluginManifest[] = [];
+
+  private settingsService!: SettingsService;
+  private registry!: PluginRegistry;
+  private commandCacheService!: CommandCacheService;
+  private lazyRunner!: LazyCommandRunner;
+  private startupPolicyService!: StartupPolicyService;
 
   get obsidianPlugins() {
     return (this.app as unknown as { plugins: any }).plugins;
@@ -49,105 +27,79 @@ export default class LazyPlugin extends Plugin {
   }
 
   async onload() {
+    this.settingsService = new SettingsService(this);
     await this.loadSettings();
-    await this.loadEnabledPluginsFromDisk();
+
+    this.registry = new PluginRegistry(this.app, this.obsidianPlugins);
+    await this.registry.loadEnabledPluginsFromDisk(this.data.showConsoleLog);
     this.updateManifests();
+
+    this.lazyRunner = new LazyCommandRunner({
+      app: this.app,
+      obsidianCommands: this.obsidianCommands,
+      obsidianPlugins: this.obsidianPlugins,
+      getCachedCommand: (commandId) =>
+        this.commandCacheService.getCachedCommand(commandId),
+      removeCachedCommandsForPlugin: (pluginId) =>
+        this.commandCacheService.removeCachedCommandsForPlugin(pluginId),
+      getData: () => this.data,
+    });
+
+    this.commandCacheService = new CommandCacheService({
+      obsidianCommands: this.obsidianCommands,
+      obsidianPlugins: this.obsidianPlugins,
+      getManifests: () => this.manifests,
+      getPluginMode: (pluginId) => this.getPluginMode(pluginId),
+      getCommandPluginId: (commandId) => this.getCommandPluginId(commandId),
+      waitForPluginLoaded: (pluginId, timeoutMs) =>
+        this.lazyRunner.waitForPluginLoaded(pluginId, timeoutMs),
+      runLazyCommand: (commandId) => this.lazyRunner.runLazyCommand(commandId),
+      getData: () => this.data,
+      saveSettings: () => this.saveSettings(),
+    });
+
+    this.startupPolicyService = new StartupPolicyService({
+      app: this.app,
+      getManifests: () => this.manifests,
+      getPluginMode: (pluginId) => this.getPluginMode(pluginId),
+      applyPluginState: (pluginId) => this.applyPluginState(pluginId),
+      writeCommunityPluginsFile: (enabledPlugins) =>
+        this.registry.writeCommunityPluginsFile(
+          enabledPlugins,
+          this.data?.showConsoleLog,
+        ),
+    });
 
     await this.migrateSettings();
     await this.setInitialPluginsConfiguration();
     this.addSettingTab(new SettingsTab(this.app, this));
 
-    await this.loadCachedCommandsFromData();
+    this.commandCacheService.loadFromData();
     await this.initializeCommandCache();
   }
 
   async onunload() {
-    // Remove registered command wrappers
-    this.registeredWrappers.forEach((commandId) =>
-      this.removeCommandWrapper(commandId),
-    );
-    this.registeredWrappers.clear();
-
-    // Clear in-memory caches
-    this.commandCache.clear();
-    this.pluginCommandIndex.clear();
-    this.inFlightPlugins.clear();
-    this.enabledPluginsFromDisk.clear();
+    this.commandCacheService?.clear();
+    this.lazyRunner?.clear();
+    this.registry?.clear();
   }
 
   async loadSettings() {
-    this.data = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    // Object.assign only works 1 level deep, so need to clone the sub-level as well
-    this.data.desktop = Object.assign(
-      {},
-      DEFAULT_DEVICE_SETTINGS,
-      this.data.desktop,
-    );
-
-    // If user has dual mobile/desktop settings enabled
-    if (this.data.dualConfigs && Platform.isMobile) {
-      if (!this.data.mobile) {
-        // No existing configuration - copy the desktop one
-        this.data.mobile = JSON.parse(
-          JSON.stringify(this.data.desktop),
-        ) as DeviceSettings;
-      } else {
-        this.data.mobile = Object.assign(
-          {},
-          DEFAULT_DEVICE_SETTINGS,
-          this.data.mobile,
-        );
-      }
-      this.settings = this.data.mobile;
-      this.device = "mobile";
-    } else {
-      this.settings = this.data.desktop;
-      this.device = "desktop/global";
+    if (!this.settingsService) {
+      this.settingsService = new SettingsService(this);
     }
+    await this.settingsService.load();
+    this.data = this.settingsService.data;
+    this.settings = this.settingsService.settings;
+    this.device = this.settingsService.device;
   }
 
   async saveSettings() {
-    await this.saveData(this.data);
+    await this.settingsService.save();
   }
 
   async migrateSettings() {
-    let hasChanges = false;
-    const settings = this.settings as DeviceSettings & {
-      defaultKeepEnabled?: boolean;
-    };
-
-    if (!settings.plugins) {
-      settings.plugins = {};
-      hasChanges = true;
-    }
-
-    if (
-      settings.defaultMode === undefined &&
-      settings.defaultKeepEnabled !== undefined
-    ) {
-      settings.defaultMode = settings.defaultKeepEnabled
-        ? "keepEnabled"
-        : "disabled";
-      delete settings.defaultKeepEnabled;
-      hasChanges = true;
-    }
-
-    Object.entries(settings.plugins).forEach(([pluginId, pluginSettings]) => {
-      const legacy = pluginSettings as {
-        keepEnabled?: boolean;
-        mode?: PluginMode;
-      };
-      if (legacy.mode === undefined && legacy.keepEnabled !== undefined) {
-        legacy.mode = legacy.keepEnabled ? "keepEnabled" : "disabled";
-        delete legacy.keepEnabled;
-        settings.plugins[pluginId] = legacy;
-        hasChanges = true;
-      }
-    });
-
-    if (hasChanges) {
-      await this.saveSettings();
-    }
+    await this.settingsService.migrate();
   }
 
   /**
@@ -197,21 +149,8 @@ export default class LazyPlugin extends Plugin {
   }
 
   updateManifests() {
-    // Get the list of installed plugins
-    const manifests = Object.values(
-      this.obsidianPlugins.manifests,
-    ) as PluginManifest[];
-    this.manifests = manifests
-      .filter(
-        (plugin: PluginManifest) =>
-          // Filter out the Lazy Loader plugin
-          plugin.id !== lazyPluginId &&
-          // Filter out desktop-only plugins from mobile
-          !(Platform.isMobile && plugin.isDesktopOnly),
-      )
-      .sort((a: PluginManifest, b: PluginManifest) =>
-        a.name.localeCompare(b.name),
-      );
+    this.registry.updateManifests();
+    this.manifests = this.registry.manifests;
   }
 
   getPluginMode(pluginId: string): PluginMode {
@@ -230,74 +169,13 @@ export default class LazyPlugin extends Plugin {
   }
 
   isPluginEnabledOnDisk(pluginId: string): boolean {
-    return (
-      this.enabledPluginsFromDisk.has(pluginId) ||
-      this.obsidianPlugins.enabledPlugins.has(pluginId)
-    );
+    return this.registry.isPluginEnabledOnDisk(pluginId);
   }
 
   async initializeCommandCache() {
-    await this.refreshCommandCache();
+    await this.commandCacheService.refreshCommandCache();
     await this.applyStartupPolicy();
-    this.registerCachedCommands();
-  }
-
-  async refreshCommandCache() {
-    let updated = false;
-    for (const plugin of this.manifests) {
-      const mode = this.getPluginMode(plugin.id);
-      if (mode === "lazy") {
-        if (this.isCommandCacheValid(plugin.id)) continue;
-        updated = (await this.refreshCommandsForPlugin(plugin.id)) || updated;
-      }
-    }
-
-    if (updated) {
-      await this.persistCommandCache();
-    }
-  }
-
-  async refreshCommandsForPlugin(pluginId: string): Promise<boolean> {
-    const commands = await this.getCommandsForPlugin(pluginId);
-    if (!commands.length) return false;
-
-    const ids = new Set<string>();
-    commands.forEach((command) => {
-      this.commandCache.set(command.id, command);
-      ids.add(command.id);
-    });
-
-    this.pluginCommandIndex.set(pluginId, ids);
-    return true;
-  }
-
-  async getCommandsForPlugin(pluginId: string): Promise<CachedCommand[]> {
-    const wasEnabled = this.obsidianPlugins.enabledPlugins.has(pluginId);
-    if (!wasEnabled) {
-      await this.obsidianPlugins.enablePlugin(pluginId);
-    }
-
-    if (!this.obsidianPlugins.plugins?.[pluginId]?._loaded) {
-      await this.waitForPluginLoaded(pluginId);
-    }
-
-    const commands = Object.values(
-      this.obsidianCommands.commands,
-    ) as CachedCommand[];
-    const pluginCommands = commands
-      .filter((command) => this.getCommandPluginId(command.id) === pluginId)
-      .map((command) => ({
-        id: command.id,
-        name: command.name,
-        icon: command.icon,
-        pluginId,
-      }));
-
-    if (!wasEnabled && this.getPluginMode(pluginId) !== "keepEnabled") {
-      await this.obsidianPlugins.disablePlugin(pluginId);
-    }
-
-    return pluginCommands;
+    this.commandCacheService.registerCachedCommands();
   }
 
   getCommandPluginId(commandId: string): string | null {
@@ -308,73 +186,7 @@ export default class LazyPlugin extends Plugin {
   }
 
   async applyStartupPolicy(showProgress = false) {
-    if (this.startupPolicyLock) {
-      this.startupPolicyPending = true;
-      await this.startupPolicyLock;
-      if (this.startupPolicyPending) {
-        this.startupPolicyPending = false;
-        await this.applyStartupPolicy(showProgress);
-      }
-      return;
-    }
-
-    const run = async () => {
-      if (this.startupPolicyDebounceTimer) {
-        window.clearTimeout(this.startupPolicyDebounceTimer);
-      }
-
-      await new Promise<void>((resolve) => {
-        this.startupPolicyDebounceTimer = window.setTimeout(() => {
-          this.startupPolicyDebounceTimer = null;
-          resolve();
-        }, this.startupPolicyDebounceMs);
-      });
-
-      const desiredEnabled = new Set<string>();
-      this.manifests.forEach((plugin) => {
-        if (this.getPluginMode(plugin.id) === "keepEnabled") {
-          desiredEnabled.add(plugin.id);
-        }
-      });
-      desiredEnabled.add(lazyPluginId);
-
-      await this.writeCommunityPluginsFile(
-        [...desiredEnabled].sort((a, b) => a.localeCompare(b)),
-      );
-
-      let progress: ProgressDialog | null = null;
-      if (showProgress) {
-        progress = new ProgressDialog(this.app, {
-          title: "Applying plugin startup policy",
-          total: this.manifests.length,
-        });
-        progress.open();
-      }
-
-      try {
-        let index = 0;
-        for (const plugin of this.manifests) {
-          index += 1;
-          progress?.setStatus(`Applying ${plugin.name}`);
-          progress?.setProgress(index);
-          await this.applyPluginState(plugin.id);
-        }
-      } finally {
-        progress?.close();
-      }
-    };
-
-    this.startupPolicyLock = run();
-    try {
-      await this.startupPolicyLock;
-    } finally {
-      this.startupPolicyLock = null;
-    }
-
-    if (this.startupPolicyPending) {
-      this.startupPolicyPending = false;
-      await this.applyStartupPolicy(showProgress);
-    }
+    await this.startupPolicyService.apply(showProgress);
   }
 
   async applyPluginState(pluginId: string) {
@@ -382,353 +194,24 @@ export default class LazyPlugin extends Plugin {
     if (mode === "keepEnabled") {
       if (!this.obsidianPlugins.enabledPlugins.has(pluginId)) {
         await this.obsidianPlugins.enablePlugin(pluginId);
-        await this.waitForPluginLoaded(pluginId);
+        await this.lazyRunner.waitForPluginLoaded(pluginId);
       }
-      this.removeCachedCommandsForPlugin(pluginId);
+      this.commandCacheService.removeCachedCommandsForPlugin(pluginId);
       return;
     }
 
     if (mode === "lazy") {
-      await this.ensureCommandsCached(pluginId);
+      await this.commandCacheService.ensureCommandsCached(pluginId);
       if (this.obsidianPlugins.enabledPlugins.has(pluginId)) {
         await this.obsidianPlugins.disablePlugin(pluginId);
       }
-      this.registerCachedCommandsForPlugin(pluginId);
+      this.commandCacheService.registerCachedCommandsForPlugin(pluginId);
       return;
     }
 
     if (this.obsidianPlugins.enabledPlugins.has(pluginId)) {
       await this.obsidianPlugins.disablePlugin(pluginId);
     }
-    this.removeCachedCommandsForPlugin(pluginId);
-  }
-
-  async writeCommunityPluginsFile(enabledPlugins: string[]) {
-    const adapter = this.app.vault.adapter;
-    const path = ".obsidian/community-plugins.json";
-    const content = JSON.stringify(enabledPlugins, null, "\t");
-
-    try {
-      await adapter.write(path, content);
-    } catch (error) {
-      if (this.data?.showConsoleLog) {
-        console.error("Failed to write community-plugins.json", error);
-      }
-    }
-  }
-
-  async ensureCommandsCached(pluginId: string) {
-    if (this.isCommandCacheValid(pluginId)) return;
-    await this.refreshCommandsForPlugin(pluginId);
-    await this.persistCommandCache();
-  }
-
-  registerCachedCommands() {
-    for (const plugin of this.manifests) {
-      if (this.getPluginMode(plugin.id) === "lazy") {
-        this.registerCachedCommandsForPlugin(plugin.id);
-      }
-    }
-  }
-
-  registerCachedCommandsForPlugin(pluginId: string) {
-    const commandIds = this.pluginCommandIndex.get(pluginId);
-    if (!commandIds) return;
-
-    commandIds.forEach((commandId) => {
-      if (this.registeredWrappers.has(commandId)) return;
-      if (this.obsidianCommands.commands[commandId]) return;
-
-      const cached = this.commandCache.get(commandId);
-      if (!cached) return;
-
-      const cmd = {
-        id: commandId,
-        name: cached.name,
-        icon: cached.icon,
-        callback: async () => {
-          await this.runLazyCommand(commandId);
-        },
-      };
-
-      this.obsidianCommands.addCommand(cmd);
-      this.registeredWrappers.add(commandId);
-    });
-  }
-
-  removeCachedCommandsForPlugin(pluginId: string) {
-    const commandIds = this.pluginCommandIndex.get(pluginId);
-    if (!commandIds) return;
-
-    commandIds.forEach((commandId) => this.removeCommandWrapper(commandId));
-  }
-
-  removeCommandWrapper(commandId: string) {
-    const commands = this.obsidianCommands as unknown as {
-      removeCommand?: (id: string) => void;
-      commands?: Record<string, unknown>;
-    };
-    if (typeof commands.removeCommand === "function") {
-      commands.removeCommand(commandId);
-    } else if (commands.commands && commands.commands[commandId]) {
-      delete commands.commands[commandId];
-    }
-    this.registeredWrappers.delete(commandId);
-  }
-
-  async runLazyCommand(commandId: string) {
-    const cached = this.commandCache.get(commandId);
-    if (!cached) return;
-
-    if (this.inFlightPlugins.has(cached.pluginId)) return;
-    this.inFlightPlugins.add(cached.pluginId);
-
-    try {
-      const isLoaded = this.obsidianPlugins.plugins?.[cached.pluginId]?._loaded;
-      if (
-        !this.obsidianPlugins.enabledPlugins.has(cached.pluginId) ||
-        !isLoaded
-      ) {
-        this.removeCachedCommandsForPlugin(cached.pluginId);
-        await this.obsidianPlugins.enablePlugin(cached.pluginId);
-        const loaded = await this.waitForPluginLoaded(cached.pluginId);
-        if (!loaded) return;
-        const ready = await this.waitForCommand(cached.id);
-        if (!ready) return;
-      }
-
-      if (this.data.showConsoleLog) {
-        console.log(`Executing lazy command: ${cached.id}`);
-      }
-
-      await new Promise<void>((resolve) => {
-        queueMicrotask(() => {
-          this.executeCommandDirect(cached.id);
-          resolve();
-        });
-      });
-    } catch (error) {
-      if (this.data.showConsoleLog) {
-        console.error(`Error executing lazy command ${commandId}:`, error);
-      }
-    } finally {
-      this.inFlightPlugins.delete(cached.pluginId);
-    }
-  }
-
-  async waitForCommand(commandId: string, timeoutMs = 8000): Promise<boolean> {
-    if (this.isCommandExecutable(commandId)) return true;
-
-    return await new Promise<boolean>((resolve) => {
-      const viewRegistry = (this.app as unknown as { viewRegistry?: any })
-        .viewRegistry;
-      let done = false;
-
-      const cleanup = () => {
-        if (done) return;
-        done = true;
-        if (viewRegistry?.off) viewRegistry.off("view-registered", onEvent);
-        if (this.app.workspace?.off)
-          this.app.workspace.off("layout-change", onEvent);
-        if (timeoutId) window.clearTimeout(timeoutId);
-      };
-
-      const onEvent = () => {
-        if (this.isCommandExecutable(commandId)) {
-          cleanup();
-          resolve(true);
-        }
-      };
-
-      if (viewRegistry?.on) viewRegistry.on("view-registered", onEvent);
-      if (this.app.workspace?.on)
-        this.app.workspace.on("layout-change", onEvent);
-
-      queueMicrotask(onEvent);
-
-      const timeoutId = window.setTimeout(() => {
-        cleanup();
-        resolve(false);
-      }, timeoutMs);
-    });
-  }
-
-  async waitForPluginLoaded(
-    pluginId: string,
-    timeoutMs = 8000,
-  ): Promise<boolean> {
-    const isLoaded = () =>
-      Boolean(this.obsidianPlugins.plugins?.[pluginId]?._loaded);
-    if (isLoaded()) return true;
-
-    return await new Promise<boolean>((resolve) => {
-      const startedAt = Date.now();
-      let timeoutId: number | null = null;
-
-      const check = () => {
-        if (isLoaded()) {
-          if (timeoutId) window.clearTimeout(timeoutId);
-          resolve(true);
-          return;
-        }
-        if (Date.now() - startedAt >= timeoutMs) {
-          resolve(false);
-          return;
-        }
-        timeoutId = window.setTimeout(check, 100);
-      };
-
-      check();
-    });
-  }
-
-  executeCommandDirect(commandId: string): boolean {
-    const command = this.obsidianCommands.commands[commandId] as
-      | {
-          callback?: () => void;
-          checkCallback?: (checking: boolean) => boolean | void;
-          editorCallback?: (editor: Editor, ctx?: unknown) => void;
-          editorCheckCallback?: (
-            checking: boolean,
-            editor: Editor,
-            ctx?: unknown,
-          ) => boolean | void;
-        }
-      | undefined;
-
-    if (!command) return false;
-
-    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
-    const editor = view?.editor;
-    const file = view?.file;
-
-    if (editor && typeof command.editorCheckCallback === "function") {
-      const ok = command.editorCheckCallback(true, editor, file);
-      if (ok === false) return false;
-      command.editorCheckCallback(false, editor, file);
-      return true;
-    }
-
-    if (editor && typeof command.editorCallback === "function") {
-      command.editorCallback(editor, file);
-      return true;
-    }
-
-    if (typeof command.checkCallback === "function") {
-      const ok = command.checkCallback(true);
-      if (ok === false) return false;
-      command.checkCallback(false);
-      return true;
-    }
-
-    if (typeof command.callback === "function") {
-      command.callback();
-      return true;
-    }
-
-    return false;
-  }
-
-  isCommandExecutable(commandId: string): boolean {
-    const command = this.obsidianCommands.commands[commandId] as
-      | {
-          callback?: () => void;
-          checkCallback?: (checking: boolean) => boolean | void;
-          editorCallback?: (editor: Editor, ctx?: unknown) => void;
-          editorCheckCallback?: (
-            checking: boolean,
-            editor: Editor,
-            ctx?: unknown,
-          ) => boolean | void;
-        }
-      | undefined;
-
-    if (!command) return false;
-
-    return (
-      typeof command.callback === "function" ||
-      typeof command.checkCallback === "function" ||
-      typeof command.editorCallback === "function" ||
-      typeof command.editorCheckCallback === "function"
-    );
-  }
-
-  async loadCachedCommandsFromData() {
-    if (!this.data.commandCache) return;
-
-    this.commandCache.clear();
-    this.pluginCommandIndex.clear();
-
-    Object.entries(this.data.commandCache).forEach(([pluginId, commands]) => {
-      const ids = new Set<string>();
-      commands.forEach((command) => {
-        const cached: CachedCommand = {
-          id: command.id,
-          name: command.name,
-          icon: command.icon,
-          pluginId,
-        };
-        this.commandCache.set(cached.id, cached);
-        ids.add(cached.id);
-      });
-      this.pluginCommandIndex.set(pluginId, ids);
-    });
-  }
-
-  async loadEnabledPluginsFromDisk() {
-    const adapter = this.app.vault.adapter;
-    const path = ".obsidian/community-plugins.json";
-    this.enabledPluginsFromDisk.clear();
-
-    try {
-      const raw = await adapter.read(path);
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        parsed.forEach((id) => {
-          if (typeof id === "string") this.enabledPluginsFromDisk.add(id);
-        });
-      }
-    } catch (error) {
-      if (this.data?.showConsoleLog) {
-        console.warn("Failed to read community-plugins.json", error);
-      }
-    }
-  }
-
-  async persistCommandCache() {
-    const cache: CommandCache = {};
-    const versions: Record<string, string> = {};
-    this.manifests.forEach((plugin) => {
-      const commands = Array.from(this.commandCache.values())
-        .filter((command) => command.pluginId === plugin.id)
-        .map((command) => ({
-          id: command.id,
-          name: command.name,
-          icon: command.icon,
-        }));
-      if (commands.length) {
-        cache[plugin.id] = commands;
-        versions[plugin.id] = plugin.version ?? "";
-      }
-    });
-
-    this.data.commandCache = cache;
-    this.data.commandCacheVersions = versions;
-    this.data.commandCacheUpdatedAt = Date.now();
-    await this.saveSettings();
-  }
-
-  isCommandCacheValid(pluginId: string): boolean {
-    if (!this.pluginCommandIndex.has(pluginId)) return false;
-    const cached = this.data.commandCache?.[pluginId];
-    if (!Array.isArray(cached) || cached.length === 0) return false;
-
-    const manifest = this.manifests.find((plugin) => plugin.id === pluginId);
-    if (!manifest) return false;
-
-    const cachedVersion = this.data.commandCacheVersions?.[pluginId];
-    if (!cachedVersion) return false;
-
-    return cachedVersion === (manifest.version ?? "");
+    this.commandCacheService.removeCachedCommandsForPlugin(pluginId);
   }
 }
