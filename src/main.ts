@@ -6,6 +6,7 @@ import { PluginRegistry } from "./services/plugin-registry";
 import { SettingsService } from "./services/settings-service";
 import { StartupPolicyService } from "./services/startup-policy-service";
 import { DeviceSettings, LazySettings, PluginMode, SettingsTab } from "./settings";
+import { Commands, Plugins } from "obsidian-typings"
 
 export default class LazyPlugin extends Plugin {
   data: LazySettings;
@@ -20,11 +21,12 @@ export default class LazyPlugin extends Plugin {
   private startupPolicyService!: StartupPolicyService;
 
   get obsidianPlugins() {
-    return (this.app as unknown as { plugins: any }).plugins;
+    // return (this.app as unknown as { plugins: any }).plugins;
+    return (this.app as unknown as { plugins: Plugins }).plugins;
   }
 
   get obsidianCommands() {
-    return (this.app as unknown as { commands: any }).commands;
+    return (this.app as unknown as { commands: Commands }).commands;
   }
 
   async onload() {
@@ -85,10 +87,8 @@ export default class LazyPlugin extends Plugin {
     this.addSettingTab(new SettingsTab(this.app, this));
 
     this.commandCacheService.loadFromData();
-
-    // DO NOT CALL THIS HERE TO AVOID UNINTENDED BEHAVIOR ON STARTUP
-    // await this.initializeCommandCache();
-
+    this.patchPluginEnableDisable();
+    await this.initializeCommandCache();
     this.patchSetViewState();
   }
 
@@ -108,6 +108,36 @@ export default class LazyPlugin extends Plugin {
     );
   }
 
+  private patchPluginEnableDisable() {
+    const plugin = this;
+    const target = this.obsidianPlugins;
+
+    this.register(
+      around(target, {
+        enablePlugin: (next) =>
+          async function (this: Plugins, pluginId: string) {
+            plugin.commandCacheService.removeCachedCommandsForPlugin(pluginId);
+            return await next.call(this, pluginId);
+          },
+        disablePlugin:
+          (next) =>
+                async function (this: Plugins, pluginId: string) {
+                  const result = await next.call(this, pluginId);
+                  const mode = plugin.getPluginMode(pluginId);
+                  if (mode === "lazy" || mode === "lazyWithView") {
+                    await plugin.commandCacheService.ensureCommandsCached(
+                      pluginId,
+                    );
+                    plugin.commandCacheService.registerCachedCommandsForPlugin(
+                      pluginId,
+                    );
+                  }
+                  return result;
+                }
+            ,
+      })
+    );
+  }
   async checkViewTypeForLazyLoading(viewType: string) {
     if (!viewType) return;
 
