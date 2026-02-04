@@ -17,6 +17,9 @@
 	"keywords": [],
 	"author": "22-2",
 	"license": "MIT",
+    "pnpm": {
+        "onlyBuiltDependencies": ["electron"]
+    },
 	"dependencies": {
 		"loglevel": "^1.9.2",
 		"monkey-around": "^3.0.0",
