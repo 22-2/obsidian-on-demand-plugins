@@ -228,19 +228,16 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc("Force a rebuild of the cached commands for lazy plugins.")
             .addButton((button) => {
                 button.setButtonText("Rebuild cache");
-                button
-                button.onClick(() => {
-                    void (async () => {
+                button.onClick(async () => {
                         button.setDisabled(true);
                         try {
-                            await this.plugin.initializeCommandCache(true);
+                            await this.plugin.initializeCommandCache({ force: true });
                         } catch (e) {
                             new Notice("Failed to rebuild command cache");
                             logger.error(e);
                         } finally {
                             button.setDisabled(false);
                         }
-                    })();
                 });
             });
 

@@ -233,9 +233,10 @@ export default class OnDemandPlugin extends Plugin {
         return this.registry.isPluginEnabledOnDisk(pluginId);
     }
 
-    async initializeCommandCache(force = false) {
+    async initializeCommandCache(options?: { force?: boolean }) {
+        const force = options?.force ?? false;
         await this.commandCacheService.refreshCommandCache(undefined, force);
-        await this.applyStartupPolicy(force);
+        await this.applyStartupPolicy(true);
         this.commandCacheService.registerCachedCommands();
     }
 
@@ -250,9 +251,10 @@ export default class OnDemandPlugin extends Plugin {
             ) => void;
         },
     ) {
+        const force = options?.force ?? false;
         await this.commandCacheService.refreshCommandCache(
             pluginIds,
-            options?.force ?? false,
+            force,
             options?.onProgress,
         );
         this.commandCacheService.registerCachedCommands();

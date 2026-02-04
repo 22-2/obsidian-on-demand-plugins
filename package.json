@@ -11,9 +11,10 @@
 		"format": "pnpm exec prettier --editorconfig --write src"
 	},
 	"keywords": [],
-    "author": "22-2",
+	"author": "22-2",
 	"license": "MIT",
 	"dependencies": {
+		"es-toolkit": "^1.44.0",
 		"loglevel": "^1.9.2",
 		"monkey-around": "^3.0.0"
 	},

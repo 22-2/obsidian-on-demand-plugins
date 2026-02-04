@@ -1,3 +1,4 @@
+import { forEachAsync } from "es-toolkit";
 import { PluginManifest } from "obsidian";
 import { CommandCache, LazySettings, PluginMode } from "../settings";
 
@@ -77,36 +78,40 @@ export class CommandCacheService {
         force = false,
         onProgress?: (current: number, total: number, plugin: PluginManifest) => void,
     ) {
-        const targetManifests = this.getTargetManifests(pluginIds);
-        const lazyManifests = targetManifests.filter((plugin) =>
-            this.isLazyMode(plugin.id),
-        );
-        const total = lazyManifests.length;
-        let updated = false;
-
-        for (let index = 0; index < lazyManifests.length; index += 1) {
-            const plugin = lazyManifests[index];
-            const current = index + 1;
-            if (!force && this.isCommandCacheValid(plugin.id)) {
-                onProgress?.(current, total, plugin);
-                continue;
-            }
-
-            updated =
-                (await this.refreshCommandsForPlugin(plugin.id)) || updated;
-            onProgress?.(current, total, plugin);
+        let lazyManifests = this.getLazyManifests();
+        if (pluginIds?.length) {
+            lazyManifests = lazyManifests.filter((plugin) =>
+                pluginIds.includes(plugin.id),
+            );
         }
+        
+        const pluginsToRefresh = force 
+            ? lazyManifests 
+            : lazyManifests.filter((plugin) => !this.isCommandCacheValid(plugin.id)
+            );
 
-        if (updated) await this.persistCommandCache();
+        const total = lazyManifests.length;
+        let hasChanges = false;
+
+        await forEachAsync(pluginsToRefresh, async (plugin, index) => {
+            const current = lazyManifests.indexOf(plugin) + 1;
+            const result = await this.refreshCommandsForPlugin(plugin.id);
+            onProgress?.(current, total, plugin);
+            if (result) hasChanges = true;
+        });
+
+        if (hasChanges) {
+            await this.persistCommandCache();
+        }
     }
 
-    private getTargetManifests(pluginIds?: string[]) {
-        const manifests = this.deps.getManifests();
-        const targetPluginIds =
-            pluginIds && pluginIds.length > 0 ? new Set(pluginIds) : null;
-        return targetPluginIds
-            ? manifests.filter((plugin) => targetPluginIds.has(plugin.id))
-            : manifests;
+    /**
+     * Return only manifests whose mode is `lazy` or `lazyOnView`.
+     */
+    private getLazyManifests() {
+        return this.deps
+            .getManifests()
+            .filter((plugin) => this.isLazyMode(plugin.id));
     }
 
     private isLazyMode(pluginId: string) {
@@ -154,12 +159,9 @@ export class CommandCacheService {
                 pluginId,
             }));
 
-        if (
-            !wasEnabled &&
-            this.deps.getPluginMode(pluginId) !== "keepEnabled"
-        ) {
-            await this.deps.obsidianPlugins.disablePlugin(pluginId);
-        }
+        // Do not disable here. We want to keep plugins enabled during cache rebuild
+        // and rely on startup policy (community-plugins.json + reload) to apply
+        // lazy states afterward.
 
         return pluginCommands;
     }
