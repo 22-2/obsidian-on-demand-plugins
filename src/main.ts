@@ -130,7 +130,7 @@ export default class OnDemandPlugin extends Plugin {
             commandCacheService: this.commandCacheService,
         });
         // DO NOT CALL THIS HERE TO AVOID UNINTENDED BEHAVIOR ON STARTUP
-        // await this.initializeCommandCache();
+        // await this.rebuildAndApplyCommandCache();
         patchSetViewState({
             register: this.register.bind(this),
             onViewType: (viewType) =>
@@ -234,11 +234,11 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     /**
-     * Initialize the command cache for all lazy plugins and apply startup policy.
+     * Rebuild the command cache for all lazy plugins and apply startup policy.
      * @param options - Optional configuration
      * @param options.force - Force refresh cache even if valid
      */
-    async initializeCommandCache(options?: { force?: boolean }) {
+    async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
         const force = options?.force ?? false;
         await this.commandCacheService.refreshCommandCache(undefined, force);
         await this.applyStartupPolicy();
