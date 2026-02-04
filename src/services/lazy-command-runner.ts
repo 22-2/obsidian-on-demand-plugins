@@ -1,4 +1,4 @@
-import { App, Editor, MarkdownView } from "obsidian";
+import { App, Editor, MarkdownView, Command } from "obsidian";
 import log from "loglevel";
 import { LazySettings } from "../settings";
 import { CachedCommand } from "./command-cache-service";
@@ -158,6 +158,12 @@ export class LazyCommandRunner {
         });
     }
 
+    /**
+     * Execute a command by invoking its registered callback function.
+     * Attempts to call the most appropriate callback (editorCheckCallback, editorCallback, checkCallback, or callback) based on available context.
+     * @param commandId - The command ID to execute
+     * @returns True if the command was executed successfully, false otherwise
+     */
     executeCommandDirect(commandId: string): boolean {
         const command = this.deps.obsidianCommands.commands[commandId] as
             | {
