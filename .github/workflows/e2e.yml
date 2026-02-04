@@ -60,14 +60,27 @@ jobs:
               run: pnpm exec playwright install
               shell: pwsh
 
-            - name: Ensure toolkit Obsidian is installed
+            - name: Ensure toolkit Obsidian is installed (Unix)
+              if: matrix.os != 'windows-latest'
               run: |
-                  # remove previous unpack (avoid stale/corrupt artifacts)
-                  rm -rf "${{ github.workspace }}/.obsidian-e2e-toolkit"
-                  # run toolkit setup which downloads & unpacks Obsidian
-                  node "${{ github.workspace }}/node_modules/obsidian-e2e-toolkit/scripts/setup.mjs"
+                # remove previous unpack (avoid stale/corrupt artifacts)
+                rm -rf "${{ github.workspace }}/.obsidian-e2e-toolkit"
+                # run toolkit setup which downloads & unpacks Obsidian
+                node "${{ github.workspace }}/node_modules/obsidian-e2e-toolkit/scripts/setup.mjs"
               env:
-                  OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
+                OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
+              shell: bash
+
+            - name: Ensure toolkit Obsidian is installed (Windows)
+              if: matrix.os == 'windows-latest'
+              run: |
+                # remove previous unpack (avoid stale/corrupt artifacts)
+                if (Test-Path "$env:GITHUB_WORKSPACE\.obsidian-e2e-toolkit") { Remove-Item -LiteralPath "$env:GITHUB_WORKSPACE\.obsidian-e2e-toolkit" -Recurse -Force }
+                # run toolkit setup which downloads & unpacks Obsidian
+                node "$env:GITHUB_WORKSPACE\node_modules\obsidian-e2e-toolkit\scripts\setup.mjs"
+              env:
+                OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
+              shell: pwsh
 
             - name: Run E2E tests
               env:
