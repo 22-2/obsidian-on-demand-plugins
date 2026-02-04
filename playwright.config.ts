@@ -9,6 +9,7 @@ export default defineConfig({
     headless: true,
     trace: 'on-first-retry',
   },
+  globalSetup: './tests/global-setup.mjs',
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
