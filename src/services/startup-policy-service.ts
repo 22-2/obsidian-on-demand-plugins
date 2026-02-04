@@ -2,6 +2,7 @@ import { App, PluginManifest } from "obsidian";
 import log from "loglevel";
 import { ProgressDialog } from "../utils/progress";
 import { ON_DEMAND_PLUGIN_ID } from "../utils/constants";
+import { isPluginLoaded, isPluginEnabled } from "../utils/utils";
 import { PluginMode } from "../settings";
 import { Commands, Plugins } from "obsidian-typings";
 
@@ -215,12 +216,16 @@ export class StartupPolicyService {
             progress?.setStatus(`Loading ${plugin.name}`);
             progress?.setProgress(index + 1);
 
-            const isLoaded =
-                this.deps.obsidianPlugins.plugins?.[plugin.id]?._loaded;
-            const isEnabled =
-                this.deps.obsidianPlugins.enabledPlugins.has(plugin.id);
+            const loaded = isPluginLoaded(
+                this.deps.obsidianPlugins.plugins,
+                plugin.id,
+            );
+            const enabled = isPluginEnabled(
+                this.deps.obsidianPlugins.enabledPlugins,
+                plugin.id,
+            );
 
-            if (!isEnabled || !isLoaded) {
+            if (!enabled || !loaded) {
                 try {
                     await this.deps.obsidianPlugins.enablePlugin(plugin.id);
                 } catch (error) {
@@ -290,6 +295,12 @@ export class StartupPolicyService {
         progress?.close();
     }
 
+    /**
+     * Wait for specified plugins to fully load with timeout.
+     * @param pluginIds - List of plugin IDs to wait for
+     * @param timeoutMs - Maximum time to wait in milliseconds
+     * @returns True if all plugins loaded within timeout, false otherwise
+     */
     private async waitForAllPluginsLoaded(
         pluginIds: string[],
         timeoutMs: number,
@@ -297,17 +308,23 @@ export class StartupPolicyService {
         if (!pluginIds.length) return true;
 
         const startedAt = Date.now();
-        const isLoaded = (pluginId: string) =>
-            Boolean(this.deps.obsidianPlugins.plugins?.[pluginId]?._loaded);
 
         while (true) {
-            if (pluginIds.every((pluginId) => isLoaded(pluginId))) {
+            if (
+                pluginIds.every((pluginId) =>
+                    isPluginLoaded(
+                        this.deps.obsidianPlugins.plugins,
+                        pluginId,
+                    ),
+                )
+            ) {
                 return true;
             }
             if (Date.now() - startedAt >= timeoutMs) {
                 return false;
             }
 
+            // Sleep for a short duration before checking again
             await sleep(100);
         }
     }

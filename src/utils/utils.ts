@@ -29,3 +29,17 @@ export function checkViewIsGone(leaf: WorkspaceLeaf): boolean {
     return !!(leaf as unknown as { emptyStateEl: HTMLElement; }).emptyStateEl && (leaf.view as unknown as { viewType: string; }).viewType !== "empty";
 }
 
+export function isPluginLoaded(
+    plugins: Record<string, { _loaded?: boolean }> | undefined,
+    pluginId: string,
+): boolean {
+    return Boolean(plugins?.[pluginId]?._loaded);
+}
+
+export function isPluginEnabled(
+    enabledPlugins: Set<string>,
+    pluginId: string,
+): boolean {
+    return enabledPlugins.has(pluginId);
+}
+

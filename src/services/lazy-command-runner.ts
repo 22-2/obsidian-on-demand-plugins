@@ -2,8 +2,7 @@ import { App, Editor, MarkdownView, Command } from "obsidian";
 import log from "loglevel";
 import { LazySettings } from "../settings";
 import { CachedCommand } from "./command-cache-service";
-import { ViewRegistry } from "obsidian-typings";
-
+import { ViewRegistry } from "obsidian-typings";import { isPluginLoaded, isPluginEnabled } from "../utils/utils";
 const logger = log.getLogger("OnDemandPlugin/LazyCommandRunner");
 
 interface LazyCommandRunnerDeps {
@@ -65,12 +64,15 @@ export class LazyCommandRunner {
         this.inFlightPlugins.add(pluginId);
 
         try {
-            const isLoaded =
-                this.deps.obsidianPlugins.plugins?.[pluginId]?._loaded;
-            if (
-                !this.deps.obsidianPlugins.enabledPlugins.has(pluginId) ||
-                !isLoaded
-            ) {
+            const loaded = isPluginLoaded(
+                this.deps.obsidianPlugins.plugins,
+                pluginId,
+            );
+            const enabled = isPluginEnabled(
+                this.deps.obsidianPlugins.enabledPlugins,
+                pluginId,
+            );
+            if (!enabled || !loaded) {
                 await this.deps.obsidianPlugins.enablePlugin(pluginId);
                 const loaded = await this.waitForPluginLoaded(pluginId);
                 if (!loaded) return false;
@@ -133,16 +135,17 @@ export class LazyCommandRunner {
         pluginId: string,
         timeoutMs = 8000,
     ): Promise<boolean> {
-        const isLoaded = () =>
-            Boolean(this.deps.obsidianPlugins.plugins?.[pluginId]?._loaded);
-        if (isLoaded()) return true;
+        const startedAt = Date.now();
+        let timeoutId: number | null = null;
 
         return await new Promise<boolean>((resolve) => {
-            const startedAt = Date.now();
-            let timeoutId: number | null = null;
-
             const check = () => {
-                if (isLoaded()) {
+                if (
+                    isPluginLoaded(
+                        this.deps.obsidianPlugins.plugins,
+                        pluginId,
+                    )
+                ) {
                     if (timeoutId) window.clearTimeout(timeoutId);
                     resolve(true);
                     return;

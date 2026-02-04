@@ -1,6 +1,7 @@
 import { forEachAsync } from "es-toolkit";
 import { PluginManifest } from "obsidian";
 import { CommandCache, LazySettings, PluginMode } from "../settings";
+import { isPluginLoaded } from "../utils/utils";
 
 export interface CachedCommand {
     id: string;
@@ -146,7 +147,7 @@ export class CommandCacheService {
             await this.deps.obsidianPlugins.enablePlugin(pluginId);
         }
 
-        if (!this.deps.obsidianPlugins.plugins?.[pluginId]?._loaded) {
+        if (!isPluginLoaded(this.deps.obsidianPlugins.plugins, pluginId)) {
             await this.deps.waitForPluginLoaded(pluginId);
         }
 
