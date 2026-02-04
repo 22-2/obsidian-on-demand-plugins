@@ -15,28 +15,32 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '23.x'
           cache: 'pnpm'
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - name: Setup pnpm (action)
+        uses: pnpm/action-setup@v4
         with:
           version: '8'
 
-      - name: Verify pnpm
-        run: pnpm -v
-        shell: bash
+      - name: Ensure pnpm (Unix)
         if: matrix.os != 'windows-latest'
+        run: |
+          npm install -g pnpm@10 || corepack prepare pnpm@10 --activate
+          pnpm -v
+        shell: bash
 
-      - name: Verify pnpm (Windows)
-        run: pnpm -v
-        shell: pwsh
+      - name: Ensure pnpm (Windows)
         if: matrix.os == 'windows-latest'
+        run: |
+          npm install -g pnpm@8 -s;
+          pnpm -v
+        shell: pwsh
 
       - name: Install dependencies
         run: pnpm install
