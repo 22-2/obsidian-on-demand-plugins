@@ -1,6 +1,10 @@
 import path from "node:path";
 import { test, expect } from "obsidian-e2e-toolkit";
 
+import { fileURLToPath } from "url"
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 test.use({
     vaultOptions: {
         fresh: true,
