@@ -8,6 +8,7 @@ import {
 } from "obsidian";
 import OnDemandPlugin from "./main";
 import log from "loglevel";
+import { ProgressDialog } from "./progress";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsTab");
 

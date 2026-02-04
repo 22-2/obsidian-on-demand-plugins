@@ -239,6 +239,25 @@ export default class OnDemandPlugin extends Plugin {
         this.commandCacheService.registerCachedCommands();
     }
 
+    async rebuildCommandCache(
+        pluginIds: string[],
+        options?: {
+            force?: boolean;
+            onProgress?: (
+                current: number,
+                total: number,
+                plugin: PluginManifest,
+            ) => void;
+        },
+    ) {
+        await this.commandCacheService.refreshCommandCache(
+            pluginIds,
+            options?.force ?? false,
+            options?.onProgress,
+        );
+        this.commandCacheService.registerCachedCommands();
+    }
+
     getCommandPluginId(commandId: string): string | null {
         const [prefix] = commandId.split(":");
         return this.manifests.some((plugin) => plugin.id === prefix)

@@ -72,7 +72,11 @@ export class CommandCacheService {
         });
     }
 
-    async refreshCommandCache(pluginIds?: string[], force = false) {
+    async refreshCommandCache(
+        pluginIds?: string[],
+        force = false,
+        onProgress?: (current: number, total: number, plugin: PluginManifest) => void,
+    ) {
         let updated = false;
         const manifests = this.deps.getManifests();
         const targetPluginIds =
@@ -80,13 +84,23 @@ export class CommandCacheService {
         const targetManifests = targetPluginIds
             ? manifests.filter((plugin) => targetPluginIds.has(plugin.id))
             : manifests;
-        for (const plugin of targetManifests) {
+        const lazyManifests = targetManifests.filter((plugin) => {
             const mode = this.deps.getPluginMode(plugin.id);
-            if (mode === "lazy" || mode === "lazyOnView") {
-                if (!force && this.isCommandCacheValid(plugin.id)) continue;
-                updated =
-                    (await this.refreshCommandsForPlugin(plugin.id)) || updated;
+            return mode === "lazy" || mode === "lazyOnView";
+        });
+        const total = lazyManifests.length;
+        let current = 0;
+
+        for (const plugin of lazyManifests) {
+            if (!force && this.isCommandCacheValid(plugin.id)) {
+                current += 1;
+                onProgress?.(current, total, plugin);
+                continue;
             }
+            updated =
+                (await this.refreshCommandsForPlugin(plugin.id)) || updated;
+            current += 1;
+            onProgress?.(current, total, plugin);
         }
 
         if (updated) {
