@@ -25,6 +25,10 @@ interface StartupPolicyDeps {
     refreshCommandCache: (pluginIds?: string[]) => Promise<void>;
 }
 
+/**
+ * Manages plugin startup policies and lifecycle.
+ * Handles lazy loading, view-based loading, and persistent plugin states with progress UI and cancellation support.
+ */
 export class StartupPolicyService {
     private startupPolicyLock: Promise<void> | null = null;
     private startupPolicyPending = false;
@@ -48,7 +52,7 @@ export class StartupPolicyService {
             return;
         }
 
-        this.startupPolicyLock = this.runApply(pluginIds);
+        this.startupPolicyLock = this.executeStartupPolicy(pluginIds);
         try {
             await this.startupPolicyLock;
         } finally {
@@ -61,7 +65,7 @@ export class StartupPolicyService {
         }
     }
 
-    private async runApply(pluginIds?: string[]) {
+    private async executeStartupPolicy(pluginIds?: string[]) {
         await this.debounce();
 
         const manifests = this.deps.getManifests();
@@ -80,17 +84,17 @@ export class StartupPolicyService {
         const lazyOnViews: Record<string, string[]> = {
             ...(this.deps.getlazyOnViews() ?? {}),
         };
-        const viewRegistryCleanup = this.patchViewRegistry(lazyOnViews);
+        const viewRegistryCleanup = this.interceptViewRegistration(lazyOnViews);
 
         try {
-            await this.applyWithProgress(
+            await this.loadLazyPluginsWithProgress(
                 lazyManifests,
                 targetPluginIds,
                 progress,
                 () => cancelled,
             );
         } finally {
-            await this.finalize(
+            await this.cleanupAndReload(
                 viewRegistryCleanup,
                 lazyOnViews,
                 !cancelled,
@@ -143,7 +147,7 @@ export class StartupPolicyService {
         return progress;
     }
 
-    private patchViewRegistry(lazyOnViews: Record<string, string[]>) {
+    private interceptViewRegistration(lazyOnViews: Record<string, string[]>) {
         const { viewRegistry } = this.deps.app as unknown as {
             viewRegistry?: {
                 registerView?: (type: string, creator: unknown) => unknown;
@@ -184,7 +188,7 @@ export class StartupPolicyService {
         };
     }
 
-    private async applyWithProgress(
+    private async loadLazyPluginsWithProgress(
         lazyManifests: PluginManifest[],
         targetPluginIds: Set<string> | null,
         progress: ProgressDialog | null,
@@ -231,7 +235,7 @@ export class StartupPolicyService {
         progress?.setProgress(lazyManifests.length + 2);
     }
 
-    private async finalize(
+    private async cleanupAndReload(
         viewRegistryCleanup: () => void,
         lazyOnViews: Record<string, string[]>,
         shouldReload: boolean,
