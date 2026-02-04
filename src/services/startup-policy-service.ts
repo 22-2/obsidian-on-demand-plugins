@@ -235,7 +235,6 @@ export class StartupPolicyService {
         const pluginIds = lazyManifests.map((plugin) => plugin.id);
         await this.waitForAllPluginsLoaded(pluginIds, 1000 * 15);
         progress?.setProgress(lazyManifests.length + 1);
-        await sleep(1500);
 
         if (isCancelled()) return;
 
