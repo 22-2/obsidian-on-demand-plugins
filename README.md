@@ -2,7 +2,7 @@
 
 Lazy load plugins by caching their commands. Plugins are enabled on-demand when you trigger their commands (or open specific views), keeping startup fast.
 
-**Important note #1**: It may take up to 2 restarts of Obsidian to see the full speed increase, if it's the first time you're using the plugin. This will only be an issue on the first install.
+**Important note #1**: After clicking **Apply changes**, Obsidian will restart once to apply the speed increase. This is only necessary after making changes to your plugin loading modes.
 
 **Important note #2**: There is no way for this plugin to know if you've manually disabled or enabled a plugin. If you want disabling a plugin to persist through an Obsidian restart, make sure you disable it inside Lazy Loader's settings page rather than simply disabling the plugin in Obsidian's plugins page.
 
@@ -41,9 +41,6 @@ Plugins that rely on the following should **not** be lazy-loaded:
 - **Global Event Hooks**: Plugins that register events like `this.app.vault.on('modify', ...)` or `this.app.workspace.on('layout-change', ...)` right at startup.
 
 Since these plugins are only enabled when triggered, their background tasks or hooks will not be active until the plugin is loaded.
-
-### Plugin Guidelines
-For more information on plugin management and standards, please refer to the [guidelines](myfiles/guidelines.txt).
 
 ## 🙏 Acknowledgements
 
