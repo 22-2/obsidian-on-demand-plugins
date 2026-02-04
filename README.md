@@ -32,6 +32,9 @@ Add a screenshot of the On‑Demand Plugins settings page to make the setup clea
 
 ## ⚠️ Recommended Usage & Warnings
 
+### Important: Backup community-plugins.json
+This plugin modifies `community-plugins.json` directly to enable bulk plugin switching. **Before using this plugin, please back up your `community-plugins.json` file** (located in your vault's `.obsidian` directory) to prevent any potential data loss.
+
 ### Periodic Execution & Hooks
 Plugins that rely on the following should **not** be lazy-loaded:
 - **Periodic tasks**: Plugins using `setInterval` or `setTimeout` for background sync, backups, or timers.
