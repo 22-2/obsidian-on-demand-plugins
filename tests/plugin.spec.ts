@@ -7,6 +7,7 @@ const __dirname = path.dirname(__filename);
 
 test.use({
     vaultOptions: {
+        logLevel: "info",
         fresh: true,
         plugins: [
             {
