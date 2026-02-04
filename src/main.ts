@@ -34,7 +34,6 @@ export default class OnDemandPlugin extends Plugin {
     private viewLazyLoader!: ViewLazyLoader;
 
     get obsidianPlugins() {
-        // return (this.app as unknown as { plugins: any }).plugins;
         return (this.app as unknown as { plugins: Plugins }).plugins;
     }
 
