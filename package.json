@@ -19,7 +19,8 @@
 	"license": "MIT",
 	"dependencies": {
 		"loglevel": "^1.9.2",
-		"monkey-around": "^3.0.0"
+		"monkey-around": "^3.0.0",
+		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.58.1",
