@@ -125,12 +125,14 @@ export class SettingsTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle
                     .setValue(this.plugin.data.dualConfigs)
-                    .onChange(async (value) => {
-                        this.plugin.data.dualConfigs = value;
-                        await this.plugin.saveSettings();
-                        // Refresh the settings to make sure the mobile section is configured
-                        await this.plugin.loadSettings();
-                        this.buildDom();
+                    .onChange((value) => {
+                        void (async () => {
+                            this.plugin.data.dualConfigs = value;
+                            await this.plugin.saveSettings();
+                            // Refresh the settings to make sure the mobile section is configured
+                            await this.plugin.loadSettings();
+                            this.buildDom();
+                        })();
                     });
             });
 
@@ -146,9 +148,9 @@ export class SettingsTab extends PluginSettingTab {
                     .setValue(
                         this.plugin.settings.defaultMode || "disabled",
                     )
-                    .onChange(async (value: PluginMode) => {
+                    .onChange((value: PluginMode) => {
                         this.plugin.settings.defaultMode = value;
-                        await this.plugin.saveSettings();
+                        void this.plugin.saveSettings();
                     });
             });
 
@@ -157,10 +159,12 @@ export class SettingsTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle
                     .setValue(this.plugin.settings.showDescriptions)
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.settings.showDescriptions = value;
-                        await this.plugin.saveSettings();
-                        this.buildDom();
+                        void (async () => {
+                            await this.plugin.saveSettings();
+                            this.buildDom();
+                        })();
                     });
             });
 
@@ -170,10 +174,12 @@ export class SettingsTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle
                     .setValue(this.plugin.data.showConsoleLog)
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.data.showConsoleLog = value;
-                        await this.plugin.saveSettings();
-                        this.plugin.configureLogger();
+                        void (async () => {
+                            await this.plugin.saveSettings();
+                            this.plugin.configureLogger();
+                        })();
                     });
             });
 
@@ -188,10 +194,10 @@ export class SettingsTab extends PluginSettingTab {
                         this.plugin.settings
                             .reRegisterLazyCommandsOnDisable,
                     )
-                    .onChange(async (value) => {
+                    .onChange((value) => {
                         this.plugin.settings.reRegisterLazyCommandsOnDisable =
                             value;
-                        await this.plugin.saveSettings();
+                        void this.plugin.saveSettings();
                     });
             });
 
@@ -222,16 +228,18 @@ export class SettingsTab extends PluginSettingTab {
             .addButton((button) => {
                 this.applyButton = button;
                 button.setButtonText("Apply changes");
-                button.onClick(async () => {
-                    if (this.pendingPluginIds.size === 0) return;
-                    this.normalizelazyOnViews();
-                    await this.plugin.saveSettings();
-                    await this.plugin.applyStartupPolicy(
-                        true,
-                        Array.from(this.pendingPluginIds),
-                    );
-                    this.pendingPluginIds.clear();
-                    this.updateApplyButton();
+                button.onClick(() => {
+                    void (async () => {
+                        if (this.pendingPluginIds.size === 0) return;
+                        this.normalizelazyOnViews();
+                        await this.plugin.saveSettings();
+                        await this.plugin.applyStartupPolicy(
+                            true,
+                            Array.from(this.pendingPluginIds),
+                        );
+                        this.pendingPluginIds.clear();
+                        this.updateApplyButton();
+                    })();
                 });
                 this.updateApplyButton();
             });
@@ -241,17 +249,19 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc("Force a rebuild of the cached commands for lazy plugins.")
             .addButton((button) => {
                 button.setButtonText("Rebuild cache");
-                button.onClick(async () => {
-                    button.setDisabled(true);
-                    try {
-                        await this.plugin.initializeCommandCache();
-                        new Notice("Command cache rebuilt");
-                    } catch (e) {
-                        new Notice("Failed to rebuild command cache");
-                        logger.error(e);
-                    } finally {
-                        button.setDisabled(false);
-                    }
+                button.onClick(() => {
+                    void (async () => {
+                        button.setDisabled(true);
+                        try {
+                            await this.plugin.initializeCommandCache();
+                            new Notice("Command cache rebuilt");
+                        } catch (e) {
+                            new Notice("Failed to rebuild command cache");
+                            logger.error(e);
+                        } finally {
+                            button.setDisabled(false);
+                        }
+                    })();
                 });
             });
 
@@ -315,7 +325,7 @@ export class SettingsTab extends PluginSettingTab {
                     this.addModeOptions(dropdown);
                     dropdown
                         .setValue(currentValue)
-                        .onChange(async (value: PluginMode) => {
+                        .onChange((value: PluginMode) => {
                             // Update the config, and defer apply until user confirms
                             this.pluginSettings[plugin.id] = {
                                 mode: value,
