@@ -32,6 +32,10 @@ export class StartupPolicyService {
 
     constructor(private deps: StartupPolicyDeps) {}
 
+    /**
+     * Apply plugin startup policy with progress indicator and reload support.
+     * @param pluginIds - Optional list of plugin IDs to apply policy to; if omitted, applies to all
+     */
     async apply(pluginIds?: string[]) {
         if (this.startupPolicyLock) {
             this.startupPolicyPending = true;

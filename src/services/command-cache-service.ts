@@ -73,6 +73,12 @@ export class CommandCacheService {
         });
     }
 
+    /**
+     * Refresh command cache for specified lazy plugins or all if force is true.
+     * @param pluginIds - Optional list of plugin IDs to refresh; if omitted, refreshes all
+     * @param force - Force refresh even if cache is valid
+     * @param onProgress - Optional callback for progress updates
+     */
     async refreshCommandCache(
         pluginIds?: string[],
         force = false,

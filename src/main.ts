@@ -233,6 +233,11 @@ export default class OnDemandPlugin extends Plugin {
         return this.registry.isPluginEnabledOnDisk(pluginId);
     }
 
+    /**
+     * Initialize the command cache for all lazy plugins and apply startup policy.
+     * @param options - Optional configuration
+     * @param options.force - Force refresh cache even if valid
+     */
     async initializeCommandCache(options?: { force?: boolean }) {
         const force = options?.force ?? false;
         await this.commandCacheService.refreshCommandCache(undefined, force);
@@ -267,6 +272,10 @@ export default class OnDemandPlugin extends Plugin {
             : null;
     }
 
+    /**
+     * Apply startup policy to specified plugins or all plugins with progress indicator.
+     * @param pluginIds - Optional list of plugin IDs to apply policy to; if omitted, applies to all
+     */
     async applyStartupPolicy(pluginIds?: string[]) {
         await this.startupPolicyService.apply(pluginIds);
     }
