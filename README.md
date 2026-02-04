@@ -6,11 +6,29 @@ Lazy load plugins by caching their commands. Plugins are enabled on-demand when 
 
 **Important note #2**: There is no way for this plugin to know if you've manually disabled or enabled a plugin. If you want disabling a plugin to persist through an Obsidian restart, make sure you disable it inside Lazy Loader's settings page rather than simply disabling the plugin in Obsidian's plugins page.
 
+## ✅ How to Use
+
+1. Open **Settings → On‑Demand Plugins**.
+2. In the plugin list, choose a mode for each plugin:
+	- **Lazy on command**: Loads when you run one of its commands.
+	- **Lazy on view**: Loads when a specific view type is opened.
+	- **Always enabled**: Loads normally at startup.
+	- **Disabled**: Keeps the plugin off.
+3. Click **Apply changes** to activate your selections.
+4. (Optional) Set **Default behavior for new plugins** at the top of the settings page.
+
 ## ✨ Features
 
 - **Command-based Loading**: Plugins are loaded only when you execute one of their commands.
 - **🖼️ View-based Loading**: Automatically load plugins when a specific view type is displayed. This is useful for plugins that enhance specific file types or views.
+- **Automatic View Type Detection**: When a plugin is set to **Lazy on view**, its view types are captured automatically during **Apply changes**. You do not need to enter view types manually.
 - **Customizable Startup Policy**: Individual settings for each plugin to decide how they should be loaded.
+
+## 📷 Screenshot
+
+Add a screenshot of the On‑Demand Plugins settings page to make the setup clearer for reviewers and users.
+<!-- Replace with your screenshot file -->
+<!-- ![On‑Demand Plugins settings](docs/settings.png) -->
 
 ## ⚠️ Recommended Usage & Warnings
 
