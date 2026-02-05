@@ -3,7 +3,7 @@ import { saveJSON } from "./storage";
 import log from "loglevel";
 import { ProgressDialog } from "../utils/progress";
 import { ON_DEMAND_PLUGIN_ID } from "../utils/constants";
-import { isPluginLoaded, isPluginEnabled } from "../utils/utils";
+import { isPluginLoaded, isPluginEnabled, PluginsMap } from "../utils/utils";
 import { PluginMode } from "../settings";
 import { Commands, Plugins } from "obsidian-typings";
 
@@ -13,7 +13,7 @@ interface StartupPolicyDeps {
     app: App;
     obsidianPlugins: {
         enabledPlugins: Set<string>;
-        plugins?: Record<string, { _loaded?: boolean }>;
+        plugins?: PluginsMap;
         enablePlugin: (id: string) => Promise<void | boolean>;
     };
     getManifests: () => PluginManifest[];

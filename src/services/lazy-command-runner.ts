@@ -3,7 +3,7 @@ import log from "loglevel";
 import { LazySettings } from "../settings";
 import { CachedCommand } from "./command-cache-service";
 import { ViewRegistry } from "obsidian-typings";
-import { isPluginLoaded, isPluginEnabled } from "../utils/utils";
+import { isPluginLoaded, isPluginEnabled, PluginsMap } from "../utils/utils";
 const logger = log.getLogger("OnDemandPlugin/LazyCommandRunner");
 
 interface LazyCommandRunnerDeps {
@@ -11,7 +11,7 @@ interface LazyCommandRunnerDeps {
     obsidianCommands: { commands: Record<string, unknown> };
     obsidianPlugins: {
         enabledPlugins: Set<string>;
-        plugins?: Record<string, { _loaded?: boolean }>;
+        plugins?: PluginsMap;
         enablePlugin: (id: string) => Promise<void>;
     };
     getCachedCommand: (commandId: string) => CachedCommand | undefined;

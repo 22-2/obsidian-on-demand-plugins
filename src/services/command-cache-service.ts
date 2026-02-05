@@ -1,7 +1,7 @@
 import { PluginManifest, App } from "obsidian";
 import { loadJSON, saveJSON } from "./storage";
 import { CommandCache, LazySettings, PluginMode } from "../settings";
-import { isPluginLoaded } from "../utils/utils";
+import { isPluginLoaded, PluginsMap } from "../utils/utils";
 
 export interface CachedCommand {
     id: string;
@@ -22,7 +22,7 @@ interface CommandCacheDeps {
     };
     obsidianPlugins: {
         enabledPlugins: Set<string>;
-        plugins?: Record<string, { _loaded?: boolean }>;
+        plugins?: PluginsMap;
         enablePlugin: (id: string) => Promise<void>;
         disablePlugin: (id: string) => Promise<void>;
     };
