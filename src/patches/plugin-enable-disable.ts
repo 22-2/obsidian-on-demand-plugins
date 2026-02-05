@@ -22,6 +22,9 @@ export function patchPluginEnableDisable(
         commandCacheService,
     } = deps;
 
+    // Monkey-patch `Plugins.enablePlugin` / `Plugins.disablePlugin` to handle
+    // when a user manually enables or disables a plugin: update the command
+    // cache and re-register lazy commands as needed.
     register(
         around(obsidianPlugins, {
             enablePlugin: (next) =>

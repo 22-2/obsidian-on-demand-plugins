@@ -9,6 +9,8 @@ interface PatchViewStateDeps {
 export function patchSetViewState(deps: PatchViewStateDeps): void {
     const { register, onViewType } = deps;
 
+    // Monkey-patch `WorkspaceLeaf.setViewState` to observe when a view
+    // type becomes active so we can run the `onViewType` hook.
     register(
         around(WorkspaceLeaf.prototype, {
             setViewState: (next: WorkspaceLeaf["setViewState"]) =>
