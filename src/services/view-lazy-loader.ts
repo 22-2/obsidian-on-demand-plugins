@@ -1,6 +1,6 @@
 import { App, EventRef, WorkspaceLeaf } from "obsidian";
 import { PluginMode } from "../settings";
-import { isLeafVisible, rebuildLeafView } from "../utils/utils";
+import { isLeafVisible, rebuildLeafView, isPluginLoaded, PluginsMap } from "../utils/utils";
 
 interface ViewLazyLoaderDeps {
     app: App;
@@ -41,11 +41,23 @@ export class ViewLazyLoader {
 
         if (this.deps.getPluginMode(pluginId) !== "lazyOnView") return;
 
+        // If the plugin was already loaded, there's no need to rebuild the view
+        const plugins = (this.deps.app as unknown as { plugins?: PluginsMap }).plugins;
+        const wasLoaded = isPluginLoaded(plugins, pluginId);
+
         const loaded = await this.deps.ensurePluginLoaded(pluginId);
         if (!loaded) return;
 
-        // Force a view reconstruction after a lazy plugin is loaded, ensuring the view is properly initialized.
-        await rebuildLeafView(leaf);
+        // Only reconstruct the view if the plugin was not already loaded before this call.
+        if (!wasLoaded) {
+            await rebuildLeafView(leaf);
+            try {
+            } catch (e) {
+                // Keep behaviour consistent with other callers: don't throw on rebuild failure
+                // (logging is handled elsewhere)
+            }
+        }
+
         this.deps.syncCommandWrappersForPlugin(pluginId);
     }
 
