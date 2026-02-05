@@ -9,6 +9,7 @@ import { StartupPolicyService } from "./services/startup-policy-service";
 import { ViewLazyLoader } from "./services/view-lazy-loader";
 import { patchPluginEnableDisable } from "./patches/plugin-enable-disable";
 import { patchSetViewState } from "./patches/view-state";
+import { registerExcalidrawWrapper } from "./patches/excalidraw-wrapper";
 import {
     DeviceSettings,
     LazySettings,
@@ -138,6 +139,14 @@ export default class OnDemandPlugin extends Plugin {
                 this.viewLazyLoader.checkViewTypeForLazyLoading(viewType),
         });
         this.viewLazyLoader.registerActiveLeafReload();
+        // Register Excalidraw special-case wrapper (isolated)
+        registerExcalidrawWrapper({
+            app: this.app,
+            registerEvent: this.registerEvent.bind(this),
+            getPluginMode: (pluginId: string) => this.getPluginMode(pluginId),
+            ensurePluginLoaded: (pluginId: string) =>
+                this.lazyRunner.ensurePluginLoaded(pluginId),
+        });
     }
 
     onunload() {

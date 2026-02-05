@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, "..");
 const pluginUnderTestId = "on-demand-plugins";
 const targetPluginId = "obsidian42-brat";
+const excalidrawPluginId = "obsidian-excalidraw-plugin";
 
 export function useOnDemandPlugins() {
     test.use({
@@ -29,6 +30,25 @@ export function useOnDemandPlugins() {
     });
 }
 
+export function useOnDemandPluginsWithExcalidraw() {
+    test.use({
+        vaultOptions: {
+            logLevel: "info",
+            fresh: true,
+            plugins: [
+                {
+                    path: repoRoot,
+                    pluginId: pluginUnderTestId,
+                },
+                {
+                    path: path.resolve(repoRoot, "myfiles", excalidrawPluginId),
+                    pluginId: excalidrawPluginId,
+                },
+            ],
+        },
+    });
+}
+
 export function ensureBuilt() {
     const mainJsPath = path.resolve(repoRoot, "main.js");
     if (!fs.existsSync(mainJsPath)) {
@@ -38,4 +58,4 @@ export function ensureBuilt() {
     return true;
 }
 
-export { repoRoot, pluginUnderTestId, targetPluginId };
+export { repoRoot, pluginUnderTestId, targetPluginId, excalidrawPluginId };
