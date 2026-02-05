@@ -27,7 +27,7 @@ This plugin achieves dramatic startup speed improvements by:
 
 ### Key Features
 - **Command-based Loading**: Plugins are loaded only when you execute one of their commands.
-- **🖼️ View-based Loading**: Automatically load plugins when a specific view type is displayed. This is useful for plugins that enhance specific file types or views.
+- **🖼️ View-based Loading**: Automatically load plugins when a specific view type is displayed.
 - **Automatic View Type Detection**: When a plugin is set to **Lazy on view**, its view types are captured automatically during **Apply changes**. You do not need to enter view types manually.
 - **Customizable Startup Policy**: Individual settings for each plugin to decide how they should be loaded.
 
@@ -52,6 +52,8 @@ Plugins that rely on the following should **not** be lazy-loaded:
 - **Global Event Hooks**: Plugins that register events like `this.app.vault.on('modify', ...)` or `this.app.workspace.on('layout-change', ...)` right at startup.
 
 Since these plugins are only enabled when triggered, their background tasks or hooks will not be active until the plugin is loaded.
+
+Note: This plugin does not support embedded or inline views (for example, Dataview embeds). Embedded views may not trigger lazy-loading as expected.
 
 ## 🙏 Acknowledgements
 
