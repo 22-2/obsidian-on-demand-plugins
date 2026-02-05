@@ -25,6 +25,7 @@
   ],
   "exclude": [
     "tests/**/*.ts",
-    "node_modules"
+    "node_modules",
+    "playwright.config.ts"
   ]
 }
