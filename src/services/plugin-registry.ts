@@ -1,9 +1,26 @@
-import { App, Platform, PluginManifest, normalizePath } from "obsidian";
+import { App, DataAdapter, Platform, PluginManifest, normalizePath } from "obsidian";
 import log from "loglevel";
-import writeFileAtomic from "write-file-atomic";
 import { ON_DEMAND_PLUGIN_ID } from "../utils/constants";
 
 const logger = log.getLogger("OnDemandPlugin/PluginRegistry");
+
+async function writeFileAtomicSimple(
+    adapter: DataAdapter,
+    path: string,
+    data: string | ArrayBuffer,
+): Promise<void> {
+    const tmpPath = `${path}.tmp-${Date.now()}-${Math.random()
+        .toString(36)
+        .slice(2, 8)}`;
+
+    if (typeof data === "string") {
+        await adapter.write(tmpPath, data);
+    } else {
+        await adapter.writeBinary(tmpPath, data);
+    }
+
+    await adapter.rename(tmpPath, path);
+}
 
 export class PluginRegistry {
     manifests: PluginManifest[] = [];
@@ -70,10 +87,11 @@ export class PluginRegistry {
         enabledPlugins: string[],
         showConsoleLog?: boolean,
     ) {
+        const adapter = this.app.vault.adapter;
         const path = this.getCommunityPluginsConfigFilePath();
         const content = JSON.stringify(enabledPlugins, null, "\t");
         try {
-            await writeFileAtomic(path, content, { encoding: "utf8" });
+            await writeFileAtomicSimple(adapter, path, content);
         } catch (error) {
             if (showConsoleLog) {
                 logger.error("Failed to write community-plugins.json", error);

@@ -28,13 +28,12 @@
 		"monkey-around": "^3.0.0",
 		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit",
 		"store2": "^2.14.4",
-		"tiny-invariant": "^1.3.3",
-		"write-file-atomic": "^7.0.0"
+		"tiny-invariant": "^1.3.3"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.58.1",
 		"@types/node": "^25.2.0",
-		"@types/write-file-atomic": "^4.0.3",
+
 		"builtin-modules": "5.0.0",
 		"esbuild": "0.27.2",
 		"obsidian": "latest",
