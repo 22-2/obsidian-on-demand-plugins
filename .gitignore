@@ -22,3 +22,5 @@ myfiles/
 data copy.json
 repomix-output.md
 .obsidian-e2e-toolkit/
+playwright-report/
+test-results/

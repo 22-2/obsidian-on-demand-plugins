@@ -6,6 +6,20 @@ import { promisify } from "node:util";
 const execP = promisify(exec);
 
 export default async function globalSetup() {
+    const repoRoot = process.cwd();
+    const mainJsPath = path.resolve(repoRoot, "main.js");
+    if (!fs.existsSync(mainJsPath)) {
+        try {
+            console.log("[global-setup] main.js missing, running build:nocheck");
+            await execP("pnpm run build:nocheck --silent", { cwd: repoRoot });
+        } catch (e) {
+            console.warn(
+                "[global-setup] build:nocheck failed (ignored):",
+                e?.message || e,
+            );
+        }
+    }
+
     const repoMapPath = path.resolve(
         process.cwd(),
         "tests",

@@ -28,6 +28,22 @@ jobs:
                   node-version: "23.x"
                   cache: "pnpm"
 
+            - name: Cache plugin downloads
+              uses: actions/cache@v4
+              with:
+                  path: myfiles
+                  key: ${{ runner.os }}-myfiles-${{ hashFiles('tests/plugin-sources.json') }}
+                  restore-keys: |
+                      ${{ runner.os }}-myfiles-
+
+            - name: Cache toolkit assets
+              uses: actions/cache@v4
+              with:
+                  path: .obsidian-e2e-toolkit
+                  key: ${{ runner.os }}-obsidian-e2e-toolkit-${{ hashFiles('pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-obsidian-e2e-toolkit-
+
             - name: Ensure pnpm (Unix)
               if: matrix.os != 'windows-latest'
               run: |
@@ -60,13 +76,17 @@ jobs:
               run: pnpm exec playwright install
               shell: pwsh
 
+            - name: Build plugin under test
+              run: pnpm run build:nocheck
+
             - name: Ensure toolkit Obsidian is installed (Unix)
               if: matrix.os != 'windows-latest'
               run: |
-                # remove previous unpack (avoid stale/corrupt artifacts)
-                rm -rf "${{ github.workspace }}/.obsidian-e2e-toolkit"
-                # run toolkit setup which downloads & unpacks Obsidian
-                node "${{ github.workspace }}/node_modules/obsidian-e2e-toolkit/scripts/setup.mjs"
+                if [ -d "${{ github.workspace }}/.obsidian-e2e-toolkit/obsidian-unpacked" ]; then
+                  echo "Toolkit cache found, skipping setup"
+                else
+                  node "${{ github.workspace }}/node_modules/obsidian-e2e-toolkit/scripts/setup.mjs"
+                fi
               env:
                 OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
               shell: bash
@@ -74,10 +94,11 @@ jobs:
             - name: Ensure toolkit Obsidian is installed (Windows)
               if: matrix.os == 'windows-latest'
               run: |
-                # remove previous unpack (avoid stale/corrupt artifacts)
-                if (Test-Path "$env:GITHUB_WORKSPACE\.obsidian-e2e-toolkit") { Remove-Item -LiteralPath "$env:GITHUB_WORKSPACE\.obsidian-e2e-toolkit" -Recurse -Force }
-                # run toolkit setup which downloads & unpacks Obsidian
-                node "$env:GITHUB_WORKSPACE\node_modules\obsidian-e2e-toolkit\scripts\setup.mjs"
+                if (Test-Path "$env:GITHUB_WORKSPACE\.obsidian-e2e-toolkit\obsidian-unpacked") {
+                  Write-Host "Toolkit cache found, skipping setup"
+                } else {
+                  node "$env:GITHUB_WORKSPACE\node_modules\obsidian-e2e-toolkit\scripts\setup.mjs"
+                }
               env:
                 OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
               shell: pwsh
