@@ -30,9 +30,7 @@ jobs:
                   cache: "pnpm"
 
             - name: Install dependencies
-              run: |
-                pnpm install --no-frozen-lockfile
-                pnpm install --prod
+              run: pnpm install --prod --no-frozen-lockfile
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
