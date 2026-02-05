@@ -33,7 +33,9 @@
 
 ## 📷 スクリーンショット
 
-設定画面のスクリーンショットを追加すると分かりやすくなります（任意）。
+<!-- Screenshot: On-Demand Plugins settings -->
+![On‑Demand Plugins settings](assets/ss.png)
+*On‑Demand Plugins 設定ページのスクリーンショット.*
 
 ## ⚠️ 推奨使用法と警告
 
