@@ -1,4 +1,4 @@
-import { Editor, MarkdownView } from "obsidian";
+import { Command, Editor, MarkdownView } from "obsidian";
 import log from "loglevel";
 import { Mutex } from "async-mutex";
 import pWaitFor from "p-wait-for";
@@ -238,17 +238,7 @@ export class LazyCommandRunner implements PluginLoader {
     }
 
     isCommandExecutable(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as
-            | {
-                  callback?: () => void;
-                  checkCallback?: (checking: boolean) => boolean | void;
-                  editorCallback?: (editor: Editor, ctx?: unknown) => void;
-                  editorCheckCallback?: (
-                      checking: boolean,
-                      editor: Editor,
-                      ctx?: unknown,
-                  ) => boolean | void;
-              }
+        const command = this.ctx.obsidianCommands.commands[commandId] as Command
             | undefined;
 
         if (!command) return false;
