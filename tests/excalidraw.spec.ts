@@ -132,3 +132,82 @@ test("layout-restore triggers lazy load for already-open Excalidraw file", async
 
     expect(hasView2).toBe(true);
 });
+
+    test("disabling Excalidraw while its view is open does not immediately reload the plugin", async ({ obsidian }) => {
+        if (!ensureBuilt()) return;
+
+        await obsidian.waitReady();
+
+        const pluginHandle = await obsidian.plugin(pluginUnderTestId);
+        // configure lazyOnView for Excalidraw
+        await pluginHandle.evaluate(async (plugin, pluginId) => {
+            const original = app.commands.executeCommandById;
+            app.commands.executeCommandById = () => true;
+            try {
+                await plugin.updatePluginSettings(pluginId, "lazyOnView");
+                plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
+                plugin.settings.lazyOnViews[pluginId] = [];
+                await plugin.saveSettings();
+            } finally {
+                app.commands.executeCommandById = original;
+            }
+        }, excalidrawPluginId);
+
+        // create an Excalidraw file and open it (will trigger lazy load)
+        await obsidian.page.evaluate(() => {
+            return app.vault.create("test3.excalidraw.md", "---\nexcalidraw-plugin: parsed\n---\n");
+        });
+
+        await obsidian.page.evaluate(() => {
+            const f = app.vault.getAbstractFileByPath("test3.excalidraw.md");
+            const leaf = app.workspace.getLeaf(false);
+            if (f && leaf) leaf.openFile(f as any);
+        });
+
+        // wait for plugin to be enabled
+        const deadline = Date.now() + 10000;
+        let enabled = false;
+        while (Date.now() < deadline) {
+            if (await obsidian.isPluginEnabled(excalidrawPluginId)) {
+                enabled = true;
+                break;
+            }
+            await new Promise((r) => setTimeout(r, 300));
+        }
+        expect(enabled).toBe(true);
+
+        // ensure an excalidraw view exists
+        const viewDeadline = Date.now() + 10000;
+        let hasView = false;
+        while (Date.now() < viewDeadline) {
+            hasView = await obsidian.page.evaluate(() => {
+                return app.workspace.getLeavesOfType("excalidraw").length > 0;
+            });
+            if (hasView) break;
+            await new Promise((r) => setTimeout(r, 300));
+        }
+        expect(hasView).toBe(true);
+
+        // simulate manual disable of the Excalidraw plugin while view remains
+        await obsidian.page.evaluate((id: string) => {
+            app.plugins.disablePlugin(id);
+        }, excalidrawPluginId);
+
+        // confirm plugin is disabled
+        const disabledDeadline = Date.now() + 5000;
+        let disabled = false;
+        while (Date.now() < disabledDeadline) {
+            if (!(await obsidian.isPluginEnabled(excalidrawPluginId))) {
+                disabled = true;
+                break;
+            }
+            await new Promise((r) => setTimeout(r, 200));
+        }
+        expect(disabled).toBe(true);
+
+        // wait a short period to ensure our wrapper does not immediately reload it
+        await new Promise((r) => setTimeout(r, 3000));
+
+        // assert plugin remains disabled (i.e., it was not immediately re-enabled)
+        expect(await obsidian.isPluginEnabled(excalidrawPluginId)).toBe(false);
+    });
