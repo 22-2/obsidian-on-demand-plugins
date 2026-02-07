@@ -27,7 +27,7 @@ interface LazyCommandRunnerDeps {
 }
 
 export class LazyCommandRunner {
-    // pluginId ごとのロックを管理
+    // Manage locks per pluginId
     private pluginMutexes = new Map<string, Mutex>();
 
     constructor(private deps: LazyCommandRunnerDeps) {}
@@ -126,7 +126,7 @@ export class LazyCommandRunner {
             );
             return true;
         } catch (error) {
-            // タイムアウトまたはその他のエラー
+            // Timeout or other error
             return false;
         }
     }
@@ -136,12 +136,12 @@ export class LazyCommandRunner {
             this.deps.app as unknown as { viewRegistry?: ViewRegistry }
         ).viewRegistry;
 
-        // 即座にチェック
+        // Immediate check
         if (this.isCommandExecutable(commandId)) return;
 
         const promises: Promise<void>[] = [];
 
-        // viewRegistry の "view-registered" イベント待ち
+        // Wait for viewRegistry 'view-registered' event
         if (viewRegistry) {
             promises.push(
                 pEvent(viewRegistry, "view-registered", {
@@ -151,7 +151,7 @@ export class LazyCommandRunner {
             );
         }
 
-        // workspace の "layout-change" イベント待ち
+        // Wait for workspace 'layout-change' event
         if (this.deps.app.workspace) {
             promises.push(
                 pEvent(this.deps.app.workspace, "layout-change", {
@@ -161,7 +161,7 @@ export class LazyCommandRunner {
             );
         }
 
-        // いずれかのイベントで条件が満たされたら解決
+        // Resolve when any event satisfies the condition
         if (promises.length > 0) {
             await Promise.race(promises);
         }
@@ -185,7 +185,7 @@ export class LazyCommandRunner {
             );
             return true;
         } catch (error) {
-            // タイムアウト
+            // Timeout
             return false;
         }
     }
