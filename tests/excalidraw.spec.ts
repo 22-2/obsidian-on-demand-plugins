@@ -56,10 +56,16 @@ test("opening .excalidraw.md triggers lazy load and shows Excalidraw view", asyn
 
     expect(enabled).toBe(true);
 
-    // assert an excalidraw view exists
-    const hasView = await obsidian.page.evaluate(() => {
-        return app.workspace.getLeavesOfType("excalidraw").length > 0;
-    });
+    // assert an excalidraw view exists (poll because view registration is async)
+    const viewDeadline = Date.now() + 10000;
+    let hasView = false;
+    while (Date.now() < viewDeadline) {
+        hasView = await obsidian.page.evaluate(() => {
+            return app.workspace.getLeavesOfType("excalidraw").length > 0;
+        });
+        if (hasView) break;
+        await new Promise((r) => setTimeout(r, 300));
+    }
 
     expect(hasView).toBe(true);
 });
@@ -113,9 +119,16 @@ test("layout-restore triggers lazy load for already-open Excalidraw file", async
 
     expect(enabled2).toBe(true);
 
-    const hasView2 = await obsidian.page.evaluate(() => {
-        return app.workspace.getLeavesOfType("excalidraw").length > 0;
-    });
+    // poll for excalidraw view (view registration is async after plugin load)
+    const viewDeadline2 = Date.now() + 10000;
+    let hasView2 = false;
+    while (Date.now() < viewDeadline2) {
+        hasView2 = await obsidian.page.evaluate(() => {
+            return app.workspace.getLeavesOfType("excalidraw").length > 0;
+        });
+        if (hasView2) break;
+        await new Promise((r) => setTimeout(r, 300));
+    }
 
     expect(hasView2).toBe(true);
 });
