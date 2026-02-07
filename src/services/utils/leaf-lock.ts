@@ -1,5 +1,5 @@
 import { WorkspaceLeaf } from "obsidian";
-import { KeyedMutex } from "keyed-mutex";
+import { Mutex } from "async-mutex";
 
 /**
  * Generic lock strategy interface for async mutual exclusion
@@ -17,13 +17,24 @@ export interface LockRelease {
  * Ensures that lazy loading for the same leaf+viewType combination is serialized.
  */
 export class LeafViewLockStrategy implements LockStrategy<{ leaf: WorkspaceLeaf; viewType: string }> {
-    private keyedMutex = new KeyedMutex<string>();
+    // Map of key -> Mutex from `async-mutex`.
+    private keyedMutex = new Map<string, Mutex>();
     private leafIds = new WeakMap<WorkspaceLeaf, string>();
     private nextLeafId = 1;
 
     async lock(target: { leaf: WorkspaceLeaf; viewType: string }): Promise<LockRelease> {
         const key = this.keyFor(target.leaf, target.viewType);
-        return await this.keyedMutex.lock(key);
+        let mutex = this.keyedMutex.get(key);
+        if (!mutex) {
+            mutex = new Mutex();
+            this.keyedMutex.set(key, mutex);
+        }
+        const release = await mutex.acquire();
+        return {
+            unlock: () => {
+                release();
+            },
+        };
     }
 
     private keyFor(leaf: WorkspaceLeaf, viewType: string): string {
