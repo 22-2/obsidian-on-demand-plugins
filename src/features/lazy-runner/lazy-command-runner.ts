@@ -89,6 +89,13 @@ export class LazyCommandRunner implements PluginLoader {
                     return true;
                 }
 
+                // Respect explicit user state on disk: if the plugin is disabled on disk
+                // do not automatically re-enable it. This prevents immediate reload when
+                // a user manually disables a plugin while its view remains open.
+                if (!this.ctx.isPluginEnabledOnDisk(pluginId)) {
+                    return false;
+                }
+
                 await this.ctx.obsidianPlugins.enablePlugin(pluginId);
                 const loadSuccess = await this.waitForPluginLoaded(pluginId);
 
