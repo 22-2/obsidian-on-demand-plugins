@@ -11,6 +11,9 @@ importers:
       async-mutex:
         specifier: ^0.5.0
         version: 0.5.0
+      keyed-mutex:
+        specifier: ^0.1.4
+        version: 0.1.4
       loglevel:
         specifier: ^1.9.2
         version: 1.9.2
@@ -768,6 +771,9 @@ packages:
   async-mutex@0.5.0:
     resolution: {integrity: sha512-1A94B18jkJ3DYq284ohPxoXbfTA5HsQ7/Mf4DEhcyLx3Bz27Rh59iScbB6EPiP+B+joue6YCxcMXSbFC1tZKwA==}
 
+  async-shared-mutex@2.2.2:
+    resolution: {integrity: sha512-6wiquk7mrEa+cHHN/clSJOPzHY28XUBqY4fK5JIdo292kMD9+wOhpx7DRm2Wjy7NtlkORHKjeM7ac+ZT5r0A/Q==}
+
   boolean@3.2.0:
     resolution: {integrity: sha512-d0II/GO9uf9lfUHH2BQsjxzRJZBdsjgsBiW4BvhWk/3qoKwQFjIDVN19PfX8F2D/r9PCMTtLWjYVCFrpeYUzsw==}
     deprecated: Package no longer supported. Contact Support at https://www.npmjs.com/support for more info.
@@ -1233,6 +1239,9 @@ packages:
   katex@0.16.28:
     resolution: {integrity: sha512-YHzO7721WbmAL6Ov1uzN/l5mY5WWWhJBSW+jq4tkfZfsxmo1hu6frS0EOswvjBUnWE6NtjEs48SFn5CQESRLZg==}
     hasBin: true
+
+  keyed-mutex@0.1.4:
+    resolution: {integrity: sha512-e8pNHwf6LUZt/gLdK8rYhsAbrLnatKlQG3ckUzgfJtoSXdluKfP/ink5Ub0HmD9T7xhMrDJmssH1iQ1tiC4rmQ==}
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
@@ -2308,6 +2317,8 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
+  async-shared-mutex@2.2.2: {}
+
   boolean@3.2.0:
     optional: true
 
@@ -2845,6 +2856,10 @@ snapshots:
   katex@0.16.28:
     dependencies:
       commander: 8.3.0
+
+  keyed-mutex@0.1.4:
+    dependencies:
+      async-shared-mutex: 2.2.2
 
   keyv@4.5.4:
     dependencies:

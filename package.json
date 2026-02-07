@@ -25,6 +25,7 @@
 	},
 	"dependencies": {
 		"async-mutex": "^0.5.0",
+		"keyed-mutex": "^0.1.4",
 		"loglevel": "^1.9.2",
 		"monkey-around": "^3.0.0",
 		"obsidian-typings": "^4.93.0",

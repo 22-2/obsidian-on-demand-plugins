@@ -1,7 +1,7 @@
 import { App, EventRef, WorkspaceLeaf, debounce } from "obsidian";
-import { Mutex } from "async-mutex";
 import { PluginMode } from "../settings";
 import { isLeafVisible, rebuildLeafView, isPluginLoaded, PluginsMap } from "../utils/utils";
+import { LockStrategy, LeafViewLockStrategy } from "./utils/leaf-lock";
 import log from "loglevel";
 
 interface ViewLazyLoaderDeps {
@@ -16,7 +16,6 @@ interface ViewLazyLoaderDeps {
 const logger = log.getLogger("OnDemandPlugin/ViewLazyLoader");
 
 export class ViewLazyLoader {
-    private leafMutexes = new WeakMap<WorkspaceLeaf, Mutex>();
     private lastProcessed = new WeakMap<WorkspaceLeaf, { viewType: string; at: number }>();
     private readonly reentryWindowMs = 1500; // ms
     private debouncedInitializeLazyViewForLeaf = debounce(
@@ -25,7 +24,10 @@ export class ViewLazyLoader {
         true,
     );
 
-    constructor(private deps: ViewLazyLoaderDeps) {}
+    constructor(
+        private deps: ViewLazyLoaderDeps,
+        private lockStrategy: LockStrategy<{ leaf: WorkspaceLeaf; viewType: string }> = new LeafViewLockStrategy(),
+    ) {}
 
     registerActiveLeafReload(): void {
         this.deps.registerEvent(
@@ -44,13 +46,12 @@ export class ViewLazyLoader {
         // Avoid loading lazy-on-view plugins during layout restoration.
         if (!this.deps.app.workspace.layoutReady) return;
         if (!leaf) return;
+        const viewType = leaf.view.getViewType();
 
-        const mutex = this.getLeafMutex(leaf);
-        await mutex.runExclusive(async () => {
+        const release = await this.lockStrategy.lock({ leaf, viewType });
+        try {
             if (!this.deps.app.workspace.layoutReady) return;
             if (!isLeafVisible(leaf)) return;
-
-            const viewType = leaf.view.getViewType();
 
             const last = this.lastProcessed.get(leaf);
             if (last && last.viewType === viewType && Date.now() - last.at < this.reentryWindowMs) {
@@ -82,7 +83,9 @@ export class ViewLazyLoader {
             this.deps.syncCommandWrappersForPlugin(pluginId);
             // record that we processed this leaf+viewType
             this.lastProcessed.set(leaf, { viewType, at: Date.now() });
-        });
+        } finally {
+            release.unlock();
+        }
     }
 
     async checkViewTypeForLazyLoading(viewType: string): Promise<void> {
@@ -108,14 +111,5 @@ export class ViewLazyLoader {
             }
         }
         return null;
-    }
-
-    private getLeafMutex(leaf: WorkspaceLeaf): Mutex {
-        const existing = this.leafMutexes.get(leaf);
-        if (existing) return existing;
-
-        const created = new Mutex();
-        this.leafMutexes.set(leaf, created);
-        return created;
     }
 }
