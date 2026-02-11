@@ -12,7 +12,6 @@ test.use({
         plugins: [
             {
                 path: path.resolve(__dirname, "..", "myfiles", "obsidian42-brat"),
-                pluginId: "obsidian42-brat",
             },
         ],
     },

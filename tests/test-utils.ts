@@ -19,11 +19,9 @@ export function useOnDemandPlugins() {
             plugins: [
                 {
                     path: repoRoot,
-                    pluginId: pluginUnderTestId,
                 },
                 {
                     path: path.resolve(repoRoot, "myfiles", targetPluginId),
-                    pluginId: targetPluginId,
                 },
             ],
         },
@@ -38,11 +36,9 @@ export function useOnDemandPluginsWithExcalidraw() {
             plugins: [
                 {
                     path: repoRoot,
-                    pluginId: pluginUnderTestId,
                 },
                 {
                     path: path.resolve(repoRoot, "myfiles", excalidrawPluginId),
-                    pluginId: excalidrawPluginId,
                 },
             ],
         },
