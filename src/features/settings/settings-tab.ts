@@ -88,24 +88,6 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         new Setting(this.containerEl)
-            .setName("Lazy command caching")
-            .setHeading();
-
-        new Setting(this.containerEl)
-            .setName("Show plugin descriptions")
-            .addToggle((toggle) => {
-                toggle
-                    .setValue(this.plugin.settings.showDescriptions)
-                    .onChange((value) => {
-                        this.plugin.settings.showDescriptions = value;
-                        void (async () => {
-                            await this.plugin.saveSettings();
-                            this.buildDom();
-                        })();
-                    });
-            });
-
-        new Setting(this.containerEl)
             .setName("Debug log output")
             .setDesc("Enable detailed logs for troubleshooting.")
             .addToggle((toggle) => {
@@ -119,6 +101,24 @@ export class SettingsTab extends PluginSettingTab {
                         })();
                     });
             });
+
+        new Setting(this.containerEl)
+            .setName("Lazy command caching")
+            .setHeading();
+
+        // new Setting(this.containerEl)
+        //     .setName("Show plugin descriptions")
+        //     .addToggle((toggle) => {
+        //         toggle
+        //             .setValue(this.plugin.settings.showDescriptions)
+        //             .onChange((value) => {
+        //                 this.plugin.settings.showDescriptions = value;
+        //                 void (async () => {
+        //                     await this.plugin.saveSettings();
+        //                     this.buildDom();
+        //                 })();
+        //             });
+        //     });
 
         new Setting(this.containerEl)
             .setName("Re-register lazy commands/views on disable")
