@@ -175,7 +175,6 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
         const key = `on-demand:commandCacheVersions:${appId}`;
         const raw = window.localStorage.getItem(key);
         const versions = raw ? JSON.parse(raw) : {};
-        console.log(`[Test Debug] Cached versions key: ${key}, content:`, versions);
         return versions[pluginId] ?? null;
     }, targetPluginId);
 
