@@ -15,11 +15,13 @@ const logger = log.getLogger("OnDemandPlugin/ActivationRules");
 
 /** Built-in file rules that are always active unless overridden. */
 const DEFAULT_FILE_RULES: Record<string, FileActivationCriteria> = {
-    // Example: Excalidraw plugin
-    // "obsidian-excalidraw-plugin": {
-    //     suffixes: [".excalidraw"],
-    //     frontmatterKeys: ["excalidraw-plugin"],
-    // },
+    "obsidian-excalidraw-plugin": {
+        suffixes: [".excalidraw"],
+        frontmatterKeys: ["excalidraw-plugin"],
+    },
+    "lineage": {
+        suffixes: [".lineage", ".ginko"],
+    }
 };
 
 // ---------------------------------------------------------------------------
