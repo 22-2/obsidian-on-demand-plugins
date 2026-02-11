@@ -3,7 +3,7 @@ import { CachedCommand, PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
 import { loadJSON, saveJSON } from "../../core/storage";
 import { CommandCache } from "../../core/types";
-import { isPluginLoaded } from "../../utils/utils";
+import { isPluginLoaded, isLazyMode } from "../../utils/utils";
 
 // Re-export for consumers
 export type { CachedCommand } from "../../core/interfaces";
@@ -25,20 +25,11 @@ export class CommandCacheService {
     }
 
     loadFromData() {
-        const data = this.ctx.getData();
-        // Prefer persisted settings data, but fall back to local store2 cache
-        let commandCacheSource = data.commandCache;
-        if (!commandCacheSource) {
-            const stored = loadJSON<CommandCache>(this.ctx.app, "commandCache");
-            if (stored) {
-                commandCacheSource = stored;
-                // If we fell back to local cache, try to hydrate versions too
-                const storedVersions = loadJSON<Record<string, string>>(this.ctx.app, "commandCacheVersions");
-                if (storedVersions && !data.commandCacheVersions) {
-                    data.commandCacheVersions = storedVersions;
-                }
-            }
-        }
+        // Load command cache from vault-scoped store (store2) only.
+        const commandCacheSource = loadJSON<CommandCache>(
+            this.ctx.app,
+            "commandCache",
+        );
         if (!commandCacheSource) return;
 
         this.commandCache.clear();
@@ -113,7 +104,7 @@ export class CommandCacheService {
 
     private isLazyMode(pluginId: string) {
         const mode = this.ctx.getPluginMode(pluginId);
-        return mode === "lazy" || mode === "lazyOnView";
+        return isLazyMode(mode);
     }
 
     async refreshCommandsForPlugin(pluginId: string): Promise<boolean> {
@@ -137,7 +128,7 @@ export class CommandCacheService {
             await this.ctx.obsidianPlugins.enablePlugin(pluginId);
         }
 
-        if (!isPluginLoaded(this.ctx.obsidianPlugins.plugins, pluginId)) {
+        if (!isPluginLoaded(this.ctx.app, pluginId)) {
             await this.pluginLoader.waitForPluginLoaded(pluginId);
         }
 
@@ -173,8 +164,7 @@ export class CommandCacheService {
 
     registerCachedCommands() {
         for (const plugin of this.ctx.getManifests()) {
-            const mode = this.ctx.getPluginMode(plugin.id);
-            if (mode === "lazy" || mode === "lazyOnView") {
+            if (this.isLazyMode(plugin.id)) {
                 this.registerCachedCommandsForPlugin(plugin.id);
             }
         }
@@ -285,7 +275,7 @@ export class CommandCacheService {
 
     isCommandCacheValid(pluginId: string): boolean {
         if (!this.pluginCommandIndex.has(pluginId)) return false;
-        const cached = this.ctx.getData().commandCache?.[pluginId];
+        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
         if (!Array.isArray(cached) || cached.length === 0) return false;
 
         const manifest = this.ctx
@@ -293,8 +283,10 @@ export class CommandCacheService {
             .find((plugin) => plugin.id === pluginId);
         if (!manifest) return false;
 
-        const cachedVersion =
-            this.ctx.getData().commandCacheVersions?.[pluginId];
+        const cachedVersion = loadJSON<Record<string, string>>(
+            this.ctx.app,
+            "commandCacheVersions",
+        )?.[pluginId];
         if (!cachedVersion) return false;
 
         return cachedVersion === (manifest.version ?? "");
@@ -317,13 +309,7 @@ export class CommandCacheService {
             }
         });
 
-        const data = this.ctx.getData();
-        data.commandCache = cache;
-        data.commandCacheVersions = versions;
-        data.commandCacheUpdatedAt = Date.now();
-        await this.ctx.saveSettings();
-
-        // Also persist local copies keyed by vault (appId) for faster/local retrieval
+        // Persist only to vault-scoped store (store2). Do not write into plugin data.json.
         saveJSON(this.ctx.app, "commandCache", cache);
         saveJSON(this.ctx.app, "commandCacheVersions", versions);
     }

@@ -10,10 +10,10 @@ Lazy load plugins by caching their commands. Plugins are enabled on-demand when 
 
 1. Open **Settings → On‑Demand Plugins**.
 2. In the plugin list, choose a mode for each plugin:
-	- **Lazy on command**: Loads when you run one of its commands.
-	- **Lazy on view**: Loads when a specific view type is opened.
+	- **Lazy on demand**: Loads when you run one of its commands, when a specified view type is opened, or when a specific file type (e.g. excalidraw.md) is opened. You can configure `lazy on file` and `lazy on view` in the modal.
+	- **Lazy on layoutready**: Loads once the workspace layout is ready.
 	- **Always enabled**: Loads normally at startup.
-	- **Disabled**: Keeps the plugin off.
+	- **Always disabled**: Keeps the plugin off.
 3. Click **Apply changes**. **Obsidian will automatically restart** to apply your selections.
 
 ## ✨ Features & How it works
@@ -25,9 +25,7 @@ This plugin achieves dramatic startup speed improvements by:
 - Dynamically loading the real plugin only when a cached command is triggered or a specific view is opened.
 - Directly modifying `.obsidian/community-plugins.json` during **Apply changes** to ensure stable bulk-switching of plugin states.
 
-### Key Features
-- **Command-based Loading**: Plugins are loaded only when you execute one of their commands.
-- **🖼️ View-based Loading**: Automatically load plugins when a specific view type is displayed.
+- **On-demand Loading (Lazy on demand)**: Plugins are loaded when you run one of their commands, when a specified view type is displayed, or when a specific file type (e.g. Excalidraw) is opened. You can configure `lazy on file` and `lazy on view` in the modal.
 - **Automatic View Type Detection**: When a plugin is set to **Lazy on view**, its view types are captured automatically during **Apply changes**. You do not need to enter view types manually.
 - **Customizable Startup Policy**: Individual settings for each plugin to decide how they should be loaded.
 
@@ -37,6 +35,10 @@ Add a screenshot of the On‑Demand Plugins settings page to make the setup clea
 <!-- Screenshot: On-Demand Plugins settings -->
 ![On‑Demand Plugins settings](assets/ss.png)
 *Screenshot of the On‑Demand Plugins settings page.*
+
+<!-- Screenshot: On-Demand Modal -->
+![On‑Demand Modal](assets/ss-modal.png)
+*Screenshot of the settings modal.*
 
 ## ⚠️ Recommended Usage & Warnings
 

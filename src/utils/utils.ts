@@ -1,5 +1,6 @@
 import { LogLevelDesc, default as log } from "loglevel";
-import { WorkspaceLeaf } from "obsidian";
+import { App, WorkspaceLeaf } from "obsidian";
+import { PluginMode } from "src/settings";
 
 export function sleep(ms: number) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -25,21 +26,23 @@ export function isLeafVisible(leaf: WorkspaceLeaf): boolean {
     return (leaf as unknown as { isVisible(): boolean }).isVisible();
 }
 
-export function checkViewIsGone(leaf: WorkspaceLeaf): boolean {
-    return (
-        !!(leaf as unknown as { emptyStateEl: HTMLElement }).emptyStateEl &&
-        (leaf.view as unknown as { viewType: string }).viewType !== "empty"
-    );
-}
-
 export function isPluginLoaded(
-    plugins: PluginsMap | undefined,
+    app: App,
     pluginId: string,
+    strict = false
 ): boolean {
-    return Boolean(plugins?.[pluginId]?._loaded);
-}
+    const plugins = app.plugins;
+    if (!plugins) return false;
+    
+    const isEnabled = plugins.enabledPlugins?.has(pluginId);
+    const isLoaded = Boolean(plugins.plugins?.[pluginId]?._loaded);
 
-export type PluginsMap = Record<string, { _loaded?: boolean }>;
+    if (strict) {
+        return Boolean(isEnabled && isLoaded);
+    } else {
+        return Boolean(isLoaded);
+    }
+}
 
 export function isPluginEnabled(
     enabledPlugins: Set<string>,
@@ -47,3 +50,11 @@ export function isPluginEnabled(
 ): boolean {
     return enabledPlugins.has(pluginId);
 }
+
+/**
+ * Checks if a plugin mode is lazy (any mode that is not "keepEnabled" or "disabled")
+ */
+export function isLazyMode(mode: PluginMode): boolean {
+    return mode === "lazy" || mode === "lazyOnView" || mode === "lazyOnLayoutReady";
+}
+

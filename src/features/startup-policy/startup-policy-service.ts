@@ -1,13 +1,12 @@
-import { App, PluginManifest } from "obsidian";
+import { App, PluginManifest, debounce } from "obsidian";
 import { saveJSON } from "../../core/storage";
 import log from "loglevel";
 import { ProgressDialog } from "../../utils/progress";
 import { ON_DEMAND_PLUGIN_ID } from "../../utils/constants";
-import { isPluginLoaded, isPluginEnabled, PluginsMap } from "../../utils/utils";
+import { isPluginLoaded, isPluginEnabled, isLazyMode } from "../../utils/utils";
 import { PluginMode } from "../../core/types";
 import { Commands, Plugins } from "obsidian-typings";
 import { Mutex } from "async-mutex";
-import pDebounce from "p-debounce";
 import pWaitFor from "p-wait-for";
 import { PluginContext } from "../../core/plugin-context";
 import { CommandCacheService } from "../command-cache/command-cache-service";
@@ -78,7 +77,7 @@ class ViewRegistryInterceptor {
  * Helper to wait for plugin load completion
  */
 class PluginLoadWaiter {
-    constructor(private plugins: PluginsMap | undefined) {}
+    constructor(private app: any) {}
 
     /**
      * Wait until all specified plugins have finished loading
@@ -88,7 +87,7 @@ class PluginLoadWaiter {
 
         try {
             await pWaitFor(
-                () => pluginIds.every((id) => isPluginLoaded(this.plugins, id)),
+                () => pluginIds.every((id) => isPluginLoaded(this.app, id)),
                 { interval: 100, timeout: timeoutMs },
             );
             return true;
@@ -114,7 +113,7 @@ class PluginLoadWaiter {
         while (true) {
             if (isCancelled()) return false;
 
-            if (pluginIds.every((id) => isPluginLoaded(this.plugins, id))) {
+            if (pluginIds.every((id) => isPluginLoaded(this.app, id))) {
                 return true;
             }
 
@@ -152,6 +151,8 @@ class PersistenceManager {
      * Write the community-plugins file
      */
     async writeCommunityPlugins(enabledPlugins: Set<string>): Promise<void> {
+        // Write whatever set the caller provides. Caller is responsible
+        // for filtering to the desired set (e.g. `keepEnabled` only).
         await this.registry.writeCommunityPluginsFile(
             [...enabledPlugins].sort((a, b) => a.localeCompare(b)),
             this.ctx.getData().showConsoleLog,
@@ -184,7 +185,7 @@ class PluginBulkLoader {
             progress?.setProgress(index + 1);
 
             const loaded = isPluginLoaded(
-                this.ctx.obsidianPlugins.plugins,
+                this.ctx.app,
                 plugin.id,
             );
             const enabled = isPluginEnabled(
@@ -238,7 +239,7 @@ export class StartupPolicyService {
             ctx.app,
             (pluginId) => ctx.getPluginMode(pluginId),
         );
-        this.pluginLoadWaiter = new PluginLoadWaiter(ctx.obsidianPlugins.plugins);
+        this.pluginLoadWaiter = new PluginLoadWaiter(ctx.app);
         this.persistenceManager = new PersistenceManager(ctx.app, ctx, registry);
         this.pluginBulkLoader = new PluginBulkLoader(ctx, commandCacheService);
     }
@@ -247,7 +248,7 @@ export class StartupPolicyService {
      * Apply plugin startup policy with progress indicator and reload support.
      * Serialized using debounce + mutex
      */
-    public apply = pDebounce(
+    public apply = debounce(
         async (pluginIds?: string[]) => {
             await this.mutex.runExclusive(async () => {
                 await this.executeStartupPolicy(pluginIds);
@@ -256,7 +257,7 @@ export class StartupPolicyService {
         100,
     );
 
-    private async executeStartupPolicy(pluginIds?: string[]) {
+    private async executeStartupPolicy(pluginIds?: string[], externalProgress?: ProgressDialog | null) {
         const manifests = this.ctx.getManifests();
         const targetPluginIds = pluginIds?.length ? new Set(pluginIds) : null;
         const targetManifests = this.getTargetManifests(
@@ -266,9 +267,18 @@ export class StartupPolicyService {
         const lazyManifests = this.getLazyManifests(targetManifests);
 
         let cancelled = false;
-        const progress = this.createProgressDialog(lazyManifests.length, () => {
+        // Use an externally supplied progress dialog when provided, otherwise create one.
+        const progress = externalProgress ?? this.createProgressDialog(lazyManifests.length, () => {
             cancelled = true;
         });
+
+        if (externalProgress) {
+            // Ensure cancel from external dialog sets our cancelled flag and totals align.
+            externalProgress.setOnCancel(() => {
+                cancelled = true;
+            });
+            externalProgress.setTotal(lazyManifests.length + 2);
+        }
 
         const lazyOnViews: Record<string, string[]> = {
             ...(this.ctx.getSettings().lazyOnViews ?? {}),
@@ -292,6 +302,16 @@ export class StartupPolicyService {
         }
     }
 
+    /**
+     * Apply startup policy but reuse an externally created ProgressDialog (optional).
+     * This allows callers to show a unified progress UI covering command cache rebuild + apply.
+     */
+    public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[]) {
+        await this.mutex.runExclusive(async () => {
+            await this.executeStartupPolicy(pluginIds, progress);
+        });
+    }
+
     private getTargetManifests(
         manifests: PluginManifest[],
         targetPluginIds: Set<string> | null,
@@ -302,10 +322,10 @@ export class StartupPolicyService {
     }
 
     private getLazyManifests(manifests: PluginManifest[]) {
-        return manifests.filter((plugin) => {
-            const mode = this.ctx.getPluginMode(plugin.id);
-            return mode === "lazy" || mode === "lazyOnView";
-        });
+        // Only legacy `lazyOnView` plugins need to be loaded during the
+        // startup apply step so we can detect view registrations. Regular
+        // `lazy` plugins should not be enabled at startup.
+        return manifests.filter((plugin) => this.ctx.getPluginMode(plugin.id) === "lazyOnView");
     }
 
     private createProgressDialog(
@@ -381,7 +401,14 @@ export class StartupPolicyService {
             this.ctx.obsidianPlugins.enabledPlugins.add(pluginId);
         });
 
-        await this.persistenceManager.writeCommunityPlugins(desiredEnabled);
+        // Ensure only `keepEnabled` plugins (plus the on-demand plugin) are persisted.
+        const toPersist = new Set<string>(
+            [...desiredEnabled].filter(
+                (id) => this.ctx.getPluginMode(id) === "keepEnabled" || id === ON_DEMAND_PLUGIN_ID,
+            ),
+        );
+
+        await this.persistenceManager.writeCommunityPlugins(toPersist);
 
         if (shouldReload) {
             try {

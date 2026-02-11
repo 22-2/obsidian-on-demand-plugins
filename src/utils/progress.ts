@@ -56,6 +56,13 @@ export class ProgressDialog extends Modal {
         }
     }
 
+    /**
+     * Allow callers to set or replace the cancel handler after construction.
+     */
+    setOnCancel(onCancel?: () => void) {
+        this.onCancel = onCancel;
+    }
+
     setTotal(total: number) {
         this.total = Math.max(1, Math.floor(total));
         this.progressEl.max = this.total;

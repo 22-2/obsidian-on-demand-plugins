@@ -76,7 +76,7 @@ export class LazyCommandRunner implements PluginLoader {
         return await mutex.runExclusive(async () => {
             try {
                 const loaded = isPluginLoaded(
-                    this.ctx.obsidianPlugins.plugins,
+                    this.ctx.app,
                     pluginId,
                 );
                 const enabled = isPluginEnabled(
@@ -168,7 +168,7 @@ export class LazyCommandRunner implements PluginLoader {
         try {
             await pTimeout(
                 pWaitFor(
-                    () => isPluginLoaded(this.ctx.obsidianPlugins.plugins, pluginId),
+                    () => isPluginLoaded(this.ctx.app, pluginId),
                     {
                         interval: 100,
                     }

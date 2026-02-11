@@ -12,3 +12,9 @@
 .lazy-plugin-progress-bar {
     width: 100%;
 }
+
+.lazy-plugin-gear-left {
+    padding: 0;
+    margin-right: 8px;
+    vertical-align: middle;
+}

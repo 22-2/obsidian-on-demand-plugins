@@ -1,10 +1,9 @@
-import { test, expect } from "obsidian-e2e-toolkit";
+import { expect, test } from "obsidian-e2e-toolkit";
 import {
-    repoRoot,
-    pluginUnderTestId,
-    excalidrawPluginId,
     ensureBuilt,
-    useOnDemandPluginsWithExcalidraw,
+    excalidrawPluginId,
+    pluginUnderTestId,
+    useOnDemandPluginsWithExcalidraw
 } from "./test-utils";
 
 useOnDemandPluginsWithExcalidraw();
@@ -20,9 +19,9 @@ test("opening .excalidraw.md triggers lazy load and shows Excalidraw view", asyn
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
         try {
-            await plugin.updatePluginSettings(pluginId, "lazyOnView");
-            plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
-            plugin.settings.lazyOnViews[pluginId] = [];
+            await plugin.updatePluginSettings(pluginId, "lazy");
+            // plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
+            // plugin.settings.lazyOnViews[pluginId] = [];
             await plugin.saveSettings();
         } finally {
             app.commands.executeCommandById = original;
@@ -30,17 +29,12 @@ test("opening .excalidraw.md triggers lazy load and shows Excalidraw view", asyn
         return { mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null };
     }, excalidrawPluginId);
 
-    expect(result.mode).toBe("lazyOnView");
-
+    expect(result.mode).toBe("lazy");
     // create an Excalidraw markdown file and open it
-    await obsidian.page.evaluate(() => {
-        return app.vault.create("test.excalidraw.md", "---\nexcalidraw-plugin: parsed\n---\n");
-    });
-
-    await obsidian.page.evaluate(() => {
-        const f = app.vault.getAbstractFileByPath("test.excalidraw.md");
+    await obsidian.page.evaluate(async () => {
+        const f = await app.vault.create("test.excalidraw.md", "---\n\nexcalidraw-plugin: parsed\ntags: [excalidraw]\n\n---\n==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'\n\n\n## Drawing\n```compressed-json\nN4IgLgngDgpiBcIYA8DGBDANgSwCYCd0B3EAGhADcZ8BnbAewDsEAmcm+gV31TkQAswYKDXgB6MQHNsYfpwBGAOlT0AtmIBeNCtlQbs6RmPry6uA4wC0KDDgLFLUTJ2lH8MTDHQ0YNMWHRJMRZFFgAGRQBmMiRPVRhGMBoEAG0AXXJ0KCgAZQCwPlBJfDwc7A0+Rk5MTHIdGCIAIXRUAGtirkZcAGF6THp8BBAAYgAzcYmQAF8poA===\n```\n%%");
         const leaf = app.workspace.getLeaf(false);
-        if (f && leaf) leaf.openFile(f as any);
+        await leaf.openFile(f);
     });
 
     // wait for plugin to be enabled
@@ -81,7 +75,7 @@ test("layout-restore triggers lazy load for already-open Excalidraw file", async
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
         try {
-            await plugin.updatePluginSettings(pluginId, "lazyOnView");
+            await plugin.updatePluginSettings(pluginId, "lazy");
             plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
             plugin.settings.lazyOnViews[pluginId] = [];
             await plugin.saveSettings();
@@ -91,14 +85,10 @@ test("layout-restore triggers lazy load for already-open Excalidraw file", async
     }, excalidrawPluginId);
 
     // create file and open it (will open as markdown initially)
-    await obsidian.page.evaluate(() => {
-        return app.vault.create("test2.excalidraw.md", "---\nexcalidraw-plugin: parsed\n---\n");
-    });
-
-    await obsidian.page.evaluate(() => {
-        const f = app.vault.getAbstractFileByPath("test2.excalidraw.md");
+    await obsidian.page.evaluate(async () => {
+        const f = await app.vault.create("test.excalidraw.md", "---\n\nexcalidraw-plugin: parsed\ntags: [excalidraw]\n\n---\n==⚠  Switch to EXCALIDRAW VIEW in the MORE OPTIONS menu of this document. ⚠== You can decompress Drawing data with the command palette: 'Decompress current Excalidraw file'. For more info check in plugin settings under 'Saving'\n\n\n## Drawing\n```compressed-json\nN4IgLgngDgpiBcIYA8DGBDANgSwCYCd0B3EAGhADcZ8BnbAewDsEAmcm+gV31TkQAswYKDXgB6MQHNsYfpwBGAOlT0AtmIBeNCtlQbs6RmPry6uA4wC0KDDgLFLUTJ2lH8MTDHQ0YNMWHRJMRZFFgAGRQBmMiRPVRhGMBoEAG0AXXJ0KCgAZQCwPlBJfDwc7A0+Rk5MTHIdGCIAIXRUAGtirkZcAGF6THp8BBAAYgAzcYmQAF8poA===\n```\n%%");
         const leaf = app.workspace.getLeaf(false);
-        if (f && leaf) leaf.openFile(f as any);
+        await leaf.openFile(f);
     });
 
     // simulate layout restore event

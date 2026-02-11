@@ -1,7 +1,7 @@
 {
 	"id": "on-demand-plugins",
 	"name": "On‑Demand Plugins",
-	"version": "2.0.5",
+	"version": "2.1.0",
 	"minAppVersion": "1.11.5",
 	"description": "Lazy load plugins by caching their commands. Plugins are enabled on-demand when you trigger their commands (or open specific views), keeping startup fast.",
 	"author": "22-2",

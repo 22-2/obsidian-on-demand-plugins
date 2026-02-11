@@ -2,6 +2,7 @@ import { around } from "monkey-around";
 import { Plugins } from "obsidian-typings";
 import { PluginContext } from "../core/plugin-context";
 import { CommandCacheService } from "../features/command-cache/command-cache-service";
+import { isLazyMode } from "../utils/utils";
 
 export function patchPluginEnableDisable(
     ctx: PluginContext,
@@ -30,7 +31,7 @@ export function patchPluginEnableDisable(
                         settings.reRegisterLazyCommandsOnDisable ?? true;
                     if (
                         shouldReRegister &&
-                        (mode === "lazy" || mode === "lazyOnView")
+                        isLazyMode(mode)
                     ) {
                         await commandCacheService.ensureCommandsCached(
                             pluginId,

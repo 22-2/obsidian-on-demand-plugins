@@ -3,10 +3,9 @@
  * Unchanged from original — just moved to core/.
  */
 import store from "store2";
-import invariant from "tiny-invariant";
 
 function getVaultId(app: any): string {
-    invariant(app, "App/Plugin/ID is required");
+    if (!app) throw new Error("App/Plugin is required");
     // Try common locations for an identifier on App or Plugin objects
     if (app.appId) return app.appId;
     if (app.app && app.app.appId) return app.app.appId;

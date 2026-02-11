@@ -24,19 +24,11 @@ test("apply changes updates startup policy", async ({ obsidian }) => {
         return {
             mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
             enabled: app.plugins.enabledPlugins.has(pluginId),
-            beforeUpdatedAt,
-            afterUpdatedAt: plugin.data?.commandCacheUpdatedAt ?? null,
         };
     }, targetPluginId);
 
     expect(result.mode).toBe("lazy");
     expect(result.enabled).toBe(false);
-    expect(result.afterUpdatedAt).toBeTruthy();
-    if (result.beforeUpdatedAt) {
-        expect(result.afterUpdatedAt).toBeGreaterThanOrEqual(
-            result.beforeUpdatedAt,
-        );
-    }
 });
 
 test("force rebuild refreshes command cache", async ({ obsidian }) => {
@@ -45,8 +37,7 @@ test("force rebuild refreshes command cache", async ({ obsidian }) => {
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const beforeUpdatedAt = plugin.data?.commandCacheUpdatedAt ?? null;
+    await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
 
@@ -56,21 +47,17 @@ test("force rebuild refreshes command cache", async ({ obsidian }) => {
         } finally {
             app.commands.executeCommandById = original;
         }
-
-        return {
-            beforeUpdatedAt,
-            afterUpdatedAt: plugin.data?.commandCacheUpdatedAt ?? null,
-            cacheCount: plugin.data?.commandCache?.[pluginId]?.length ?? 0,
-        };
     }, targetPluginId);
 
-    expect(result.afterUpdatedAt).toBeTruthy();
-    if (result.beforeUpdatedAt) {
-        expect(result.afterUpdatedAt).toBeGreaterThanOrEqual(
-            result.beforeUpdatedAt,
-        );
-    }
-    expect(result.cacheCount).toBeGreaterThanOrEqual(0);
+    const cacheCount = await pluginHandle.evaluate(async (plugin, pluginId) => {
+        const appId = (app as any).appId ?? (app as any).app?.appId ?? (app as any).manifest?.id;
+        const key = `on-demand:commandCache:${appId}`;
+        const raw = window.localStorage.getItem(key);
+        const cache = raw ? JSON.parse(raw) : {};
+        return cache[pluginId]?.length ?? 0;
+    }, targetPluginId);
+
+    expect(cacheCount).toBeGreaterThanOrEqual(0);
 });
 
 test("lazyOnView loads plugin on view activation", async ({ obsidian }) => {
@@ -182,7 +169,16 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
     }, targetPluginId);
 
     expect(result.manifestVersion).toBeTruthy();
-    expect(result.cachedVersion).toBe(result.manifestVersion);
+
+    const cachedVersion = await pluginHandle.evaluate(async (plugin, pluginId) => {
+        const appId = (app as any).appId;
+        const key = `on-demand:commandCacheVersions:${appId}`;
+        const raw = window.localStorage.getItem(key);
+        const versions = raw ? JSON.parse(raw) : {};
+        return versions[pluginId] ?? null;
+    }, targetPluginId);
+
+    expect(cachedVersion).toBe(result.manifestVersion);
 });
 
 test("apply changes writes community-plugins.json", async ({ obsidian }) => {

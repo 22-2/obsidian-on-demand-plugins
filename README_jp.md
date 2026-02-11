@@ -10,10 +10,10 @@
 
 1. **設定 → On‑Demand Plugins** を開きます。
 2. プラグイン一覧で各プラグインの動作モードを選びます：
-   - **Lazy on command**: プラグインのコマンドを実行したときに読み込まれます。
-   - **Lazy on view**: 指定したビューが開かれたときに読み込まれます。
+   - **Lazy on demand**: コマンド実行、指定したビューが開かれたとき、または excalidraw.md のような特定のファイル（`lazy on file`）を開いたときに読み込まれます。設定モーダルで `lazy on file` と `lazy on view` を指定できます。
+   - **Lazy on layoutready**: レイアウトの準備が整った（layout-ready）時点で読み込まれます。
    - **Always enabled**: 起動時に通常通り読み込まれます。
-   - **Disabled**: プラグインをオフのままにします。
+   - **Always disabled**: プラグインをオフのままにします。
 3. **Apply changes** をクリックします。**Obsidian が自動的に再起動され**、選択した設定が適用されます。
 
 ## ✨ 機能と仕組み
@@ -26,8 +26,7 @@
 - 安定して動作させるために、一括設定の適用時に `.obsidian/community-plugins.json` を直接書き換えます。
 
 ### 主な機能
-- **コマンドベースの読み込み**: プラグインはそのコマンドを実行したときだけ読み込まれます。
-- **ビュー起点の読み込み**: 指定したビュータイプが表示されたときにプラグインを自動で読み込みます。
+- **オンデマンド読み込み (Lazy on demand)**: プラグインはコマンド実行または指定したビューが開かれたときに読み込まれます。設定モーダルで `lazy on file` と `lazy on view` を指定できます。
 - **ビュータイプの自動検出**: プラグインを **Lazy on view** に設定すると、Apply changes 時にビュータイプが自動的に取得されます。手動で指定する必要はありません。
 - **カスタマイズ可能な起動ポリシー**: 各プラグインの読み込み方法を個別に設定できます。
 
@@ -36,6 +35,10 @@
 <!-- Screenshot: On-Demand Plugins settings -->
 ![On‑Demand Plugins settings](assets/ss.png)
 *On‑Demand Plugins 設定ページのスクリーンショット.*
+
+<!-- Screenshot: On-Demand Modal -->
+![On‑Demand Modal](assets/ss-modal.png)
+*設定モーダルのスクリーンショット.*
 
 ## ⚠️ 推奨使用法と警告
 

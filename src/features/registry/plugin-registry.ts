@@ -4,24 +4,6 @@ import { ON_DEMAND_PLUGIN_ID } from "../../utils/constants";
 
 const logger = log.getLogger("OnDemandPlugin/PluginRegistry");
 
-async function writeFileAtomicSimple(
-    adapter: DataAdapter,
-    path: string,
-    data: string | ArrayBuffer,
-): Promise<void> {
-    const tmpPath = `${path}.tmp-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 8)}`;
-
-    if (typeof data === "string") {
-        await adapter.write(tmpPath, data);
-    } else {
-        await adapter.writeBinary(tmpPath, data);
-    }
-
-    await adapter.rename(tmpPath, path);
-}
-
 export class PluginRegistry {
     manifests: PluginManifest[] = [];
     enabledPluginsFromDisk = new Set<string>();
@@ -91,7 +73,7 @@ export class PluginRegistry {
         const path = this.getCommunityPluginsConfigFilePath();
         const content = JSON.stringify(enabledPlugins, null, "\t");
         try {
-            await writeFileAtomicSimple(adapter, path, content);
+            await adapter.write(path, content);
         } catch (error) {
             if (showConsoleLog) {
                 logger.error("Failed to write community-plugins.json", error);
