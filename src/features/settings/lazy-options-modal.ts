@@ -67,7 +67,7 @@ export class LazyOptionsModal extends Modal {
         // --- File Settings ---
         new Setting(contentEl)
             .setName("Lazy on File")
-            .setDesc("Load plugin when specific files are opened (by suffix, frontmatter, etc.).")
+            .setDesc("Load plugin when specific files are opened (by suffix, etc.).")
             .addToggle(toggle => toggle
                 .setValue(this.options.useFile)
                 .onChange(value => {
