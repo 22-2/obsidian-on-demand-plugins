@@ -1,5 +1,6 @@
 import { LogLevelDesc, default as log } from "loglevel";
 import { App, WorkspaceLeaf } from "obsidian";
+import { PluginMode } from "src/settings";
 
 export function sleep(ms: number) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -50,11 +51,17 @@ export function isPluginLoaded(
     }
 }
 
-export type PluginsMap = Record<string, { _loaded?: boolean }>;
-
 export function isPluginEnabled(
     enabledPlugins: Set<string>,
     pluginId: string,
 ): boolean {
     return enabledPlugins.has(pluginId);
 }
+
+/**
+ * Checks if a plugin mode is lazy (either "lazy" or "lazyOnView")
+ */
+export function isLazyMode(mode: PluginMode): boolean {
+    return mode === "lazy" || mode === "lazyOnView";
+}
+

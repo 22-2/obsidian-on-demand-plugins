@@ -7,26 +7,20 @@
  */
 import { TFile } from "obsidian";
 import { PluginContext } from "../../core/plugin-context";
-import { FileActivationCriteria, PluginMode } from "../../core/types";
+import { FileActivationCriteria } from "../../core/types";
 import log from "loglevel";
+import { isLazyMode } from "src/utils/utils";
 
 const logger = log.getLogger("OnDemandPlugin/ActivationRules");
 
 /** Built-in file rules that are always active unless overridden. */
 const DEFAULT_FILE_RULES: Record<string, FileActivationCriteria> = {
+    // Example: Excalidraw plugin
     // "obsidian-excalidraw-plugin": {
     //     suffixes: [".excalidraw"],
     //     frontmatterKeys: ["excalidraw-plugin"],
     // },
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function isLazyMode(mode: PluginMode): boolean {
-    return mode === "lazy" || mode === "lazyOnView";
-}
 
 // ---------------------------------------------------------------------------
 // View-type resolution
@@ -35,9 +29,15 @@ function isLazyMode(mode: PluginMode): boolean {
 /**
  * Find the plugin that should be lazy-loaded for the given `viewType`.
  *
- * Returns `null` when no plugin claims this view type, or when the matching
- * plugin also has file-based rules (in which case FileLazyLoader handles it
- * to prevent infinite rebuild loops).
+ * This function checks both the modern per-plugin lazyOptions and the legacy
+ * global lazyOnViews map. It returns `null` when:
+ * - No plugin claims this view type
+ * - The matching plugin also has file-based rules (to prevent infinite rebuild loops)
+ * - The plugin is not in a lazy mode
+ *
+ * @param ctx - The plugin context containing settings and app instance
+ * @param viewType - The view type to resolve (e.g., "markdown", "canvas")
+ * @returns The plugin ID that should handle this view type, or null
  */
 export function resolvePluginForViewType(
     ctx: PluginContext,
@@ -81,7 +81,13 @@ export function resolvePluginForViewType(
 /**
  * Find the plugin that should be lazy-loaded for the given `file`.
  *
- * Returns `null` when no plugin matches.
+ * This function checks both the modern per-plugin lazyOptions and the legacy
+ * global lazyOnFiles map (plus built-in defaults). It evaluates file criteria
+ * such as suffixes, frontmatter keys, and content patterns.
+ *
+ * @param ctx - The plugin context containing settings and app instance
+ * @param file - The file to check against activation criteria
+ * @returns The plugin ID that should handle this file, or null
  */
 export async function resolvePluginForFile(
     ctx: PluginContext,
@@ -120,6 +126,19 @@ export async function resolvePluginForFile(
 // Criteria matching
 // ---------------------------------------------------------------------------
 
+/**
+ * Checks if a file matches the given activation criteria.
+ *
+ * Criteria can include:
+ * - Suffixes: File basename must end with one of the specified suffixes
+ * - Frontmatter keys: File must have one of the specified keys in its frontmatter
+ * - Content patterns: File content must match one of the specified regex patterns
+ *
+ * @param ctx - The plugin context containing the app instance
+ * @param file - The file to check
+ * @param criteria - The activation criteria to match against
+ * @returns True if the file matches any of the criteria
+ */
 export async function matchesCriteria(
     ctx: PluginContext,
     file: TFile,
