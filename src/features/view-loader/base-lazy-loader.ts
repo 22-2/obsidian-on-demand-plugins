@@ -3,7 +3,7 @@ import { WorkspaceLeaf } from "obsidian";
 import { PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
 import { isPluginLoaded, rebuildLeafView } from "../../utils/utils";
-import { LockStrategy } from "./leaf-lock";
+import { LockStrategy } from "./helpers/leaf-lock";
 
 const logger = log.getLogger("OnDemandPlugin/BaseLazyLoader");
 

@@ -16,7 +16,7 @@ import { ViewLazyLoader } from "../features/view-loader/view-lazy-loader";
 import { FileLazyLoader } from "../features/view-loader/file-lazy-loader";
 import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
 import { patchSetViewState } from "../patches/view-state";
-import { LeafLockManager, LeafViewLockStrategy } from "../features/view-loader/leaf-lock";
+import { LeafLockManager, LeafViewLockStrategy } from "../features/view-loader/helpers/leaf-lock";
 
 
 export class ServiceContainer {

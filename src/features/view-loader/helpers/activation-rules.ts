@@ -6,8 +6,8 @@
  * look-ups and hard-coded special cases.
  */
 import { TFile } from "obsidian";
-import { PluginContext } from "../../core/plugin-context";
-import { FileActivationCriteria } from "../../core/types";
+import { PluginContext } from "../../../core/plugin-context";
+import { FileActivationCriteria } from "../../../core/types";
 import log from "loglevel";
 import { isLazyMode } from "src/utils/utils";
 
