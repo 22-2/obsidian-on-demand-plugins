@@ -25,20 +25,11 @@ export class CommandCacheService {
     }
 
     loadFromData() {
-        const data = this.ctx.getData();
-        // Prefer persisted settings data, but fall back to local store2 cache
-        let commandCacheSource = data.commandCache;
-        if (!commandCacheSource) {
-            const stored = loadJSON<CommandCache>(this.ctx.app, "commandCache");
-            if (stored) {
-                commandCacheSource = stored;
-                // If we fell back to local cache, try to hydrate versions too
-                const storedVersions = loadJSON<Record<string, string>>(this.ctx.app, "commandCacheVersions");
-                if (storedVersions && !data.commandCacheVersions) {
-                    data.commandCacheVersions = storedVersions;
-                }
-            }
-        }
+        // Load command cache from vault-scoped store (store2) only.
+        const commandCacheSource = loadJSON<CommandCache>(
+            this.ctx.app,
+            "commandCache",
+        );
         if (!commandCacheSource) return;
 
         this.commandCache.clear();
@@ -285,7 +276,7 @@ export class CommandCacheService {
 
     isCommandCacheValid(pluginId: string): boolean {
         if (!this.pluginCommandIndex.has(pluginId)) return false;
-        const cached = this.ctx.getData().commandCache?.[pluginId];
+        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
         if (!Array.isArray(cached) || cached.length === 0) return false;
 
         const manifest = this.ctx
@@ -293,8 +284,10 @@ export class CommandCacheService {
             .find((plugin) => plugin.id === pluginId);
         if (!manifest) return false;
 
-        const cachedVersion =
-            this.ctx.getData().commandCacheVersions?.[pluginId];
+        const cachedVersion = loadJSON<Record<string, string>>(
+            this.ctx.app,
+            "commandCacheVersions",
+        )?.[pluginId];
         if (!cachedVersion) return false;
 
         return cachedVersion === (manifest.version ?? "");
@@ -317,13 +310,7 @@ export class CommandCacheService {
             }
         });
 
-        const data = this.ctx.getData();
-        data.commandCache = cache;
-        data.commandCacheVersions = versions;
-        data.commandCacheUpdatedAt = Date.now();
-        await this.ctx.saveSettings();
-
-        // Also persist local copies keyed by vault (appId) for faster/local retrieval
+        // Persist only to vault-scoped store (store2). Do not write into plugin data.json.
         saveJSON(this.ctx.app, "commandCache", cache);
         saveJSON(this.ctx.app, "commandCacheVersions", versions);
     }
