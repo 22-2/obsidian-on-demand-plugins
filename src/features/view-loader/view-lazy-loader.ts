@@ -2,7 +2,7 @@ import { WorkspaceLeaf, debounce } from "obsidian";
 import { PluginContext } from "../../core/plugin-context";
 import { CommandRegistry, PluginLoader } from "../../core/interfaces";
 import { isLeafVisible } from "../../utils/utils";
-import { LockStrategy, LeafViewLockStrategy, LeafLockManager } from "./leaf-lock";
+import { LockStrategy, LeafViewLockStrategy, defaultLeafLockManager } from "./leaf-lock";
 import { resolvePluginForViewType } from "./activation-rules";
 import { BaseLazyLoader } from "./base-lazy-loader";
 import log from "loglevel";
@@ -26,7 +26,7 @@ export class ViewLazyLoader extends BaseLazyLoader<{ leaf: WorkspaceLeaf; viewTy
         pluginLoader: PluginLoader & { ensurePluginLoaded(pluginId: string): Promise<boolean> },
         private commandRegistry: CommandRegistry,
         lockStrategy: LockStrategy<{ leaf: WorkspaceLeaf; viewType: string }> = new LeafViewLockStrategy(
-            new LeafLockManager(),
+            defaultLeafLockManager,
         ),
     ) {
         super(ctx, pluginLoader, lockStrategy);

@@ -79,12 +79,12 @@ export class LeafViewLockStrategy implements LockStrategy<{ leaf: WorkspaceLeaf;
  * Specialized strategy for locking a leaf regardless of its viewType.
  * Used by FileLazyLoader to prevent concurrent file-based processing on the same leaf.
  */
-export class LeafLockStrategy implements LockStrategy<WorkspaceLeaf> {
-    constructor(private manager: LeafLockManager) {}
+// NOTE: `LeafLockStrategy` adapter was removed to simplify the codebase.
+// If an adapter is needed, callers can provide an object implementing
+// `LockStrategy<WorkspaceLeaf>` that delegates to `LeafLockManager.lock(leaf, "leaf-generic")`.
 
-    async lock(leaf: WorkspaceLeaf): Promise<LockRelease> {
-        return this.manager.lock(leaf, "leaf-generic");
-    }
-}
+// Default shared manager to ensure code that constructs loaders without
+// explicitly providing a manager will still use a unified lock space.
+export const defaultLeafLockManager = new LeafLockManager();
 
 

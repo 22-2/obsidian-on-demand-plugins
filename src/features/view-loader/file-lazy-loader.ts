@@ -3,7 +3,7 @@ import { TFile, View, WorkspaceLeaf } from "obsidian";
 import { PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
 import { resolvePluginForFile } from "./activation-rules";
-import { LeafLockManager, LockStrategy } from "./leaf-lock";
+import { LockStrategy, defaultLeafLockManager } from "./leaf-lock";
 import { BaseLazyLoader } from "./base-lazy-loader";
 
 const logger = log.getLogger("OnDemandPlugin/FileLazyLoader");
@@ -32,7 +32,9 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
     constructor(
         ctx: PluginContext,
         pluginLoader: PluginLoader & { ensurePluginLoaded(pluginId: string): Promise<boolean> },
-        lockStrategy: LockStrategy<WorkspaceLeaf> = new LeafLockManager(),
+        lockStrategy: LockStrategy<WorkspaceLeaf> = {
+            lock: (leaf: WorkspaceLeaf) => defaultLeafLockManager.lock(leaf, "leaf-generic"),
+        },
     ) {
         super(ctx, pluginLoader, lockStrategy);
     }

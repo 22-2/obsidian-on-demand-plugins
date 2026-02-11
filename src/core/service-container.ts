@@ -16,7 +16,7 @@ import { ViewLazyLoader } from "../features/view-loader/view-lazy-loader";
 import { FileLazyLoader } from "../features/view-loader/file-lazy-loader";
 import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
 import { patchSetViewState } from "../patches/view-state";
-import { LeafLockManager, LeafLockStrategy, LeafViewLockStrategy } from "../features/view-loader/leaf-lock";
+import { LeafLockManager, LeafViewLockStrategy } from "../features/view-loader/leaf-lock";
 
 
 export class ServiceContainer {
@@ -71,7 +71,8 @@ export class ServiceContainer {
         this.fileLoader = new FileLazyLoader(
             ctx,
             this.lazyRunner,
-            new LeafLockStrategy(lockManager),
+            // Delegate to the shared manager with the "leaf-generic" subKey
+            { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") },
         );
 
     }
