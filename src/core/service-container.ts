@@ -13,9 +13,9 @@ import { PluginRegistry } from "../features/registry/plugin-registry";
 import { SettingsService } from "../features/settings/settings-service";
 import { StartupPolicyService } from "../features/startup-policy/startup-policy-service";
 import { ViewLazyLoader } from "../features/view-loader/view-lazy-loader";
+import { FileLazyLoader } from "../features/view-loader/file-lazy-loader";
 import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
 import { patchSetViewState } from "../patches/view-state";
-import { registerExcalidrawWrapper } from "../patches/excalidraw-wrapper";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;
@@ -24,6 +24,7 @@ export class ServiceContainer {
     readonly commandCache: CommandCacheService;
     readonly startupPolicy: StartupPolicyService;
     readonly viewLoader: ViewLazyLoader;
+    readonly fileLoader: FileLazyLoader;
 
     constructor(private ctx: PluginContext) {
         // 1. Registry (no service deps)
@@ -57,6 +58,9 @@ export class ServiceContainer {
             this.lazyRunner,
             this.commandCache,
         );
+
+        // 8. FileLazyLoader (needs ctx + pluginLoader)
+        this.fileLoader = new FileLazyLoader(ctx, this.lazyRunner);
     }
 
     /**
@@ -84,8 +88,8 @@ export class ServiceContainer {
 
         this.viewLoader.registerActiveLeafReload();
 
-        // Register Excalidraw special-case wrapper
-        registerExcalidrawWrapper(this.ctx, this.lazyRunner);
+        // Register standardized FileLazyLoader (handles Excalidraw and others via lazyOnFiles)
+        this.fileLoader.register();
     }
 
     /**

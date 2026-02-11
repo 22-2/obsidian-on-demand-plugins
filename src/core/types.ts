@@ -8,6 +8,12 @@ export interface PluginSettings {
     userConfigured?: boolean;
 }
 
+export interface FileActivationCriteria {
+    extensions?: string[];
+    frontmatterKeys?: string[];
+    contentPatterns?: string[];
+}
+
 // Settings per device (desktop/mobile)
 export interface DeviceSettings {
     // defaultMode: PluginMode;
@@ -15,6 +21,7 @@ export interface DeviceSettings {
     reRegisterLazyCommandsOnDisable: boolean;
     plugins: { [pluginId: string]: PluginSettings };
     lazyOnViews: { [pluginId: string]: string[] };
+    lazyOnFiles: { [pluginId: string]: FileActivationCriteria };
 }
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
@@ -23,6 +30,7 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
     reRegisterLazyCommandsOnDisable: true,
     plugins: {},
     lazyOnViews: {},
+    lazyOnFiles: {},
 };
 
 // Global settings for the plugin
