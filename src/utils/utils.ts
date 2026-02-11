@@ -26,13 +26,6 @@ export function isLeafVisible(leaf: WorkspaceLeaf): boolean {
     return (leaf as unknown as { isVisible(): boolean }).isVisible();
 }
 
-export function checkViewIsGone(leaf: WorkspaceLeaf): boolean {
-    return (
-        !!(leaf as unknown as { emptyStateEl: HTMLElement }).emptyStateEl &&
-        (leaf.view as unknown as { viewType: string }).viewType !== "empty"
-    );
-}
-
 export function isPluginLoaded(
     app: App,
     pluginId: string,
