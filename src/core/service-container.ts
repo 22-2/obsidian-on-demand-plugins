@@ -106,6 +106,19 @@ export class ServiceContainer {
 
         // Register standardized FileLazyLoader (handles Excalidraw and others via lazyOnFiles)
         this.fileLoader.register();
+
+        this.registerLayoutReadyLoader();
+    }
+
+    private registerLayoutReadyLoader() {
+        this.ctx.app.workspace.onLayoutReady(async () => {
+            const manifests = this.ctx.getManifests();
+            for (const manifest of manifests) {
+                if (this.ctx.getPluginMode(manifest.id) === "lazyOnLayoutReady") {
+                    await this.lazyRunner.ensurePluginLoaded(manifest.id);
+                }
+            }
+        });
     }
 
     /**

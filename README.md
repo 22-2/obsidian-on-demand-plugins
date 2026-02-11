@@ -12,6 +12,7 @@ Lazy load plugins by caching their commands. Plugins are enabled on-demand when 
 2. In the plugin list, choose a mode for each plugin:
 	- **Lazy on command**: Loads when you run one of its commands.
 	- **Lazy on view**: Loads when a specific view type is opened.
+	- **Lazy on layoutready**: Loads once the workspace layout is ready.
 	- **Always enabled**: Loads normally at startup.
 	- **Disabled**: Keeps the plugin off.
 3. Click **Apply changes**. **Obsidian will automatically restart** to apply your selections.

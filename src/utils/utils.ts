@@ -52,9 +52,9 @@ export function isPluginEnabled(
 }
 
 /**
- * Checks if a plugin mode is lazy (either "lazy" or "lazyOnView")
+ * Checks if a plugin mode is lazy (any mode that is not "keepEnabled" or "disabled")
  */
 export function isLazyMode(mode: PluginMode): boolean {
-    return mode === "lazy" || mode === "lazyOnView";
+    return mode === "lazy" || mode === "lazyOnView" || mode === "lazyOnLayoutReady";
 }
 
