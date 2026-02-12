@@ -3,11 +3,7 @@ import { Plugin, PluginManifest } from "obsidian";
 import { ServiceContainer } from "./core/service-container";
 import { createPluginContext } from "./core/plugin-context";
 import { SettingsTab } from "./features/settings/settings-tab";
-import {
-    DeviceSettings,
-    LazySettings,
-    PluginMode,
-} from "./core/types";
+import { DeviceSettings, LazySettings, PluginMode } from "./core/types";
 import { toggleLoggerBy } from "./core/utils";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");

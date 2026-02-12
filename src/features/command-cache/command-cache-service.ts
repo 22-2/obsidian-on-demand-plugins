@@ -275,7 +275,9 @@ export class CommandCacheService {
 
     isCommandCacheValid(pluginId: string): boolean {
         if (!this.pluginCommandIndex.has(pluginId)) return false;
-        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
+        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[
+            pluginId
+        ];
         if (!Array.isArray(cached) || cached.length === 0) return false;
 
         const manifest = this.ctx

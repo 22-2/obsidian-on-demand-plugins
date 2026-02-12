@@ -19,9 +19,9 @@ const DEFAULT_FILE_RULES: Record<string, FileActivationCriteria> = {
         suffixes: [".excalidraw"],
         frontmatterKeys: ["excalidraw-plugin"],
     },
-    "lineage": {
+    lineage: {
         suffixes: [".lineage", ".ginko"],
-    }
+    },
 };
 
 // ---------------------------------------------------------------------------
@@ -54,12 +54,16 @@ export function resolvePluginForViewType(
 
         // Defer to FileLazyLoader when file rules are also present
         if (hasFileRules(ctx, pluginId)) {
-            logger.debug(`[LazyPlugins] resolvePluginForViewType: ${pluginId} has view rule for ${viewType} but also has file rules. Skipping.`);
+            logger.debug(
+                `[LazyPlugins] resolvePluginForViewType: ${pluginId} has view rule for ${viewType} but also has file rules. Skipping.`,
+            );
             continue;
         }
 
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
-        logger.debug(`[LazyPlugins] resolvePluginForViewType: resolved ${pluginId} for ${viewType}`);
+        logger.debug(
+            `[LazyPlugins] resolvePluginForViewType: resolved ${pluginId} for ${viewType}`,
+        );
         return pluginId;
     }
 
@@ -69,7 +73,9 @@ export function resolvePluginForViewType(
         if (!viewTypes.includes(viewType)) continue;
         if (hasFileRules(ctx, pluginId)) continue;
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
-        logger.debug(`[LazyPlugins] resolvePluginForViewType (legacy): resolved ${pluginId} for ${viewType}`);
+        logger.debug(
+            `[LazyPlugins] resolvePluginForViewType (legacy): resolved ${pluginId} for ${viewType}`,
+        );
         return pluginId;
     }
 
@@ -102,8 +108,13 @@ export async function resolvePluginForFile(
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
 
         const opts = pluginSettings.lazyOptions;
-        if (opts?.useFile && (await matchesCriteria(ctx, file, opts.fileCriteria))) {
-            logger.debug(`[LazyPlugins] resolvePluginForFile: resolved ${pluginId} for ${file.path}`);
+        if (
+            opts?.useFile &&
+            (await matchesCriteria(ctx, file, opts.fileCriteria))
+        ) {
+            logger.debug(
+                `[LazyPlugins] resolvePluginForFile: resolved ${pluginId} for ${file.path}`,
+            );
             return pluginId;
         }
     }
@@ -116,7 +127,9 @@ export async function resolvePluginForFile(
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
 
         if (await matchesCriteria(ctx, file, criteria)) {
-            logger.debug(`[LazyPlugins] resolvePluginForFile (legacy/default): resolved ${pluginId} for ${file.path}`);
+            logger.debug(
+                `[LazyPlugins] resolvePluginForFile (legacy/default): resolved ${pluginId} for ${file.path}`,
+            );
             return pluginId;
         }
     }
@@ -160,7 +173,9 @@ export async function matchesCriteria(
         const cache = app.metadataCache.getFileCache(file);
         if (cache?.frontmatter) {
             for (const key of criteria.frontmatterKeys) {
-                if (Object.prototype.hasOwnProperty.call(cache.frontmatter, key)) {
+                if (
+                    Object.prototype.hasOwnProperty.call(cache.frontmatter, key)
+                ) {
                     return true;
                 }
             }
@@ -196,7 +211,8 @@ function hasFileRules(ctx: PluginContext, pluginId: string): boolean {
     if (settings.plugins[pluginId]?.lazyOptions?.useFile) return true;
 
     const lazyOnFiles = settings.lazyOnFiles || {};
-    if (lazyOnFiles[pluginId] && Object.keys(lazyOnFiles[pluginId]).length > 0) return true;
+    if (lazyOnFiles[pluginId] && Object.keys(lazyOnFiles[pluginId]).length > 0)
+        return true;
 
     if (pluginId in DEFAULT_FILE_RULES) return true;
 

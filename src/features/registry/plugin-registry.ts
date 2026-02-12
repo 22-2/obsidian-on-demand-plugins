@@ -1,4 +1,10 @@
-import { App, DataAdapter, Platform, PluginManifest, normalizePath } from "obsidian";
+import {
+    App,
+    DataAdapter,
+    Platform,
+    PluginManifest,
+    normalizePath,
+} from "obsidian";
 import log from "loglevel";
 import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
 

@@ -18,8 +18,10 @@ import { ViewLazyLoader } from "../features/lazy-loader/view-lazy-loader";
 import { FileLazyLoader } from "../features/lazy-loader/file-lazy-loader";
 import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
 import { patchSetViewState } from "../patches/view-state";
-import { LeafLockManager, LeafViewLockStrategy } from "../features/lazy-loader/helpers/leaf-lock";
-
+import {
+    LeafLockManager,
+    LeafViewLockStrategy,
+} from "../features/lazy-loader/helpers/leaf-lock";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;
@@ -74,9 +76,11 @@ export class ServiceContainer {
             ctx,
             this.lazyRunner,
             // Delegate to the shared manager with the "leaf-generic" subKey
-            { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") },
+            {
+                lock: (leaf: WorkspaceLeaf) =>
+                    lockManager.lock(leaf, "leaf-generic"),
+            },
         );
-
     }
 
     /**
@@ -114,7 +118,9 @@ export class ServiceContainer {
         this.ctx.app.workspace.onLayoutReady(async () => {
             const manifests = this.ctx.getManifests();
             for (const manifest of manifests) {
-                if (this.ctx.getPluginMode(manifest.id) === "lazyOnLayoutReady") {
+                if (
+                    this.ctx.getPluginMode(manifest.id) === "lazyOnLayoutReady"
+                ) {
                     await this.lazyRunner.ensurePluginLoaded(manifest.id);
                 }
             }
@@ -129,7 +135,9 @@ export class ServiceContainer {
         // Show a progress dialog early to cover the command cache rebuild and the
         // subsequent startup policy apply steps.
         const manifests = this.ctx.getManifests();
-        const lazyCount = manifests.filter((p) => this.ctx.getPluginMode(p.id) === "lazyOnView").length;
+        const lazyCount = manifests.filter(
+            (p) => this.ctx.getPluginMode(p.id) === "lazyOnView",
+        ).length;
 
         const progress = new ProgressDialog(this.ctx.app, {
             title: "Rebuilding command cache",
@@ -140,10 +148,14 @@ export class ServiceContainer {
         });
         progress.open();
 
-        await this.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
-            progress.setStatus(`Rebuilding ${plugin.name}`);
-            progress.setProgress(current, total);
-        });
+        await this.commandCache.refreshCommandCache(
+            undefined,
+            force,
+            (current, total, plugin) => {
+                progress.setStatus(`Rebuilding ${plugin.name}`);
+                progress.setProgress(current, total);
+            },
+        );
 
         // Reuse the same progress dialog for the startup policy apply step so
         // the user sees a continuous progress experience.

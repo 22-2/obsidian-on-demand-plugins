@@ -29,10 +29,7 @@ export function patchPluginEnableDisable(
                     const settings = ctx.getSettings();
                     const shouldReRegister =
                         settings.reRegisterLazyCommandsOnDisable ?? true;
-                    if (
-                        shouldReRegister &&
-                        isLazyMode(mode)
-                    ) {
+                    if (shouldReRegister && isLazyMode(mode)) {
                         await commandCacheService.ensureCommandsCached(
                             pluginId,
                         );

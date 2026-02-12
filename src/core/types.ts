@@ -67,7 +67,12 @@ export interface CachedCommandEntry {
 export type CommandCache = Record<string, CachedCommandEntry[]>;
 export type CommandCacheVersions = Record<string, string>;
 
-export type PluginMode = "disabled" | "lazy" | "keepEnabled" | "lazyOnView" | "lazyOnLayoutReady";
+export type PluginMode =
+    | "disabled"
+    | "lazy"
+    | "keepEnabled"
+    | "lazyOnView"
+    | "lazyOnLayoutReady";
 
 export const PluginModes: Record<PluginMode, string> = {
     disabled: "⛔ Always disabled",

@@ -46,7 +46,7 @@ export interface PluginContext {
     readonly app: App;
     readonly obsidianPlugins: Plugins;
     readonly obsidianCommands: Commands;
-    readonly _plugin : OnDemandPlugin
+    readonly _plugin: OnDemandPlugin;
 
     /** Get all plugin manifests (excluding self and platform-filtered). */
     getManifests(): PluginManifest[];
@@ -86,22 +86,26 @@ export interface PluginContext {
 export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
     return {
         _plugin: plugin,
-        get app() { return plugin.app; },
+        get app() {
+            return plugin.app;
+        },
         get obsidianPlugins() {
-            return (plugin.app as unknown as { plugins: Plugins; }).plugins;
+            return (plugin.app as unknown as { plugins: Plugins }).plugins;
         },
         get obsidianCommands() {
-            return (plugin.app as unknown as { commands: Commands; }).commands;
+            return (plugin.app as unknown as { commands: Commands }).commands;
         },
         getManifests: () => plugin.manifests,
         getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
-        getDefaultModeForPlugin: (pluginId) => plugin.getDefaultModeForPlugin(pluginId),
+        getDefaultModeForPlugin: (pluginId) =>
+            plugin.getDefaultModeForPlugin(pluginId),
         getCommandPluginId: (commandId) => plugin.getCommandPluginId(commandId),
         getData: () => plugin.data,
         getSettings: () => plugin.settings,
         saveSettings: () => plugin.saveSettings(),
         register: plugin.register.bind(plugin),
         registerEvent: plugin.registerEvent.bind(plugin),
-        isPluginEnabledOnDisk: (pluginId) => plugin.isPluginEnabledOnDisk(pluginId),
+        isPluginEnabledOnDisk: (pluginId) =>
+            plugin.isPluginEnabledOnDisk(pluginId),
     };
 }

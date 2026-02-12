@@ -75,10 +75,7 @@ export class LazyCommandRunner implements PluginLoader {
 
         return await mutex.runExclusive(async () => {
             try {
-                const loaded = isPluginLoaded(
-                    this.ctx.app,
-                    pluginId,
-                );
+                const loaded = isPluginLoaded(this.ctx.app, pluginId);
                 const enabled = isPluginEnabled(
                     this.ctx.obsidianPlugins.enabledPlugins,
                     pluginId,
@@ -112,12 +109,9 @@ export class LazyCommandRunner implements PluginLoader {
         if (this.isCommandExecutable(commandId)) return true;
 
         try {
-            await pTimeout(
-                this.createCommandReadyPromise(commandId),
-                {
-                    milliseconds: timeoutMs,
-                }
-            );
+            await pTimeout(this.createCommandReadyPromise(commandId), {
+                milliseconds: timeoutMs,
+            });
             return true;
         } catch (error) {
             // Timeout or other error
@@ -141,7 +135,7 @@ export class LazyCommandRunner implements PluginLoader {
                 pEvent(viewRegistry, "view-registered", {
                     filter: () => this.isCommandExecutable(commandId),
                     rejectionEvents: [],
-                }) as Promise<void>
+                }) as Promise<void>,
             );
         }
 
@@ -151,7 +145,7 @@ export class LazyCommandRunner implements PluginLoader {
                 pEvent(this.ctx.app.workspace, "layout-change", {
                     filter: () => this.isCommandExecutable(commandId),
                     rejectionEvents: [],
-                }) as Promise<void>
+                }) as Promise<void>,
             );
         }
 
@@ -167,15 +161,12 @@ export class LazyCommandRunner implements PluginLoader {
     ): Promise<boolean> {
         try {
             await pTimeout(
-                pWaitFor(
-                    () => isPluginLoaded(this.ctx.app, pluginId),
-                    {
-                        interval: 100,
-                    }
-                ),
+                pWaitFor(() => isPluginLoaded(this.ctx.app, pluginId), {
+                    interval: 100,
+                }),
                 {
                     milliseconds: timeoutMs,
-                }
+                },
             );
             return true;
         } catch (error) {
@@ -238,7 +229,8 @@ export class LazyCommandRunner implements PluginLoader {
     }
 
     isCommandExecutable(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as Command
+        const command = this.ctx.obsidianCommands.commands[commandId] as
+            | Command
             | undefined;
 
         if (!command) return false;
