@@ -40,7 +40,7 @@
 		"builtin-modules": "5.0.0",
 		"esbuild": "0.27.3",
 		"obsidian": "latest",
-		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.6",
+		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.61",
 		"playwright": "^1.58.2",
 		"prettier": "^3.8.1",
 		"tslib": "2.8.1",
