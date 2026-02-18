@@ -1,7 +1,7 @@
 
 import path from "node:path";
-import { test, expect } from "obsidian-e2e-toolkit";
-import { repoRoot, pluginUnderTestId, ensureBuilt } from "./test-utils";
+import { expect, test } from "obsidian-e2e-toolkit";
+import { ensureBuilt, pluginUnderTestId, repoRoot } from "./test-utils";
 
 const lineagePluginId = "lineage";
 

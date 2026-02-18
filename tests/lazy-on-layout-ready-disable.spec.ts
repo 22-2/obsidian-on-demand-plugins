@@ -1,5 +1,5 @@
-import { test, expect } from "obsidian-e2e-toolkit";
-import { pluginUnderTestId, targetPluginId, ensureBuilt, useOnDemandPlugins } from "./test-utils";
+import { expect, test } from "obsidian-e2e-toolkit";
+import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
 
 useOnDemandPlugins();
 

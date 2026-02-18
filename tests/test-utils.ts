@@ -1,5 +1,5 @@
-import path from "node:path";
 import fs from "node:fs";
+import path from "node:path";
 import { test } from "obsidian-e2e-toolkit";
 import { fileURLToPath } from "url";
 

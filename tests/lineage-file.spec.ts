@@ -1,6 +1,6 @@
-import { test, expect } from "obsidian-e2e-toolkit";
 import path from "node:path";
-import { repoRoot, ensureBuilt } from "./test-utils";
+import { expect, test } from "obsidian-e2e-toolkit";
+import { ensureBuilt, repoRoot } from "./test-utils";
 
 test.use({
     vaultOptions: {
