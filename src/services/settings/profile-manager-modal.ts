@@ -15,7 +15,7 @@ export class ProfileManagerModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
-        contentEl.createEl("h2", { text: "Manage Profiles" });
+        contentEl.createEl("h2", { text: "Manage profiles" });
 
         const profiles = this.settingsService.data.profiles;
         const profileIds = Object.keys(profiles);
