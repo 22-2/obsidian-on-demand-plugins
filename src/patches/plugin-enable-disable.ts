@@ -1,8 +1,8 @@
 import { around } from "monkey-around";
 import { Plugins } from "obsidian-typings";
-import { PluginContext } from "../../core/plugin-context";
-import { CommandCacheService } from "../command-cache/command-cache-service";
-import { PluginMode } from "../../core/types";
+import { PluginContext } from "src/core/plugin-context";
+import { CommandCacheService } from "src/services/command-cache/command-cache-service";
+import { PluginMode } from "src/core/types";
 
 /**
  * Returns true for lazy modes that use command-based lazy loading

@@ -17,8 +17,8 @@ import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
 import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
-import { patchPluginEnableDisable } from "./patches/plugin-enable-disable";
-import { patchSetViewState } from "./patches/view-state";
+import { patchPluginEnableDisable } from "src/patches/plugin-enable-disable";
+import { patchSetViewState } from "src/patches/view-state";
 import {
     LeafLockManager,
     LeafViewLockStrategy,
