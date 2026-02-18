@@ -12,8 +12,8 @@
 		"build": "tsc -noEmit -skipLibCheck && pnpm run build:nocheck",
 		"build:nocheck": "node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
-		"lint": "pnpm exec eslint . --ext .ts,.js,.mjs",
-		"format": "pnpm exec prettier --editorconfig --write src"
+		"lint": "pnpm exec eslint ./src --ext .ts,.js,.mjs",
+		"format": "pnpm exec prettier --editorconfig --write ./src"
 	},
 	"keywords": [],
 	"author": "22-2",
