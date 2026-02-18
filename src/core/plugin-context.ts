@@ -7,7 +7,7 @@
  */
 import { App, PluginManifest } from "obsidian";
 import { Commands, Plugins } from "obsidian-typings";
-import OnDemandPlugin from "src/main";
+import OnDemandPlugin from "../main";
 import { DeviceSettings, LazySettings, PluginMode } from "./types";
 
 /**

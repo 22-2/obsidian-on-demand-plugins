@@ -17,12 +17,12 @@ import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
 import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
-import { patchPluginEnableDisable } from "src/patches/plugin-enable-disable";
-import { patchSetViewState } from "src/patches/view-state";
+import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
+import { patchSetViewState } from "../patches/view-state";
 import {
     LeafLockManager,
     LeafViewLockStrategy,
-} from "./lazy-loader/inernal/leaf-lock";
+} from "./lazy-loader/internal/leaf-lock";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;
@@ -227,12 +227,21 @@ export class ServiceContainer {
             return;
         }
 
-        if (isLazyMode(mode)) {
+        if (mode === "lazy" || mode === "lazyOnView") {
             await this.commandCache.ensureCommandsCached(pluginId);
             if (this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
                 await this.ctx.obsidianPlugins.disablePlugin(pluginId);
             }
             this.commandCache.registerCachedCommandsForPlugin(pluginId);
+            return;
+        }
+
+        if (mode === "lazyOnLayoutReady") {
+            this.commandCache.removeCachedCommandsForPlugin(pluginId);
+            // If layout is already ready, load it immediately. Otherwise it will be handled by the layoutReadyLoader.
+            if (this.ctx.app.workspace.layoutReady) {
+                await this.lazyRunner.ensurePluginLoaded(pluginId);
+            }
             return;
         }
 

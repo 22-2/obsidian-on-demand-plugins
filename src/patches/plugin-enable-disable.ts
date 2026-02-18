@@ -1,8 +1,8 @@
 import { around } from "monkey-around";
 import { Plugins } from "obsidian-typings";
-import { PluginContext } from "src/core/plugin-context";
-import { CommandCacheService } from "src/services/command-cache/command-cache-service";
-import { PluginMode } from "src/core/types";
+import { PluginContext } from "../core/plugin-context";
+import { CommandCacheService } from "../services/command-cache/command-cache-service";
+import { PluginMode } from "../core/types";
 
 /**
  * Returns true for lazy modes that use command-based lazy loading
@@ -13,7 +13,8 @@ import { PluginMode } from "src/core/types";
  * `ensureCommandsCached` → `getCommandsForPlugin` → `enablePlugin`, which
  * undoes the user's disable action.
  */
-function isCommandBasedLazyMode(mode: PluginMode): boolean {
+function isCommandBasedLazyMode(mode: PluginMode | undefined): boolean {
+    if (!mode) return false;
     return mode === "lazy" || mode === "lazyOnView";
 }
 
@@ -38,12 +39,23 @@ export function patchPluginEnableDisable(
                 async function (this: Plugins, pluginId: string) {
                     const result = await next.call(this, pluginId);
                     const mode = ctx.getPluginMode(pluginId);
-                    // Re-register lazy commands on disable only for command-based lazy modes
-                    // (lazy, lazyOnView). lazyOnLayoutReady does not use command wrappers.
                     const settings = ctx.getSettings();
+                    const data = ctx.getData();
                     const shouldReRegister =
                         settings.reRegisterLazyCommandsOnDisable ?? true;
+
+                    if (data.showConsoleLog) {
+                        console.log(
+                            `[LazyPlugins] disablePlugin patch: id=${pluginId}, mode=${mode}, shouldReRegister=${shouldReRegister}`,
+                        );
+                    }
+
                     if (shouldReRegister && isCommandBasedLazyMode(mode)) {
+                        if (data.showConsoleLog) {
+                            console.log(
+                                `[LazyPlugins] Re-registering commands for ${pluginId}`,
+                            );
+                        }
                         await commandCacheService.ensureCommandsCached(
                             pluginId,
                         );

@@ -1,5 +1,5 @@
 import { Platform } from "obsidian";
-import OnDemandPlugin from "src/main";
+import OnDemandPlugin from "../../main";
 import { loadJSON } from "../../core/storage";
 import {
     DEFAULT_DEVICE_SETTINGS,

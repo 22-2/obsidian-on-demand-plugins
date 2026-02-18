@@ -25,6 +25,7 @@ test("disabling a lazyOnLayoutReady plugin should not re-enable it", async ({ ob
         app.commands.executeCommandById = () => true;
         try {
             await plugin.updatePluginSettings(pluginId, "lazyOnLayoutReady");
+            plugin.data.showConsoleLog = true;
             await plugin.saveSettings();
         } finally {
             app.commands.executeCommandById = original;
@@ -92,6 +93,7 @@ test("disabling a lazyOnLayoutReady plugin does not trigger ensureCommandsCached
     //    Even with this setting on, lazyOnLayoutReady should NOT re-register commands
     await pluginHandle.evaluate(async (plugin) => {
         plugin.settings.reRegisterLazyCommandsOnDisable = true;
+        plugin.data.showConsoleLog = true;
         await plugin.saveSettings();
     });
 

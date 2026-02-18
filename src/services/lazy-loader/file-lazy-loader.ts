@@ -2,8 +2,8 @@ import log from "loglevel";
 import { TFile, View, WorkspaceLeaf } from "obsidian";
 import { PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
-import { resolvePluginForFile } from "./inernal/activation-rules";
-import { LockStrategy } from "./inernal/leaf-lock";
+import { resolvePluginForFile } from "./internal/activation-rules";
+import { LockStrategy } from "./internal/leaf-lock";
 import { BaseLazyLoader } from "./base-lazy-loader";
 
 const logger = log.getLogger("OnDemandPlugin/FileLazyLoader");

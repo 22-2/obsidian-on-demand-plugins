@@ -9,7 +9,7 @@ import { TFile } from "obsidian";
 import { PluginContext } from "../../../core/plugin-context";
 import { FileActivationCriteria } from "../../../core/types";
 import log from "loglevel";
-import { isLazyMode } from "src/core/utils";
+import { isLazyMode } from "../../../core/utils";
 
 const logger = log.getLogger("OnDemandPlugin/ActivationRules");
 
