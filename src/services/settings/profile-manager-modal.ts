@@ -131,7 +131,7 @@ export class ProfileManagerModal extends Modal {
 
         // Add new Profile
         new Setting(contentEl)
-            .setName("Create New Profile")
+            .setName("Create new profile")
             .addButton((btn) => {
                 btn.setButtonText("Create")
                    .setCta()
@@ -143,7 +143,7 @@ export class ProfileManagerModal extends Modal {
 
     openRenameModal(id: string, currentName: string) {
         const modal = new Modal(this.app);
-        modal.titleEl.setText("Rename Profile");
+        modal.titleEl.setText("Rename profile");
         
         let newName = currentName;
         
@@ -170,12 +170,12 @@ export class ProfileManagerModal extends Modal {
 
     openCreateModal() {
         const modal = new Modal(this.app);
-        modal.titleEl.setText("Create Profile");
+        modal.titleEl.setText("Create profile");
         
         let newName = "";
         
         new Setting(modal.contentEl)
-            .setName("Profile Name")
+            .setName("Profile name")
             .addText(text => text.setPlaceholder("My new profile").onChange(v => newName = v));
             
         new Setting(modal.contentEl)
