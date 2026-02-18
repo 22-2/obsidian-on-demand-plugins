@@ -70,8 +70,8 @@ importers:
         specifier: latest
         version: 1.12.0(@codemirror/state@6.5.4)(@codemirror/view@6.39.12)
       obsidian-e2e-toolkit:
-        specifier: github:22-2/obsidian-e2e-toolkit#0.1.7
-        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/b4ee4959a6f04ed159e479d20e4df631c468cee4(@playwright/test@1.58.2)(playwright@1.58.2)
+        specifier: github:22-2/obsidian-e2e-toolkit#0.1.71
+        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/d370e91687da22fce5ddadca9e64cca95761a211(@playwright/test@1.58.2)(playwright@1.58.2)
       playwright:
         specifier: ^1.58.2
         version: 1.58.2
@@ -1676,9 +1676,9 @@ packages:
     resolution: {integrity: sha512-NuAESUOUMrlIXOfHKzD6bpPu3tYt3xvjNdRIQ+FeT0lNb4K8WR70CaDxhuNguS2XG+GjkyMwOzsN5ZktImfhLA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/b4ee4959a6f04ed159e479d20e4df631c468cee4:
-    resolution: {tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/b4ee4959a6f04ed159e479d20e4df631c468cee4}
-    version: 0.1.7
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/d370e91687da22fce5ddadca9e64cca95761a211:
+    resolution: {tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/d370e91687da22fce5ddadca9e64cca95761a211}
+    version: 0.1.71
     engines: {node: '>=23.0.0'}
     peerDependencies:
       '@playwright/test': ^1.56.0
@@ -3694,7 +3694,7 @@ snapshots:
   object-keys@1.1.1:
     optional: true
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/b4ee4959a6f04ed159e479d20e4df631c468cee4(@playwright/test@1.58.2)(playwright@1.58.2):
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/d370e91687da22fce5ddadca9e64cca95761a211(@playwright/test@1.58.2)(playwright@1.58.2):
     dependencies:
       '@electron/asar': 4.0.1
       '@playwright/test': 1.58.2

@@ -47,7 +47,7 @@
 		"globals": "^17.3.0",
 		"jiti": "^2.6.1",
 		"obsidian": "latest",
-		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.7",
+		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.71",
 		"playwright": "^1.58.2",
 		"prettier": "^3.8.1",
 		"tslib": "2.8.1",
