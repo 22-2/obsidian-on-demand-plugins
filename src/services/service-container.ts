@@ -5,9 +5,9 @@
  * where the object graph is assembled, replacing the ad-hoc callback
  * wiring that was previously spread across main.ts.
  */
-import { PluginManifest, WorkspaceLeaf } from "obsidian";
+import type { PluginManifest, WorkspaceLeaf } from "obsidian";
 import PQueue from "p-queue";
-import { PluginContext } from "../core/plugin-context";
+import type { PluginContext } from "../core/plugin-context";
 import { ProgressDialog } from "../core/progress";
 import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
 import { patchSetViewState } from "../patches/view-state";

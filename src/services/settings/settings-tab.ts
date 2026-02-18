@@ -1,14 +1,17 @@
 import log from "loglevel";
-import {
+import type {
     App,
     ButtonComponent,
-    DropdownComponent,
+    DropdownComponent
+} from "obsidian";
+import {
     ExtraButtonComponent,
     Notice,
     PluginSettingTab,
     Setting
 } from "obsidian";
-import { PluginMode, PluginModes, PluginSettings } from "../../core/types";
+import type { PluginMode, PluginSettings } from "../../core/types";
+import { PluginModes } from "../../core/types";
 import { isLazyMode } from "../../core/utils";
 import type OnDemandPlugin from "../../main";
 import { LazyOptionsModal } from "./lazy-options-modal";

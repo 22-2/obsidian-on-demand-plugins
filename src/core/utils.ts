@@ -1,6 +1,7 @@
-import { default as log, LogLevelDesc } from "loglevel";
-import { App, WorkspaceLeaf } from "obsidian";
-import { PluginMode } from "./settings";
+import type { LogLevelDesc } from "loglevel";
+import { default as log } from "loglevel";
+import type { App, WorkspaceLeaf } from "obsidian";
+import type { PluginMode } from "./settings";
 
 export function sleep(ms: number) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));

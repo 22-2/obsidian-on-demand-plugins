@@ -6,9 +6,9 @@
  * look-ups and hard-coded special cases.
  */
 import log from "loglevel";
-import { TFile } from "obsidian";
-import { PluginContext } from "src/core/plugin-context";
-import { FileActivationCriteria } from "src/core/types";
+import type { TFile } from "obsidian";
+import type { PluginContext } from "src/core/plugin-context";
+import type { FileActivationCriteria } from "src/core/types";
 import { isLazyMode } from "src/core/utils";
 
 const logger = log.getLogger("OnDemandPlugin/ActivationRules");

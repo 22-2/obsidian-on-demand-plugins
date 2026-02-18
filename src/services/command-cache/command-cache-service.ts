@@ -1,8 +1,8 @@
-import { PluginManifest } from "obsidian";
-import { CachedCommand, PluginLoader } from "../../core/interfaces";
-import { PluginContext } from "../../core/plugin-context";
+import type { PluginManifest } from "obsidian";
+import type { CachedCommand, PluginLoader } from "../../core/interfaces";
+import type { PluginContext } from "../../core/plugin-context";
 import { loadJSON, saveJSON } from "../../core/storage";
-import { CommandCache } from "../../core/types";
+import type { CommandCache } from "../../core/types";
 import { isLazyMode, isPluginLoaded } from "../../core/utils";
 
 // Re-export for consumers

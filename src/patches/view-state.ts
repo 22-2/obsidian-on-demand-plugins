@@ -1,5 +1,6 @@
 import { around } from "monkey-around";
-import { ViewState, WorkspaceLeaf } from "obsidian";
+import type { ViewState } from "obsidian";
+import { WorkspaceLeaf } from "obsidian";
 
 interface PatchViewStateDeps {
     register: (unload: () => void) => void;

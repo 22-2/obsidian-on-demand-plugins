@@ -1,12 +1,13 @@
 import { Mutex } from "async-mutex";
 import log from "loglevel";
-import { Command, MarkdownFileInfo, MarkdownView } from "obsidian";
-import { ViewRegistry } from "obsidian-typings";
+import type { Command, MarkdownFileInfo } from "obsidian";
+import { MarkdownView } from "obsidian";
+import type { ViewRegistry } from "obsidian-typings";
 import { pEvent } from "p-event";
 import pTimeout from "p-timeout";
 import pWaitFor from "p-wait-for";
-import { CommandRegistry, PluginLoader } from "../../core/interfaces";
-import { PluginContext } from "../../core/plugin-context";
+import type { CommandRegistry, PluginLoader } from "../../core/interfaces";
+import type { PluginContext } from "../../core/plugin-context";
 import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
 
 const logger = log.getLogger("OnDemandPlugin/LazyCommandRunner");

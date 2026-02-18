@@ -1,7 +1,8 @@
 import log from "loglevel";
-import { Plugin, PluginManifest } from "obsidian";
+import type { PluginManifest } from "obsidian";
+import { Plugin } from "obsidian";
 import { createPluginContext } from "./core/plugin-context";
-import { DeviceSettings, LazySettings, PluginMode } from "./core/types";
+import type { DeviceSettings, LazySettings, PluginMode } from "./core/types";
 import { toggleLoggerBy } from "./core/utils";
 import { ServiceContainer } from "./services/service-container";
 import { SettingsTab } from "./services/settings/settings-tab";

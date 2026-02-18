@@ -1,8 +1,9 @@
 import log from "loglevel";
-import {
-    App, normalizePath, Platform,
+import type {
+    App,
     PluginManifest
 } from "obsidian";
+import { normalizePath, Platform } from "obsidian";
 import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
 
 const logger = log.getLogger("OnDemandPlugin/PluginRegistry");
