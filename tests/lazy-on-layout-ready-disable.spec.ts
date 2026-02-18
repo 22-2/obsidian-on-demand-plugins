@@ -62,7 +62,7 @@ test("disabling a lazyOnLayoutReady plugin should not re-enable it", async ({ ob
     expect(stillDisabled).toBe(true);
 });
 
-test("disabling a lazyOnLayoutReady plugin does not trigger ensureCommandsCached", async ({ obsidian }) => {
+test("disabling a lazyOnLayoutReady plugin preserves its lazy mode", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
@@ -89,10 +89,9 @@ test("disabling a lazyOnLayoutReady plugin does not trigger ensureCommandsCached
         await new Promise((r) => setTimeout(r, 200));
     }
 
-    // 3. Disable with reRegisterLazyCommandsOnDisable = true
-    //    Even with this setting on, lazyOnLayoutReady should NOT re-register commands
+    // 3. Disable the plugin — with the Observe & Sync strategy,
+    //    lazyOnLayoutReady mode is left untouched (no settings sync)
     await pluginHandle.evaluate(async (plugin) => {
-        plugin.settings.reRegisterLazyCommandsOnDisable = true;
         plugin.data.showConsoleLog = true;
         await plugin.saveSettings();
     });
@@ -110,4 +109,10 @@ test("disabling a lazyOnLayoutReady plugin does not trigger ensureCommandsCached
     await new Promise((r) => setTimeout(r, 3000));
     const isEnabled = await obsidian.isPluginEnabled(targetPluginId);
     expect(isEnabled).toBe(false);
+
+    // 5. Verify the mode is still lazyOnLayoutReady (not changed to disabled)
+    const mode = await pluginHandle.evaluate(async (plugin, pluginId) => {
+        return plugin.settings?.plugins?.[pluginId]?.mode ?? null;
+    }, targetPluginId);
+    expect(mode).toBe("lazyOnLayoutReady");
 });

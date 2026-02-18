@@ -26,7 +26,6 @@ export interface FileActivationCriteria {
 export interface DeviceSettings {
     // defaultMode: PluginMode;
     showDescriptions: boolean;
-    reRegisterLazyCommandsOnDisable: boolean;
     plugins: { [pluginId: string]: PluginSettings };
     lazyOnViews: { [pluginId: string]: string[] };
     lazyOnFiles: { [pluginId: string]: FileActivationCriteria };
@@ -35,7 +34,6 @@ export interface DeviceSettings {
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
     // defaultMode: "disabled",
     showDescriptions: true,
-    reRegisterLazyCommandsOnDisable: true,
     plugins: {},
     lazyOnViews: {},
     lazyOnFiles: {},

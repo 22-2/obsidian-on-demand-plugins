@@ -75,39 +75,36 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
     expect(result.cachedVersion).toBe(result.manifestVersion);
 });
 
-test("reRegisterLazyCommandsOnDisable keeps command wrappers", async ({ obsidian }) => {
+test("disabling keepEnabled plugin syncs settings to disabled", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
+
+    // 1. Set the target plugin to keepEnabled
     await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
 
         try {
-            plugin.settings.reRegisterLazyCommandsOnDisable = true;
-            await plugin.saveSettings();
-            await plugin.updatePluginSettings(pluginId, "lazy");
-            await plugin.rebuildAndApplyCommandCache({ force: true });
+            await plugin.updatePluginSettings(pluginId, "keepEnabled");
         } finally {
             app.commands.executeCommandById = original;
         }
     }, targetPluginId);
 
-    const commandId = await obsidian.page.evaluate((id) => {
-        return Object.keys(app.commands.commands).find((cmd) =>
-            cmd.startsWith(`${id}:`),
-        );
-    }, targetPluginId);
-
-    expect(commandId).toBeTruthy();
-
+    // 2. Disable via Obsidian UI (triggers the patch)
     await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
 
-    const stillExists = await obsidian.page.evaluate((cmd) => {
-        return Boolean(app.commands.commands[cmd]);
-    }, commandId as string);
+    // 3. Verify settings synced to "disabled"
+    const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
+        return {
+            mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
+            userConfigured: plugin.settings?.plugins?.[pluginId]?.userConfigured ?? false,
+        };
+    }, targetPluginId);
 
-    expect(stillExists).toBe(true);
+    expect(result.mode).toBe("disabled");
+    expect(result.userConfigured).toBe(true);
 });

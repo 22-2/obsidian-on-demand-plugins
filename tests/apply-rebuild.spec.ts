@@ -109,41 +109,45 @@ test("lazyOnView loads plugin on view activation", async ({ obsidian }) => {
     expect(enabled).toBe(true);
 });
 
-test("reRegisterLazyCommandsOnDisable keeps command wrappers", async ({ obsidian }) => {
+test("enabling disabled plugin syncs settings to keepEnabled", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
+
+    // 1. Set the target plugin to disabled
     await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
 
         try {
-            plugin.settings.reRegisterLazyCommandsOnDisable = true;
-            await plugin.saveSettings();
-            await plugin.updatePluginSettings(pluginId, "lazy");
-            await plugin.rebuildAndApplyCommandCache({ force: true });
+            await plugin.updatePluginSettings(pluginId, "disabled");
         } finally {
             app.commands.executeCommandById = original;
         }
     }, targetPluginId);
 
-    const commandId = await obsidian.page.evaluate((id) => {
-        return Object.keys(app.commands.commands).find((cmd) =>
-            cmd.startsWith(`${id}:`),
-        );
+    // 2. Enable via Obsidian UI (triggers the patch)
+    await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
+
+    // Wait for enable to complete
+    const enableDeadline = Date.now() + 8000;
+    while (Date.now() < enableDeadline) {
+        if (await obsidian.isPluginEnabled(targetPluginId)) break;
+        await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // 3. Verify settings synced to "keepEnabled"
+    const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
+        return {
+            mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
+            userConfigured: plugin.settings?.plugins?.[pluginId]?.userConfigured ?? false,
+        };
     }, targetPluginId);
 
-    expect(commandId).toBeTruthy();
-
-    await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
-
-    const stillExists = await obsidian.page.evaluate((cmd) => {
-        return Boolean(app.commands.commands[cmd]);
-    }, commandId as string);
-
-    expect(stillExists).toBe(true);
+    expect(result.mode).toBe("keepEnabled");
+    expect(result.userConfigured).toBe(true);
 });
 
 test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {

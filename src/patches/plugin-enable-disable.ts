@@ -1,71 +1,93 @@
 import { around } from "monkey-around";
 import type { Plugins } from "obsidian-typings";
 import type { PluginContext } from "../core/plugin-context";
-import type { PluginMode } from "../core/types";
 import type { CommandCacheService } from "../services/command-cache/command-cache-service";
 
 /**
- * Returns true for lazy modes that use command-based lazy loading
- * (i.e. modes where command wrappers should be re-registered on disable).
+ * Observe & Sync strategy (案3):
  *
- * `lazyOnLayoutReady` is excluded because it loads plugins at layout ready time,
- * not via command wrappers. Re-registering commands for it would trigger
- * `ensureCommandsCached` → `getCommandsForPlugin` → `enablePlugin`, which
- * undoes the user's disable action.
+ * When the user toggles a plugin via Obsidian's UI (not through demand-plugins),
+ * we sync the demand-plugins settings **only** for `keepEnabled` ↔ `disabled`
+ * transitions. Lazy modes (`lazy`, `lazyOnView`, `lazyOnLayoutReady`) are left
+ * untouched because:
+ *   - Lazy plugins are already in a disabled state by design (commands are
+ *     registered as wrappers, plugin loads on demand).
+ *   - Changing their mode on a UI toggle would lose the user's lazy configuration.
+ *   - On next startup, the lazy mode will be applied correctly regardless.
  */
-function isCommandBasedLazyMode(mode: PluginMode | undefined): boolean {
-    // lazyOnLayoutReady is excluded because it loads plugins at layout ready time,
-    // not via command wrappers. Re-registering commands for it would trigger
-    // ensureCommandsCached → getCommandsForPlugin → enablePlugin.
-    if (!mode || mode === "lazyOnLayoutReady") return false;
-    return mode === "lazy" || mode === "lazyOnView";
-}
-
 export function patchPluginEnableDisable(
     ctx: PluginContext,
     commandCacheService: CommandCacheService,
 ): void {
     const obsidianPlugins = ctx.obsidianPlugins as unknown as Plugins;
 
-    // Monkey-patch `Plugins.enablePlugin` / `Plugins.disablePlugin` to handle
-    // when a user manually enables or disables a plugin: update the command
-    // cache and re-register lazy commands as needed.
     ctx.register(
         around(obsidianPlugins, {
             enablePlugin: (next) =>
                 async function (this: Plugins, pluginId: string) {
                     const result = await next.call(this, pluginId);
+
+                    const mode = ctx.getPluginMode(pluginId);
+                    const data = ctx.getData();
+
+                    if (data.showConsoleLog) {
+                        console.log(
+                            `[LazyPlugins] enablePlugin patch: id=${pluginId}, mode=${mode}`,
+                        );
+                    }
+
+                    // Sync settings: disabled → keepEnabled
+                    if (mode === "disabled") {
+                        const settings = ctx.getSettings();
+                        settings.plugins[pluginId] = {
+                            mode: "keepEnabled",
+                            userConfigured: true,
+                        };
+                        await ctx.saveSettings();
+
+                        if (data.showConsoleLog) {
+                            console.log(
+                                `[LazyPlugins] Synced settings: ${pluginId} disabled → keepEnabled`,
+                            );
+                        }
+                    }
+
                     commandCacheService.syncCommandWrappersForPlugin(pluginId);
                     return result;
                 },
             disablePlugin: (next) =>
                 async function (this: Plugins, pluginId: string) {
                     const result = await next.call(this, pluginId);
+
                     const mode = ctx.getPluginMode(pluginId);
-                    const settings = ctx.getSettings();
                     const data = ctx.getData();
-                    const shouldReRegister =
-                        settings.reRegisterLazyCommandsOnDisable ?? true;
 
                     if (data.showConsoleLog) {
                         console.log(
-                            `[LazyPlugins] disablePlugin patch: id=${pluginId}, mode=${mode}, shouldReRegister=${shouldReRegister}`,
+                            `[LazyPlugins] disablePlugin patch: id=${pluginId}, mode=${mode}`,
                         );
                     }
 
-                    if (shouldReRegister && isCommandBasedLazyMode(mode)) {
+                    // Sync settings: keepEnabled → disabled
+                    if (mode === "keepEnabled") {
+                        const settings = ctx.getSettings();
+                        settings.plugins[pluginId] = {
+                            mode: "disabled",
+                            userConfigured: true,
+                        };
+                        await ctx.saveSettings();
+
                         if (data.showConsoleLog) {
                             console.log(
-                                `[LazyPlugins] Re-registering commands for ${pluginId}`,
+                                `[LazyPlugins] Synced settings: ${pluginId} keepEnabled → disabled`,
                             );
                         }
-                        await commandCacheService.ensureCommandsCached(
-                            pluginId,
-                        );
-                        commandCacheService.registerCachedCommandsForPlugin(
-                            pluginId,
-                        );
                     }
+
+                    // For lazy modes: do nothing. The plugin was already in a
+                    // disabled state; the lazy config is preserved and will be
+                    // re-applied on next startup.
+
                     return result;
                 },
         }),
