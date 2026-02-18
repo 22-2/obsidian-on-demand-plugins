@@ -3,6 +3,9 @@ import type { Plugins } from "obsidian-typings";
 import type { PluginContext } from "../core/plugin-context";
 import type { CommandCacheService } from "../services/command-cache/command-cache-service";
 import { PLUGIN_MODE } from "../core/types";
+import log from "loglevel";
+
+const logger = log.getLogger("OnDemandPlugin/Patches/PluginEnableDisable");
 
 /**
  * Observe & Sync strategy (案3):
@@ -31,11 +34,9 @@ export function patchPluginEnableDisable(
                     const mode = ctx.getPluginMode(pluginId);
                     const data = ctx.getData();
 
-                    if (data.showConsoleLog) {
-                        console.log(
-                            `[LazyPlugins] enablePlugin patch: id=${pluginId}, mode=${mode}`,
-                        );
-                    }
+                    logger.debug(
+                        `[LazyPlugins] enablePlugin patch: id=${pluginId}, mode=${mode}`,
+                    );
 
                     // Sync settings: alwaysDisabled → alwaysEnabled
                     if (mode === PLUGIN_MODE.ALWAYS_DISABLED) {
@@ -46,11 +47,9 @@ export function patchPluginEnableDisable(
                         };
                         await ctx.saveSettings();
 
-                        if (data.showConsoleLog) {
-                            console.log(
-                                `[LazyPlugins] Synced settings: ${pluginId} disabled → keepEnabled`,
-                            );
-                        }
+                        logger.debug(
+                            `[LazyPlugins] Synced settings: ${pluginId} disabled → keepEnabled`,
+                        );
                     }
 
                     commandCacheService.syncCommandWrappersForPlugin(pluginId);
@@ -61,13 +60,11 @@ export function patchPluginEnableDisable(
                     const result = await next.call(this, pluginId);
 
                     const mode = ctx.getPluginMode(pluginId);
-                    const data = ctx.getData();
+                    // const data = ctx.getData();
 
-                    if (data.showConsoleLog) {
-                        console.log(
-                            `[LazyPlugins] disablePlugin patch: id=${pluginId}, mode=${mode}`,
-                        );
-                    }
+                    logger.debug(
+                        `[LazyPlugins] disablePlugin patch: id=${pluginId}, mode=${mode}`,
+                    );
 
                     // Sync settings: alwaysEnabled → alwaysDisabled
                     if (mode === PLUGIN_MODE.ALWAYS_ENABLED) {
@@ -78,11 +75,9 @@ export function patchPluginEnableDisable(
                         };
                         await ctx.saveSettings();
 
-                        if (data.showConsoleLog) {
-                            console.log(
-                                `[LazyPlugins] Synced settings: ${pluginId} alwaysEnabled → alwaysDisabled`,
-                            );
-                        }
+                        logger.debug(
+                            `[LazyPlugins] Synced settings: ${pluginId} alwaysEnabled → alwaysDisabled`,
+                        );
                     }
 
                     // For lazy modes: do nothing. The plugin was already in a
