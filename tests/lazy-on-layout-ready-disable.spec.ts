@@ -97,7 +97,7 @@ test("disabling a lazyOnLayoutReady plugin does not trigger ensureCommandsCached
         await plugin.saveSettings();
     });
 
-    await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
+    await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // Wait for disable to take effect
     const disableDeadline = Date.now() + 8000;
