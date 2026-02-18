@@ -1,5 +1,5 @@
 import { Platform } from "obsidian";
-import OnDemandPlugin from "src/main";
+import OnDemandPlugin from "../../main";
 import { loadJSON } from "../../core/storage";
 import {
     DEFAULT_DEVICE_SETTINGS,
@@ -67,39 +67,5 @@ export class SettingsService {
 
     async save() {
         await this.plugin.saveData(this.data);
-    }
-
-    async migrate() {
-        let hasChanges = false;
-        const settings = this.settings as DeviceSettings;
-
-        if (!settings.plugins) {
-            settings.plugins = {};
-            hasChanges = true;
-        }
-
-        Object.entries(settings.plugins).forEach(
-            ([pluginId, pluginSettings]) => {
-                const legacy = pluginSettings as {
-                    keepEnabled?: boolean;
-                    mode?: PluginMode;
-                };
-                if (
-                    legacy.mode === undefined &&
-                    legacy.keepEnabled !== undefined
-                ) {
-                    legacy.mode = legacy.keepEnabled
-                        ? "keepEnabled"
-                        : "disabled";
-                    delete legacy.keepEnabled;
-                    settings.plugins[pluginId] = legacy;
-                    hasChanges = true;
-                }
-            },
-        );
-
-        if (hasChanges) {
-            await this.save();
-        }
     }
 }

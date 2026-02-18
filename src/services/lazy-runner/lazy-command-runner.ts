@@ -1,10 +1,10 @@
-import { Command, Editor, MarkdownView } from "obsidian";
+import { Command, Editor, MarkdownView, MarkdownFileInfo } from "obsidian";
 import log from "loglevel";
 import { Mutex } from "async-mutex";
 import pWaitFor from "p-wait-for";
 import { pEvent } from "p-event";
 import pTimeout from "p-timeout";
-import { ViewRegistry } from "obsidian-typings";
+import { CommandsCommandsRecord, ViewRegistry } from "obsidian-typings";
 import { PluginContext } from "../../core/plugin-context";
 import { CommandRegistry, PluginLoader } from "../../core/interfaces";
 import { isPluginLoaded, isPluginEnabled } from "../../core/utils";
@@ -182,45 +182,78 @@ export class LazyCommandRunner implements PluginLoader {
      * @returns True if the command was executed successfully, false otherwise
      */
     executeCommandDirect(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as
-            | {
-                  callback?: () => void;
-                  checkCallback?: (checking: boolean) => boolean | void;
-                  editorCallback?: (editor: Editor, ctx?: unknown) => void;
-                  editorCheckCallback?: (
-                      checking: boolean,
-                      editor: Editor,
-                      ctx?: unknown,
-                  ) => boolean | void;
-              }
-            | undefined;
+        const command = this.ctx.obsidianCommands.commands[commandId] as Command;
 
         if (!command) return false;
 
-        const view = this.ctx.app.workspace.getActiveViewOfType(MarkdownView);
-        const editor = view?.editor;
-        const file = view?.file;
+        const activeEditor = this.ctx.app.workspace.activeEditor as MarkdownFileInfo | null;
 
-        if (editor && typeof command.editorCheckCallback === "function") {
-            const ok = command.editorCheckCallback(true, editor, file);
-            if (ok === false) return false;
-            command.editorCheckCallback(false, editor, file);
-            return true;
-        }
+        if (activeEditor && activeEditor.editor) {
+            const editor = activeEditor.editor;
 
-        if (editor && typeof command.editorCallback === "function") {
-            command.editorCallback(editor, file);
-            return true;
+            // Follow conditions from myfiles/command.js
+            if (activeEditor instanceof MarkdownView) {
+                const view = activeEditor;
+                const activeEl = activeDocument.activeElement;
+                if (
+                    view.inlineTitleEl?.contains(activeEl) ||
+                    view.titleEl?.contains(activeEl)
+                ) {
+                    return false;
+                }
+            }
+
+            if (
+                !command.allowProperties &&
+                activeDocument.activeElement?.closest(".metadata-container")
+            ) {
+                return false;
+            }
+
+            if (
+                !command.allowPreview &&
+                (activeEditor as MarkdownView).getMode?.() === "preview"
+            ) {
+                return false;
+            }
+
+            if (typeof command.editorCheckCallback === "function") {
+                if (command.editorCheckCallback(true, editor, activeEditor)) {
+                    if (this.ctx.getData().showConsoleLog) {
+                        logger.debug(
+                            `Executing editorCheckCallback for: ${commandId}`,
+                        );
+                    }
+                    command.editorCheckCallback(false, editor, activeEditor);
+                    return true;
+                }
+                return false;
+            }
+
+            if (typeof command.editorCallback === "function") {
+                if (this.ctx.getData().showConsoleLog) {
+                    logger.debug(`Executing editorCallback for: ${commandId}`);
+                }
+                command.editorCallback(editor, activeEditor);
+                return true;
+            }
         }
 
         if (typeof command.checkCallback === "function") {
-            const ok = command.checkCallback(true);
-            if (ok === false) return false;
-            command.checkCallback(false);
-            return true;
+            if (command.checkCallback(true)) {
+                if (this.ctx.getData().showConsoleLog) {
+                    logger.debug(`Executing checkCallback for: ${commandId}`);
+                }
+                command.checkCallback(false);
+                return true;
+            }
+            return false;
         }
 
         if (typeof command.callback === "function") {
+            if (this.ctx.getData().showConsoleLog) {
+                logger.debug(`Executing callback for: ${commandId}`);
+            }
             command.callback();
             return true;
         }

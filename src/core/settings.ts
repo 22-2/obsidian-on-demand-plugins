@@ -10,12 +10,12 @@ export type {
     CommandCache,
     CommandCacheVersions,
     PluginMode,
-} from "./core/types";
+} from "./types";
 
 export {
     DEFAULT_DEVICE_SETTINGS,
     DEFAULT_SETTINGS,
     PluginModes,
-} from "./core/types";
+} from "./types";
 
-export { SettingsTab } from "./features/settings/settings-tab";
+export { SettingsTab } from "../services/settings/settings-tab";

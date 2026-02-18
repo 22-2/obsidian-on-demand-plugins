@@ -14,6 +14,7 @@ const excalidrawPluginId = "obsidian-excalidraw-plugin";
 export function useOnDemandPlugins() {
     test.use({
         vaultOptions: {
+            enableBrowserConsoleLogging: true,
             logLevel: "info",
             fresh: true,
             plugins: [
@@ -31,6 +32,7 @@ export function useOnDemandPlugins() {
 export function useOnDemandPluginsWithExcalidraw() {
     test.use({
         vaultOptions: {
+            enableBrowserConsoleLogging: true,
             logLevel: "info",
             fresh: true,
             plugins: [
