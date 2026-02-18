@@ -1,9 +1,9 @@
 import { App, PluginManifest, debounce } from "obsidian";
 import { saveJSON } from "../../core/storage";
 import log from "loglevel";
-import { ProgressDialog } from "../../utils/progress";
-import { ON_DEMAND_PLUGIN_ID } from "../../utils/constants";
-import { isPluginLoaded, isPluginEnabled, isLazyMode } from "../../utils/utils";
+import { ProgressDialog } from "../../core/progress";
+import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
+import { isPluginLoaded, isPluginEnabled, isLazyMode } from "../../core/utils";
 import { PluginMode } from "../../core/types";
 import { Commands, Plugins } from "obsidian-typings";
 import { Mutex } from "async-mutex";
@@ -18,7 +18,9 @@ const logger = log.getLogger("OnDemandPlugin/StartupPolicyService");
  * Manage interception of the ViewRegistry
  */
 class ViewRegistryInterceptor {
-    private originalRegisterView: ((type: string, creator: unknown) => unknown) | null = null;
+    private originalRegisterView:
+        | ((type: string, creator: unknown) => unknown)
+        | null = null;
 
     constructor(
         private app: App,
@@ -60,13 +62,18 @@ class ViewRegistryInterceptor {
                 }
             }
 
-            return this.originalRegisterView!.apply(viewRegistry, [type, creator]);
+            return this.originalRegisterView!.apply(viewRegistry, [
+                type,
+                creator,
+            ]);
         };
 
         return () => this.restore(viewRegistry);
     }
 
-    private restore(viewRegistry: { registerView?: (type: string, creator: unknown) => unknown }) {
+    private restore(viewRegistry: {
+        registerView?: (type: string, creator: unknown) => unknown;
+    }) {
         if (viewRegistry && this.originalRegisterView) {
             viewRegistry.registerView = this.originalRegisterView;
         }
@@ -139,7 +146,9 @@ class PersistenceManager {
     /**
      * Persist lazyOnViews (remote + local)
      */
-    async savelazyOnViews(lazyOnViews: Record<string, string[]>): Promise<void> {
+    async savelazyOnViews(
+        lazyOnViews: Record<string, string[]>,
+    ): Promise<void> {
         const settings = this.ctx.getSettings();
         settings.lazyOnViews = lazyOnViews;
         await this.ctx.saveSettings();
@@ -184,10 +193,7 @@ class PluginBulkLoader {
             progress?.setStatus(`Loading ${plugin.name}`);
             progress?.setProgress(index + 1);
 
-            const loaded = isPluginLoaded(
-                this.ctx.app,
-                plugin.id,
-            );
+            const loaded = isPluginLoaded(this.ctx.app, plugin.id);
             const enabled = isPluginEnabled(
                 this.ctx.obsidianPlugins.enabledPlugins,
                 plugin.id,
@@ -240,7 +246,11 @@ export class StartupPolicyService {
             (pluginId) => ctx.getPluginMode(pluginId),
         );
         this.pluginLoadWaiter = new PluginLoadWaiter(ctx.app);
-        this.persistenceManager = new PersistenceManager(ctx.app, ctx, registry);
+        this.persistenceManager = new PersistenceManager(
+            ctx.app,
+            ctx,
+            registry,
+        );
         this.pluginBulkLoader = new PluginBulkLoader(ctx, commandCacheService);
     }
 
@@ -248,16 +258,16 @@ export class StartupPolicyService {
      * Apply plugin startup policy with progress indicator and reload support.
      * Serialized using debounce + mutex
      */
-    public apply = debounce(
-        async (pluginIds?: string[]) => {
-            await this.mutex.runExclusive(async () => {
-                await this.executeStartupPolicy(pluginIds);
-            });
-        },
-        100,
-    );
+    public apply = debounce(async (pluginIds?: string[]) => {
+        await this.mutex.runExclusive(async () => {
+            await this.executeStartupPolicy(pluginIds);
+        });
+    }, 100);
 
-    private async executeStartupPolicy(pluginIds?: string[], externalProgress?: ProgressDialog | null) {
+    private async executeStartupPolicy(
+        pluginIds?: string[],
+        externalProgress?: ProgressDialog | null,
+    ) {
         const manifests = this.ctx.getManifests();
         const targetPluginIds = pluginIds?.length ? new Set(pluginIds) : null;
         const targetManifests = this.getTargetManifests(
@@ -268,9 +278,11 @@ export class StartupPolicyService {
 
         let cancelled = false;
         // Use an externally supplied progress dialog when provided, otherwise create one.
-        const progress = externalProgress ?? this.createProgressDialog(lazyManifests.length, () => {
-            cancelled = true;
-        });
+        const progress =
+            externalProgress ??
+            this.createProgressDialog(lazyManifests.length, () => {
+                cancelled = true;
+            });
 
         if (externalProgress) {
             // Ensure cancel from external dialog sets our cancelled flag and totals align.
@@ -283,7 +295,8 @@ export class StartupPolicyService {
         const lazyOnViews: Record<string, string[]> = {
             ...(this.ctx.getSettings().lazyOnViews ?? {}),
         };
-        const viewRegistryCleanup = this.viewRegistryInterceptor.intercept(lazyOnViews);
+        const viewRegistryCleanup =
+            this.viewRegistryInterceptor.intercept(lazyOnViews);
 
         try {
             await this.loadLazyPluginsWithProgress(
@@ -306,7 +319,10 @@ export class StartupPolicyService {
      * Apply startup policy but reuse an externally created ProgressDialog (optional).
      * This allows callers to show a unified progress UI covering command cache rebuild + apply.
      */
-    public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[]) {
+    public async applyWithProgress(
+        progress: ProgressDialog | null,
+        pluginIds?: string[],
+    ) {
         await this.mutex.runExclusive(async () => {
             await this.executeStartupPolicy(pluginIds, progress);
         });
@@ -325,7 +341,9 @@ export class StartupPolicyService {
         // Only legacy `lazyOnView` plugins need to be loaded during the
         // startup apply step so we can detect view registrations. Regular
         // `lazy` plugins should not be enabled at startup.
-        return manifests.filter((plugin) => this.ctx.getPluginMode(plugin.id) === "lazyOnView");
+        return manifests.filter(
+            (plugin) => this.ctx.getPluginMode(plugin.id) === "lazyOnView",
+        );
     }
 
     private createProgressDialog(
@@ -349,7 +367,11 @@ export class StartupPolicyService {
         progress: ProgressDialog | null,
         isCancelled: () => boolean,
     ) {
-        await this.pluginBulkLoader.loadWithProgress(lazyManifests, progress, isCancelled);
+        await this.pluginBulkLoader.loadWithProgress(
+            lazyManifests,
+            progress,
+            isCancelled,
+        );
 
         if (isCancelled()) return;
 
@@ -404,7 +426,9 @@ export class StartupPolicyService {
         // Ensure only `keepEnabled` plugins (plus the on-demand plugin) are persisted.
         const toPersist = new Set<string>(
             [...desiredEnabled].filter(
-                (id) => this.ctx.getPluginMode(id) === "keepEnabled" || id === ON_DEMAND_PLUGIN_ID,
+                (id) =>
+                    this.ctx.getPluginMode(id) === "keepEnabled" ||
+                    id === ON_DEMAND_PLUGIN_ID,
             ),
         );
 

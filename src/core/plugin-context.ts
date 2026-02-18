@@ -7,8 +7,8 @@
  */
 import { App, PluginManifest } from "obsidian";
 import { Commands, Plugins } from "obsidian-typings";
-import { DeviceSettings, LazySettings, PluginMode } from "./types";
 import OnDemandPlugin from "src/main";
+import { DeviceSettings, LazySettings, PluginMode } from "./types";
 
 /**
  * Minimal view of Obsidian's `Commands` object used by services.
@@ -46,7 +46,7 @@ export interface PluginContext {
     readonly app: App;
     readonly obsidianPlugins: Plugins;
     readonly obsidianCommands: Commands;
-    readonly _plugin : OnDemandPlugin
+    readonly _plugin: OnDemandPlugin;
 
     /** Get all plugin manifests (excluding self and platform-filtered). */
     getManifests(): PluginManifest[];
@@ -77,4 +77,35 @@ export interface PluginContext {
 
     /** Whether the plugin is enabled on disk (community-plugins.json). */
     isPluginEnabledOnDisk(pluginId: string): boolean;
+}
+
+/**
+ * Create a PluginContext adapter that bridges the Obsidian Plugin instance
+ * to the PluginContext interface used by all services.
+ */
+export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
+    return {
+        _plugin: plugin,
+        get app() {
+            return plugin.app;
+        },
+        get obsidianPlugins() {
+            return (plugin.app as unknown as { plugins: Plugins }).plugins;
+        },
+        get obsidianCommands() {
+            return (plugin.app as unknown as { commands: Commands }).commands;
+        },
+        getManifests: () => plugin.manifests,
+        getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
+        getDefaultModeForPlugin: (pluginId) =>
+            plugin.getDefaultModeForPlugin(pluginId),
+        getCommandPluginId: (commandId) => plugin.getCommandPluginId(commandId),
+        getData: () => plugin.data,
+        getSettings: () => plugin.settings,
+        saveSettings: () => plugin.saveSettings(),
+        register: plugin.register.bind(plugin),
+        registerEvent: plugin.registerEvent.bind(plugin),
+        isPluginEnabledOnDisk: (pluginId) =>
+            plugin.isPluginEnabledOnDisk(pluginId),
+    };
 }

@@ -1,44 +1,12 @@
 import log from "loglevel";
 import { Plugin, PluginManifest } from "obsidian";
-import { Commands, Plugins } from "obsidian-typings";
-import { ServiceContainer } from "./core/service-container";
-import { PluginContext } from "./core/plugin-context";
-import { SettingsTab } from "./features/settings/settings-tab";
-import {
-    DeviceSettings,
-    LazySettings,
-    PluginMode,
-} from "./core/types";
-import { toggleLoggerBy } from "./utils/utils";
+import { ServiceContainer } from "./services/service-container";
+import { createPluginContext } from "./core/plugin-context";
+import { SettingsTab } from "./services/settings/settings-tab";
+import { DeviceSettings, LazySettings, PluginMode } from "./core/types";
+import { toggleLoggerBy } from "./core/utils";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
-
-/**
- * Create a PluginContext adapter that bridges the Obsidian Plugin instance
- * to the PluginContext interface used by all services.
- */
-function createPluginContext(plugin: OnDemandPlugin): PluginContext {
-    return {
-        _plugin: plugin,
-        get app() { return plugin.app; },
-        get obsidianPlugins() {
-            return (plugin.app as unknown as { plugins: Plugins }).plugins;
-        },
-        get obsidianCommands() {
-            return (plugin.app as unknown as { commands: Commands }).commands;
-        },
-        getManifests: () => plugin.manifests,
-        getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
-        getDefaultModeForPlugin: (pluginId) => plugin.getDefaultModeForPlugin(pluginId),
-        getCommandPluginId: (commandId) => plugin.getCommandPluginId(commandId),
-        getData: () => plugin.data,
-        getSettings: () => plugin.settings,
-        saveSettings: () => plugin.saveSettings(),
-        register: plugin.register.bind(plugin),
-        registerEvent: plugin.registerEvent.bind(plugin),
-        isPluginEnabledOnDisk: (pluginId) => plugin.isPluginEnabledOnDisk(pluginId),
-    };
-}
 
 export default class OnDemandPlugin extends Plugin {
     data: LazySettings;

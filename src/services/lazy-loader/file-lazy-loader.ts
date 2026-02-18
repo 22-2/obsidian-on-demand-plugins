@@ -2,8 +2,8 @@ import log from "loglevel";
 import { TFile, View, WorkspaceLeaf } from "obsidian";
 import { PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
-import { resolvePluginForFile } from "./helpers/activation-rules";
-import { LockStrategy } from "./helpers/leaf-lock";
+import { resolvePluginForFile } from "./inernal/activation-rules";
+import { LockStrategy } from "./inernal/leaf-lock";
 import { BaseLazyLoader } from "./base-lazy-loader";
 
 const logger = log.getLogger("OnDemandPlugin/FileLazyLoader");
@@ -31,7 +31,9 @@ interface ViewState {
 export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
     constructor(
         ctx: PluginContext,
-        pluginLoader: PluginLoader & { ensurePluginLoaded(pluginId: string): Promise<boolean> },
+        pluginLoader: PluginLoader & {
+            ensurePluginLoaded(pluginId: string): Promise<boolean>;
+        },
         lockStrategy: LockStrategy<WorkspaceLeaf>,
     ) {
         super(ctx, pluginLoader, lockStrategy);
@@ -82,7 +84,10 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
         }
     }
 
-    private async checkFileForLazyLoading(file: TFile, leaf: WorkspaceLeaf): Promise<void> {
+    private async checkFileForLazyLoading(
+        file: TFile,
+        leaf: WorkspaceLeaf,
+    ): Promise<void> {
         const leafId = this.getLeafId(leaf);
 
         await this.loadPluginWithLock(
@@ -92,7 +97,9 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
             async (wasNewlyLoaded) => {
                 // Only rebuild if the plugin was newly loaded
                 if (!wasNewlyLoaded) {
-                    logger.debug(`skipping rebuildLeafView for ${file.path} - plugin was not newly loaded`);
+                    logger.debug(
+                        `skipping rebuildLeafView for ${file.path} - plugin was not newly loaded`,
+                    );
                     return;
                 }
 

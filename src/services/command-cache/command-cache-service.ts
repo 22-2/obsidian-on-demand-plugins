@@ -3,7 +3,7 @@ import { CachedCommand, PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
 import { loadJSON, saveJSON } from "../../core/storage";
 import { CommandCache } from "../../core/types";
-import { isPluginLoaded, isLazyMode } from "../../utils/utils";
+import { isPluginLoaded, isLazyMode } from "../../core/utils";
 
 // Re-export for consumers
 export type { CachedCommand } from "../../core/interfaces";
@@ -275,7 +275,9 @@ export class CommandCacheService {
 
     isCommandCacheValid(pluginId: string): boolean {
         if (!this.pluginCommandIndex.has(pluginId)) return false;
-        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
+        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[
+            pluginId
+        ];
         if (!Array.isArray(cached) || cached.length === 0) return false;
 
         const manifest = this.ctx

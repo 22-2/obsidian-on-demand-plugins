@@ -2,8 +2,8 @@ import log from "loglevel";
 import { WorkspaceLeaf } from "obsidian";
 import { PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
-import { isPluginLoaded, rebuildLeafView } from "../../utils/utils";
-import { LockStrategy } from "./helpers/leaf-lock";
+import { isPluginLoaded, rebuildLeafView } from "../../core/utils";
+import { LockStrategy } from "./inernal/leaf-lock";
 
 const logger = log.getLogger("OnDemandPlugin/BaseLazyLoader");
 
@@ -14,7 +14,9 @@ const logger = log.getLogger("OnDemandPlugin/BaseLazyLoader");
 export abstract class BaseLazyLoader<TLockTarget> {
     constructor(
         protected ctx: PluginContext,
-        protected pluginLoader: PluginLoader & { ensurePluginLoaded(pluginId: string): Promise<boolean> },
+        protected pluginLoader: PluginLoader & {
+            ensurePluginLoaded(pluginId: string): Promise<boolean>;
+        },
         protected lockStrategy: LockStrategy<TLockTarget>,
     ) {}
 
@@ -49,7 +51,9 @@ export abstract class BaseLazyLoader<TLockTarget> {
         getPluginId: () => Promise<string | null>,
         context: { leafId: string; description: string },
     ): Promise<boolean> {
-        logger.debug(`started for ${context.description} in leaf ${context.leafId}`);
+        logger.debug(
+            `started for ${context.description} in leaf ${context.leafId}`,
+        );
 
         const pluginId = await getPluginId();
         if (!pluginId) {
@@ -80,23 +84,34 @@ export abstract class BaseLazyLoader<TLockTarget> {
     /**
      * Rebuilds the view for a leaf and logs the result.
      */
-    protected async rebuildLeafViewWithLogging(leaf: WorkspaceLeaf, leafId: string): Promise<void> {
+    protected async rebuildLeafViewWithLogging(
+        leaf: WorkspaceLeaf,
+        leafId: string,
+    ): Promise<void> {
         const oldViewType = leaf.view.getViewType();
-        logger.debug(`triggering rebuildLeafView for leaf ${leafId}. Current viewType: ${oldViewType}`);
+        logger.debug(
+            `triggering rebuildLeafView for leaf ${leafId}. Current viewType: ${oldViewType}`,
+        );
 
         await rebuildLeafView(leaf);
 
         const newViewType = leaf.view.getViewType();
-        logger.debug(`rebuildLeafView completed for leaf ${leafId}. New viewType: ${newViewType}`);
+        logger.debug(
+            `rebuildLeafView completed for leaf ${leafId}. New viewType: ${newViewType}`,
+        );
 
         // Fallback: if view type didn't change and is still markdown, try forceful setViewState
         if (newViewType === oldViewType && oldViewType === "markdown") {
-            logger.debug(`View type remains 'markdown'. Trying forceful setViewState fallback...`);
+            logger.debug(
+                `View type remains 'markdown'. Trying forceful setViewState fallback...`,
+            );
             const state = leaf.getViewState();
             await leaf.setViewState(state);
 
             const finalViewType = leaf.view.getViewType();
-            logger.debug(`after setViewState fallback, viewType is: ${finalViewType}`);
+            logger.debug(
+                `after setViewState fallback, viewType is: ${finalViewType}`,
+            );
         }
     }
 

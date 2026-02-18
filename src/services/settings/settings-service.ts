@@ -51,7 +51,10 @@ export class SettingsService {
         }
 
         // Try to hydrate lazyOnViews from local store2 cache (vault-specific) if available
-        const stored = loadJSON<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
+        const stored = loadJSON<Record<string, string[]>>(
+            this.plugin.app,
+            "lazyOnViews",
+        );
         if (stored && Object.keys(stored).length > 0) {
             if (!this.data.desktop) this.data.desktop = DEFAULT_DEVICE_SETTINGS;
             this.data.desktop.lazyOnViews = {

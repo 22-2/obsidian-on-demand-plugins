@@ -1,9 +1,9 @@
 import { WorkspaceLeaf, debounce } from "obsidian";
 import { PluginContext } from "../../core/plugin-context";
 import { CommandRegistry, PluginLoader } from "../../core/interfaces";
-import { isLeafVisible } from "../../utils/utils";
-import { LeafResource, LockStrategy } from "./helpers/leaf-lock";
-import { resolvePluginForViewType } from "./helpers/activation-rules";
+import { isLeafVisible } from "../../core/utils";
+import { LeafResource, LockStrategy } from "./inernal/leaf-lock";
+import { resolvePluginForViewType } from "./inernal/activation-rules";
 import { BaseLazyLoader } from "./base-lazy-loader";
 import log from "loglevel";
 
@@ -23,7 +23,9 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
 
     constructor(
         ctx: PluginContext,
-        pluginLoader: PluginLoader & { ensurePluginLoaded(pluginId: string): Promise<boolean> },
+        pluginLoader: PluginLoader & {
+            ensurePluginLoaded(pluginId: string): Promise<boolean>;
+        },
         private commandRegistry: CommandRegistry,
         lockStrategy: LockStrategy<LeafResource>,
     ) {
@@ -32,7 +34,10 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
 
     registerActiveLeafReload(): void {
         this.ctx.registerEvent(
-            this.ctx.app.workspace.on("active-leaf-change", this.debouncedInitializeLazyViewForLeaf),
+            this.ctx.app.workspace.on(
+                "active-leaf-change",
+                this.debouncedInitializeLazyViewForLeaf,
+            ),
         );
 
         // Initial load
@@ -50,11 +55,15 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
         const viewType = leaf.view.getViewType();
         const leafId = this.getLeafId(leaf);
 
-        logger.debug(`[LazyPlugins] initializeLazyViewForLeaf: started for leaf ${leafId}, viewType: ${viewType}`);
+        logger.debug(
+            `[LazyPlugins] initializeLazyViewForLeaf: started for leaf ${leafId}, viewType: ${viewType}`,
+        );
 
         // Check visibility and re-entry guard before acquiring lock
         if (!isLeafVisible(leaf)) {
-            logger.debug(`[LazyPlugins] initializeLazyViewForLeaf: skipped (not visible) for leaf ${leafId}`);
+            logger.debug(
+                `[LazyPlugins] initializeLazyViewForLeaf: skipped (not visible) for leaf ${leafId}`,
+            );
             return;
         }
 
@@ -81,4 +90,3 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
         }
     }
 }
-

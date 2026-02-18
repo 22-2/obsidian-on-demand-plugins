@@ -1,7 +1,7 @@
 {
 	"name": "on-demand-plugins",
 	"type": "module",
-	"version": "2.1.0",
+	"version": "2.1.1",
 	"description": "Lazy load plugins by caching their commands. Plugins are enabled on-demand when you trigger their commands (or open specific views), keeping startup fast.",
 	"main": "main.js",
 	"scripts": {
@@ -29,6 +29,7 @@
 		"monkey-around": "^3.0.0",
 		"obsidian-typings": "^4.99.0",
 		"p-event": "^7.1.0",
+		"p-queue": "^9.1.0",
 		"p-timeout": "^7.0.1",
 		"p-wait-for": "^6.0.0",
 		"store2": "^2.14.4"
@@ -39,7 +40,7 @@
 		"builtin-modules": "5.0.0",
 		"esbuild": "0.27.3",
 		"obsidian": "latest",
-		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.6",
+		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.61",
 		"playwright": "^1.58.2",
 		"prettier": "^3.8.1",
 		"tslib": "2.8.1",
