@@ -1,4 +1,4 @@
-import { LogLevelDesc, default as log } from "loglevel";
+import { default as log, LogLevelDesc } from "loglevel";
 import { App, WorkspaceLeaf } from "obsidian";
 import { PluginMode } from "./settings";
 

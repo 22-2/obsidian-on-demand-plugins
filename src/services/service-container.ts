@@ -7,22 +7,21 @@
  */
 import { PluginManifest, WorkspaceLeaf } from "obsidian";
 import PQueue from "p-queue";
-import { ProgressDialog } from "../core/progress";
-import { isLazyMode } from "../core/utils";
 import { PluginContext } from "../core/plugin-context";
+import { ProgressDialog } from "../core/progress";
+import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
+import { patchSetViewState } from "../patches/view-state";
 import { CommandCacheService } from "./command-cache/command-cache-service";
+import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
+import {
+    LeafLockManager,
+    LeafViewLockStrategy
+} from "./lazy-loader/internal/leaf-lock";
+import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
 import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
-import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
-import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
-import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
-import { patchSetViewState } from "../patches/view-state";
-import {
-    LeafLockManager,
-    LeafViewLockStrategy,
-} from "./lazy-loader/internal/leaf-lock";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;

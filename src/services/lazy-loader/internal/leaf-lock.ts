@@ -1,5 +1,5 @@
-import { WorkspaceLeaf } from "obsidian";
 import { Mutex } from "async-mutex";
+import { WorkspaceLeaf } from "obsidian";
 
 /**
  * Generic lock strategy interface for async mutual exclusion.

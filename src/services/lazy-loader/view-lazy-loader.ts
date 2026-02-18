@@ -1,11 +1,11 @@
-import { WorkspaceLeaf, debounce } from "obsidian";
-import { PluginContext } from "../../core/plugin-context";
-import { CommandRegistry, PluginLoader } from "../../core/interfaces";
-import { isLeafVisible } from "../../core/utils";
-import { LeafResource, LockStrategy } from "./internal/leaf-lock";
-import { resolvePluginForViewType } from "./internal/activation-rules";
-import { BaseLazyLoader } from "./base-lazy-loader";
 import log from "loglevel";
+import { debounce, WorkspaceLeaf } from "obsidian";
+import { CommandRegistry, PluginLoader } from "../../core/interfaces";
+import { PluginContext } from "../../core/plugin-context";
+import { isLeafVisible } from "../../core/utils";
+import { BaseLazyLoader } from "./base-lazy-loader";
+import { resolvePluginForViewType } from "./internal/activation-rules";
+import { LeafResource, LockStrategy } from "./internal/leaf-lock";
 
 const logger = log.getLogger("OnDemandPlugin/ViewLazyLoader");
 

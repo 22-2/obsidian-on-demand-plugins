@@ -1,10 +1,10 @@
 import log from "loglevel";
 import { Plugin, PluginManifest } from "obsidian";
-import { ServiceContainer } from "./services/service-container";
 import { createPluginContext } from "./core/plugin-context";
-import { SettingsTab } from "./services/settings/settings-tab";
 import { DeviceSettings, LazySettings, PluginMode } from "./core/types";
 import { toggleLoggerBy } from "./core/utils";
+import { ServiceContainer } from "./services/service-container";
+import { SettingsTab } from "./services/settings/settings-tab";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
 

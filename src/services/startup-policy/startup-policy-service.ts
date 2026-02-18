@@ -1,14 +1,14 @@
-import { App, PluginManifest, debounce } from "obsidian";
-import { saveJSON } from "../../core/storage";
-import log from "loglevel";
-import { ProgressDialog } from "../../core/progress";
-import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
-import { isPluginLoaded, isPluginEnabled, isLazyMode } from "../../core/utils";
-import { PluginMode } from "../../core/types";
-import { Commands, Plugins } from "obsidian-typings";
 import { Mutex } from "async-mutex";
+import log from "loglevel";
+import { App, debounce, PluginManifest } from "obsidian";
+import { Commands, Plugins } from "obsidian-typings";
 import pWaitFor from "p-wait-for";
+import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
 import { PluginContext } from "../../core/plugin-context";
+import { ProgressDialog } from "../../core/progress";
+import { saveJSON } from "../../core/storage";
+import { PluginMode } from "../../core/types";
+import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
 import { CommandCacheService } from "../command-cache/command-cache-service";
 import { PluginRegistry } from "../registry/plugin-registry";
 

@@ -1,13 +1,12 @@
 import { Platform } from "obsidian";
-import OnDemandPlugin from "../../main";
 import { loadJSON } from "../../core/storage";
 import {
     DEFAULT_DEVICE_SETTINGS,
     DEFAULT_SETTINGS,
     DeviceSettings,
-    LazySettings,
-    PluginMode,
+    LazySettings
 } from "../../core/types";
+import OnDemandPlugin from "../../main";
 
 export class SettingsService {
     data: LazySettings;

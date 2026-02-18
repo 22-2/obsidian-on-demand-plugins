@@ -3,7 +3,7 @@ import { CachedCommand, PluginLoader } from "../../core/interfaces";
 import { PluginContext } from "../../core/plugin-context";
 import { loadJSON, saveJSON } from "../../core/storage";
 import { CommandCache } from "../../core/types";
-import { isPluginLoaded, isLazyMode } from "../../core/utils";
+import { isLazyMode, isPluginLoaded } from "../../core/utils";
 
 // Re-export for consumers
 export type { CachedCommand } from "../../core/interfaces";

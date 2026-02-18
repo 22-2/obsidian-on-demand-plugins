@@ -5,10 +5,10 @@
  * plugin should handle a given view type or file, removing duplicated rule
  * look-ups and hard-coded special cases.
  */
+import log from "loglevel";
 import { TFile } from "obsidian";
 import { PluginContext } from "src/core/plugin-context";
 import { FileActivationCriteria } from "src/core/types";
-import log from "loglevel";
 import { isLazyMode } from "src/core/utils";
 
 const logger = log.getLogger("OnDemandPlugin/ActivationRules");

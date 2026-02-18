@@ -6,12 +6,12 @@ import {
     ExtraButtonComponent,
     Notice,
     PluginSettingTab,
-    Setting,
+    Setting
 } from "obsidian";
-import type OnDemandPlugin from "../../main";
 import { PluginMode, PluginModes, PluginSettings } from "../../core/types";
-import { LazyOptionsModal } from "./lazy-options-modal";
 import { isLazyMode } from "../../core/utils";
+import type OnDemandPlugin from "../../main";
+import { LazyOptionsModal } from "./lazy-options-modal";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsTab");
 
