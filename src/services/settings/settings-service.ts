@@ -152,11 +152,12 @@ export class SettingsService {
         this.currentProfileId = profileId;
         this.settings = this.data.profiles[profileId].settings;
         
-        // We technically don't need to save here implemented as session-only switch,
-        // but if we want to persist the "last used profile" we might need to.
-        // For now, per spec, we just switch in memory.
-        // However, if we modified settings before switching, we should save?
-        // Let's just update the reference.
+        // Update the default ID for this device type so it persists after restart
+        if (Platform.isMobile) {
+            this.data.mobileProfileId = profileId;
+        } else {
+            this.data.desktopProfileId = profileId;
+        }
     }
 
     createProfile(name: string, sourceProfileId?: string): string {

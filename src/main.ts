@@ -98,7 +98,8 @@ export default class OnDemandPlugin extends Plugin {
     async switchProfile(profileId: string) {
         await this.container.settingsService.switchProfile(profileId);
         this.settings = this.container.settingsService.settings;
-        await this.applyStartupPolicy();
+        await this.saveSettings();
+        await this.applyStartupPolicyAndRestart();
     }
 
     updateManifests() {
@@ -151,7 +152,7 @@ export default class OnDemandPlugin extends Plugin {
             : null;
     }
 
-    async applyStartupPolicy(pluginIds?: string[]) {
+    async applyStartupPolicyAndRestart(pluginIds?: string[]) {
         await this.container.applyStartupPolicy(pluginIds);
     }
 

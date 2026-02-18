@@ -80,15 +80,9 @@ export class SettingsTab extends PluginSettingTab {
                 dropdown.onChange(async (newProfileId) => {
                     if (newProfileId === this.plugin.container.settingsService.currentProfileId) return;
                     
-                    // Switch profile
-                    await this.plugin.container.settingsService.switchProfile(newProfileId);
-                    
-                    // Apply changes immediately (as requested)
+                    // Use the managed switchProfile method which updates references and saves
                     new Notice(`Switched to profile: ${profiles[newProfileId].name}`);
-                    await this.plugin.applyStartupPolicy();
-                    
-                    // Refresh UI
-                    this.buildDom();
+                    await this.plugin.switchProfile(newProfileId);
                 });
             })
             .addExtraButton((btn) => {
@@ -189,7 +183,7 @@ export class SettingsTab extends PluginSettingTab {
                     if (this.pendingPluginIds.size === 0) return;
                     this.normalizelazyOnViews();
                     await this.plugin.saveSettings();
-                    await this.plugin.applyStartupPolicy(
+                    await this.plugin.applyStartupPolicyAndRestart(
                         Array.from(this.pendingPluginIds),
                     );
                     this.pendingPluginIds.clear();
