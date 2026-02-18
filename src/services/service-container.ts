@@ -22,6 +22,7 @@ import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
+import { PLUGIN_MODE } from "../core/types";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;
@@ -126,7 +127,7 @@ export class ServiceContainer {
         const manifests = this.ctx.getManifests();
 
         const toLoad = manifests.filter(
-            (m) => this.ctx.getPluginMode(m.id) === "lazyOnLayoutReady",
+            (m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY,
         );
 
         if (toLoad.length === 0) return;
@@ -155,7 +156,7 @@ export class ServiceContainer {
         // subsequent startup policy apply steps.
         const manifests = this.ctx.getManifests();
         const lazyCount = manifests.filter(
-            (p) => this.ctx.getPluginMode(p.id) === "lazyOnView",
+            (p) => this.ctx.getPluginMode(p.id) === PLUGIN_MODE.LAZY_ON_VIEW,
         ).length;
 
         const progress = new ProgressDialog(this.ctx.app, {
@@ -217,7 +218,7 @@ export class ServiceContainer {
      */
     async applyPluginState(pluginId: string) {
         const mode = this.ctx.getPluginMode(pluginId);
-        if (mode === "keepEnabled") {
+        if (mode === PLUGIN_MODE.ALWAYS_ENABLED) {
             if (!this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
                 await this.ctx.obsidianPlugins.enablePlugin(pluginId);
                 await this.lazyRunner.waitForPluginLoaded(pluginId);
@@ -226,7 +227,7 @@ export class ServiceContainer {
             return;
         }
 
-        if (mode === "lazy" || mode === "lazyOnView") {
+        if (mode === PLUGIN_MODE.LAZY || mode === PLUGIN_MODE.LAZY_ON_VIEW) {
             await this.commandCache.ensureCommandsCached(pluginId);
             if (this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
                 await this.ctx.obsidianPlugins.disablePlugin(pluginId);
@@ -235,7 +236,7 @@ export class ServiceContainer {
             return;
         }
 
-        if (mode === "lazyOnLayoutReady") {
+        if (mode === PLUGIN_MODE.LAZY_ON_LAYOUT_READY) {
             this.commandCache.removeCachedCommandsForPlugin(pluginId);
             // If layout is already ready, load it immediately. Otherwise it will be handled by the layoutReadyLoader.
             if (this.ctx.app.workspace.layoutReady) {
