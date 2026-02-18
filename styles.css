@@ -18,3 +18,49 @@
     margin-right: 8px;
     vertical-align: middle;
 }
+
+/* Profile Management */
+.lazy-settings-profile-container {
+    border-bottom: 1px solid var(--background-modifier-border);
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+}
+
+.lazy-profile-badges {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    margin-top: 0.5em;
+}
+
+/* Profile Manager Modal */
+.lazy-profile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.lazy-profile-row {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+}
+
+.lazy-profile-info {
+    flex: 1;
+}
+
+.lazy-profile-name {
+    font-weight: bold;
+}
+
+.lazy-profile-meta {
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+.lazy-profile-actions {
+    display: flex;
+    gap: 8px;
+}

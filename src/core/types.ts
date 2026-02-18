@@ -41,21 +41,46 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
     lazyOnFiles: {},
 };
 
+// Settings per profile
+export interface Profile {
+    id: string;
+    name: string;
+    settings: DeviceSettings;
+}
+
 // Global settings for the plugin
 export interface LazySettings {
-    dualConfigs: boolean;
     showConsoleLog: boolean;
-    desktop: DeviceSettings;
-    mobile?: DeviceSettings;
+
+    // Profile Management
+    profiles: Record<string, Profile>;
+    desktopProfileId: string;
+    mobileProfileId: string;
+    
+    // Command Cache (Global)
     commandCache?: CommandCache;
     commandCacheVersions?: CommandCacheVersions;
     commandCacheUpdatedAt?: number;
+
+    // Legacy fields for migration (optional)
+    dualConfigs?: boolean;
+    desktop?: DeviceSettings;
+    mobile?: DeviceSettings;
 }
 
+export const DEFAULT_PROFILE_ID = "Default";
+
 export const DEFAULT_SETTINGS: LazySettings = {
-    dualConfigs: false,
     showConsoleLog: false,
-    desktop: DEFAULT_DEVICE_SETTINGS,
+    profiles: {
+        [DEFAULT_PROFILE_ID]: {
+            id: DEFAULT_PROFILE_ID,
+            name: "Default",
+            settings: DEFAULT_DEVICE_SETTINGS,
+        },
+    },
+    desktopProfileId: DEFAULT_PROFILE_ID,
+    mobileProfileId: DEFAULT_PROFILE_ID,
 };
 
 export interface CachedCommandEntry {

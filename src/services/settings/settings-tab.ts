@@ -15,6 +15,7 @@ import { PluginModes } from "../../core/types";
 import { isLazyMode } from "../../core/utils";
 import type OnDemandPlugin from "../../main";
 import { LazyOptionsModal } from "./lazy-options-modal";
+import { ProfileManagerModal } from "./profile-manager-modal";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsTab");
 
@@ -45,9 +46,7 @@ export class SettingsTab extends PluginSettingTab {
         // Update the list of installed plugins
         this.plugin.updateManifests();
 
-        // Load the settings from disk when the settings modal is displayed.
-        // This avoids the issue where someone has synced the settings from another device,
-        // but since the plugin has already been loaded, the new settings do not show up.
+        // Load settings to ensure we have the latest profiles
         await this.plugin.loadSettings();
         this.pluginSettings = this.plugin.settings.plugins;
 
@@ -66,25 +65,63 @@ export class SettingsTab extends PluginSettingTab {
         this.containerEl.empty();
         this.dropdowns = [];
 
-        new Setting(this.containerEl)
-            .setName("Separate desktop/mobile configuration")
-            .setDesc(
-                "Enable this if you want to have different settings depending whether you're using a desktop or mobile device. " +
-                    `All of the settings below can be configured differently on desktop and mobile. You're currently using the ${this.plugin.device} settings.`,
-            )
-            .addToggle((toggle) => {
-                toggle
-                    .setValue(this.plugin.data.dualConfigs)
-                    .onChange((value) => {
-                        void (async () => {
-                            this.plugin.data.dualConfigs = value;
-                            await this.plugin.saveSettings();
-                            // Refresh the settings to make sure the mobile section is configured
-                            await this.plugin.loadSettings();
-                            this.buildDom();
-                        })();
-                    });
+        // --- Profile Management Section ---
+        const profileContainer = this.containerEl.createDiv("lazy-settings-profile-container");
+
+        new Setting(profileContainer)
+            .setName("Active profile")
+            .setDesc("Select the active profile. Switching profiles will immediately apply the new configuration.")
+            .addDropdown((dropdown) => {
+                const profiles = this.plugin.data.profiles;
+                Object.values(profiles).forEach((p) => {
+                    dropdown.addOption(p.id, p.name);
+                });
+                dropdown.setValue(this.plugin.container.settingsService.currentProfileId);
+                dropdown.onChange(async (newProfileId) => {
+                    if (newProfileId === this.plugin.container.settingsService.currentProfileId) return;
+                    
+                    // Switch profile
+                    await this.plugin.container.settingsService.switchProfile(newProfileId);
+                    
+                    // Apply changes immediately (as requested)
+                    new Notice(`Switched to profile: ${profiles[newProfileId].name}`);
+                    await this.plugin.applyStartupPolicy();
+                    
+                    // Refresh UI
+                    this.buildDom();
+                });
+            })
+            .addExtraButton((btn) => {
+                btn.setIcon("settings")
+                   .setTooltip("Manage profiles")
+                   .onClick(() => {
+                       new ProfileManagerModal(
+                           this.app,
+                           this.plugin.container.settingsService, // Access via container to get the instance
+                           // Callback on change
+                           async () => {
+                               await this.plugin.saveSettings();
+                               this.buildDom(); // Refresh dropdown
+                           }
+                       ).open();
+                   });
             });
+
+        // Show which profile is default for current device
+        const currentId = this.plugin.container.settingsService.currentProfileId;
+        const isDesktopDefault = this.plugin.data.desktopProfileId === currentId;
+        const isMobileDefault = this.plugin.data.mobileProfileId === currentId;
+        
+        if (isDesktopDefault || isMobileDefault) {
+             const badges = [];
+             if (isDesktopDefault) badges.push("Desktop default");
+             if (isMobileDefault) badges.push("Mobile default");
+             
+             const infoEl = profileContainer.createEl("div", { cls: "lazy-profile-badges" });
+             infoEl.setText(`Current profile is set as: ${badges.join(", ")}`);
+        }
+
+        // --- Standard Settings ---
 
         new Setting(this.containerEl)
             .setName("Debug log output")
@@ -104,20 +141,6 @@ export class SettingsTab extends PluginSettingTab {
         new Setting(this.containerEl)
             .setName("Lazy command caching")
             .setHeading();
-
-        // new Setting(this.containerEl)
-        //     .setName("Show plugin descriptions")
-        //     .addToggle((toggle) => {
-        //         toggle
-        //             .setValue(this.plugin.settings.showDescriptions)
-        //             .onChange((value) => {
-        //                 this.plugin.settings.showDescriptions = value;
-        //                 void (async () => {
-        //                     await this.plugin.saveSettings();
-        //                     this.buildDom();
-        //                 })();
-        //             });
-        //     });
 
         new Setting(this.containerEl)
             .setName("Re-register lazy commands/views wrapper on disable")

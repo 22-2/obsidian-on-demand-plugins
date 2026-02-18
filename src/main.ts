@@ -16,7 +16,7 @@ export default class OnDemandPlugin extends Plugin {
     device = "desktop/global";
     manifests: PluginManifest[] = [];
 
-    private container!: ServiceContainer;
+    container!: ServiceContainer;
 
     async onload() {
         const ctx = createPluginContext(this);
@@ -45,7 +45,8 @@ export default class OnDemandPlugin extends Plugin {
         await this.container.settingsService.load();
         this.data = this.container.settingsService.data;
         this.settings = this.container.settingsService.settings;
-        this.device = this.container.settingsService.device;
+        const profileId = this.container.settingsService.currentProfileId;
+        this.device = this.container.settingsService.data.profiles[profileId]?.name ?? "Unknown";
     }
 
     async saveSettings() {
@@ -92,6 +93,12 @@ export default class OnDemandPlugin extends Plugin {
         this.settings.plugins[pluginId] = { mode, userConfigured: true };
         await this.saveSettings();
         await this.container.applyPluginState(pluginId);
+    }
+
+    async switchProfile(profileId: string) {
+        await this.container.settingsService.switchProfile(profileId);
+        this.settings = this.container.settingsService.settings;
+        await this.applyStartupPolicy();
     }
 
     updateManifests() {
