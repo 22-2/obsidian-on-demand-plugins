@@ -3,6 +3,7 @@ import type { PluginManifest } from "obsidian";
 import { Plugin } from "obsidian";
 import { createPluginContext } from "./core/plugin-context";
 import type { DeviceSettings, LazySettings, PluginMode } from "./core/types";
+import { PLUGIN_MODE } from "./core/types";
 import { toggleLoggerBy } from "./core/utils";
 import { ServiceContainer } from "./services/service-container";
 import { SettingsTab } from "./services/settings/settings-tab";
@@ -71,11 +72,11 @@ export default class OnDemandPlugin extends Plugin {
 
             if (
                 !current.userConfigured &&
-                current.mode === "disabled" &&
+                current.mode === PLUGIN_MODE.ALWAYS_DISABLED &&
                 this.isPluginEnabledOnDisk(plugin.id)
             ) {
                 this.settings.plugins[plugin.id] = {
-                    mode: "keepEnabled",
+                    mode: PLUGIN_MODE.ALWAYS_ENABLED,
                     userConfigured: false,
                 };
                 hasChanges = true;
@@ -107,9 +108,9 @@ export default class OnDemandPlugin extends Plugin {
 
     getDefaultModeForPlugin(pluginId: string): PluginMode {
         if (this.isPluginEnabledOnDisk(pluginId)) {
-            return "keepEnabled";
+            return PLUGIN_MODE.ALWAYS_ENABLED;
         }
-        return "disabled";
+        return PLUGIN_MODE.ALWAYS_DISABLED;
     }
 
     isPluginEnabledOnDisk(pluginId: string): boolean {

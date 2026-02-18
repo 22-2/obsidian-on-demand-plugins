@@ -9,6 +9,7 @@ import type { PluginContext } from "../../core/plugin-context";
 import { ProgressDialog } from "../../core/progress";
 import { saveJSON } from "../../core/storage";
 import type { PluginMode } from "../../core/types";
+import { PLUGIN_MODE } from "../../core/types";
 import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
 import type { CommandCacheService } from "../command-cache/command-cache-service";
 import type { PluginRegistry } from "../registry/plugin-registry";
@@ -51,7 +52,7 @@ class ViewRegistryInterceptor {
 
             if (
                 loadingPluginId &&
-                this.getPluginMode(loadingPluginId) === "lazyOnView" &&
+                this.getPluginMode(loadingPluginId) === PLUGIN_MODE.LAZY_ON_VIEW &&
                 typeof type === "string" &&
                 type.length > 0
             ) {
@@ -343,7 +344,7 @@ export class StartupPolicyService {
         // startup apply step so we can detect view registrations. Regular
         // `lazy` plugins should not be enabled at startup.
         return manifests.filter(
-            (plugin) => this.ctx.getPluginMode(plugin.id) === "lazyOnView",
+            (plugin) => this.ctx.getPluginMode(plugin.id) === PLUGIN_MODE.LAZY_ON_VIEW,
         );
     }
 
@@ -404,7 +405,7 @@ export class StartupPolicyService {
 
         // Remove entries that are not lazyOnView
         for (const plugin of this.ctx.getManifests()) {
-            if (this.ctx.getPluginMode(plugin.id) !== "lazyOnView") {
+            if (this.ctx.getPluginMode(plugin.id) !== PLUGIN_MODE.LAZY_ON_VIEW) {
                 delete lazyOnViews[plugin.id];
             }
         }
@@ -413,7 +414,7 @@ export class StartupPolicyService {
         // Keep only plugins with `keepEnabled` in the enabled list
         const desiredEnabled = new Set<string>();
         this.ctx.getManifests().forEach((plugin) => {
-            if (this.ctx.getPluginMode(plugin.id) === "keepEnabled") {
+            if (this.ctx.getPluginMode(plugin.id) === PLUGIN_MODE.ALWAYS_ENABLED) {
                 desiredEnabled.add(plugin.id);
             }
         });
@@ -427,9 +428,7 @@ export class StartupPolicyService {
         // Ensure only `keepEnabled` plugins (plus the on-demand plugin) are persisted.
         const toPersist = new Set<string>(
             [...desiredEnabled].filter(
-                (id) =>
-                    this.ctx.getPluginMode(id) === "keepEnabled" ||
-                    id === ON_DEMAND_PLUGIN_ID,
+                (id) => this.ctx.getPluginMode(id) === PLUGIN_MODE.ALWAYS_ENABLED || id === ON_DEMAND_PLUGIN_ID,
             ),
         );
 

@@ -2,6 +2,7 @@ import { around } from "monkey-around";
 import type { Plugins } from "obsidian-typings";
 import type { PluginContext } from "../core/plugin-context";
 import type { CommandCacheService } from "../services/command-cache/command-cache-service";
+import { PLUGIN_MODE } from "../core/types";
 
 /**
  * Observe & Sync strategy (案3):
@@ -36,11 +37,11 @@ export function patchPluginEnableDisable(
                         );
                     }
 
-                    // Sync settings: disabled → keepEnabled
-                    if (mode === "disabled") {
+                    // Sync settings: alwaysDisabled → alwaysEnabled
+                    if (mode === PLUGIN_MODE.ALWAYS_DISABLED) {
                         const settings = ctx.getSettings();
                         settings.plugins[pluginId] = {
-                            mode: "keepEnabled",
+                            mode: PLUGIN_MODE.ALWAYS_ENABLED,
                             userConfigured: true,
                         };
                         await ctx.saveSettings();
@@ -68,18 +69,18 @@ export function patchPluginEnableDisable(
                         );
                     }
 
-                    // Sync settings: keepEnabled → disabled
-                    if (mode === "keepEnabled") {
+                    // Sync settings: alwaysEnabled → alwaysDisabled
+                    if (mode === PLUGIN_MODE.ALWAYS_ENABLED) {
                         const settings = ctx.getSettings();
                         settings.plugins[pluginId] = {
-                            mode: "disabled",
+                            mode: PLUGIN_MODE.ALWAYS_DISABLED,
                             userConfigured: true,
                         };
                         await ctx.saveSettings();
 
                         if (data.showConsoleLog) {
                             console.log(
-                                `[LazyPlugins] Synced settings: ${pluginId} keepEnabled → disabled`,
+                                `[LazyPlugins] Synced settings: ${pluginId} alwaysEnabled → alwaysDisabled`,
                             );
                         }
                     }
