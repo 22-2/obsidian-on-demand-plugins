@@ -101,14 +101,14 @@ export class SettingsService {
         const desktopId = "Default"; 
         profiles[desktopId] = {
             id: desktopId,
-            name: "Default (Desktop)",
+            name: "Default (desktop)",
             settings: desktopSettings,
         };
 
         // Migrate Mobile
         let mobileId = desktopId;
         if (this.data.dualConfigs && this.data.mobile) {
-            mobileId = "Mobile";
+            mobileId = "mobile";
             const mobileSettings = Object.assign(
                 {},
                 DEFAULT_DEVICE_SETTINGS,
