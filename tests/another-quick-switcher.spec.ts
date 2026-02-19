@@ -27,9 +27,16 @@ test("Another Quick Switcher: should NOT be loaded at startup when set to lazy",
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
     
-    // 1. Set to lazy mode
+    // 1. Set to lazy mode and apply (writes community-plugins.json)
     await pluginHandle.evaluate(async (plugin, pluginId) => {
-        await plugin.updatePluginSettings(pluginId, "lazy");
+        const original = app.commands.executeCommandById;
+        app.commands.executeCommandById = () => true; // prevent actual reload
+        try {
+            await plugin.updatePluginSettings(pluginId, "lazy");
+            await plugin.applyStartupPolicyAndRestart([pluginId]);
+        } finally {
+            app.commands.executeCommandById = original;
+        }
     }, targetPluginId);
 
     // 2. Restart Obsidian to check startup state

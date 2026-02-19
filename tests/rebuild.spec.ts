@@ -88,7 +88,7 @@ test("disabling keepEnabled plugin syncs settings to disabled", async ({ obsidia
         app.commands.executeCommandById = () => true;
 
         try {
-            await plugin.updatePluginSettings(pluginId, "keepEnabled");
+            await plugin.updatePluginSettings(pluginId, "alwaysEnabled");
         } finally {
             app.commands.executeCommandById = original;
         }
@@ -105,6 +105,6 @@ test("disabling keepEnabled plugin syncs settings to disabled", async ({ obsidia
         };
     }, targetPluginId);
 
-    expect(result.mode).toBe("disabled");
+    expect(result.mode).toBe("alwaysDisabled");
     expect(result.userConfigured).toBe(true);
 });

@@ -124,7 +124,7 @@ test("enabling disabled plugin syncs settings to keepEnabled", async ({ obsidian
         app.commands.executeCommandById = () => true;
 
         try {
-            await plugin.updatePluginSettings(pluginId, "disabled");
+            await plugin.updatePluginSettings(pluginId, "alwaysDisabled");
         } finally {
             app.commands.executeCommandById = original;
         }
@@ -148,7 +148,7 @@ test("enabling disabled plugin syncs settings to keepEnabled", async ({ obsidian
         };
     }, targetPluginId);
 
-    expect(result.mode).toBe("keepEnabled");
+    expect(result.mode).toBe("alwaysEnabled");
     expect(result.userConfigured).toBe(true);
 });
 
