@@ -32,9 +32,9 @@ export class StartupPolicyService {
     ) {}
 
     /** Apply startup policy (debounced + serialized via mutex). */
-    public apply = debounce(async (pluginIds?: string[]) => {
-        await this.mutex.runExclusive(() => this.executeStartupPolicy(pluginIds));
-    }, 100);
+    // public apply = debounce(async (pluginIds?: string[]) => {
+    //     await this.mutex.runExclusive(() => this.executeStartupPolicy(pluginIds));
+    // }, 100);
 
     /** Apply startup policy reusing an externally created ProgressDialog. */
     public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[]) {
