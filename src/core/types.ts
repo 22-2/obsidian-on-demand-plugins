@@ -54,7 +54,7 @@ export interface LazySettings {
     profiles: Record<string, Profile>;
     desktopProfileId: string;
     mobileProfileId: string;
-    
+
     // Command Cache (Global)
     commandCache?: CommandCache;
     commandCacheVersions?: CommandCacheVersions;
@@ -94,14 +94,14 @@ export const PLUGIN_MODE = {
     ALWAYS_DISABLED: "alwaysDisabled",
     LAZY: "lazy",
     ALWAYS_ENABLED: "alwaysEnabled",
-    /** 
+    /**
      * @deprecated
-    */
+     */
     LAZY_ON_VIEW: "lazyOnView",
     LAZY_ON_LAYOUT_READY: "lazyOnLayoutReady",
 } as const;
 
-export type PluginMode = typeof PLUGIN_MODE[keyof typeof PLUGIN_MODE];
+export type PluginMode = (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE];
 
 export const PluginModes: Record<PluginMode, string> = {
     [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",

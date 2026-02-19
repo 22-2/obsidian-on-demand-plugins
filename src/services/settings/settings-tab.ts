@@ -1,15 +1,6 @@
 import log from "loglevel";
-import type {
-    App,
-    ButtonComponent,
-    DropdownComponent
-} from "obsidian";
-import {
-    ExtraButtonComponent,
-    Notice,
-    PluginSettingTab,
-    Setting
-} from "obsidian";
+import type { App, ButtonComponent, DropdownComponent } from "obsidian";
+import { ExtraButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
 import type { PluginMode, PluginSettings } from "../../core/types";
 import { PluginModes } from "../../core/types";
 import { isLazyMode } from "../../core/utils";
@@ -79,7 +70,7 @@ export class SettingsTab extends PluginSettingTab {
                 dropdown.setValue(this.plugin.container.settingsService.currentProfileId);
                 dropdown.onChange(async (newProfileId) => {
                     if (newProfileId === this.plugin.container.settingsService.currentProfileId) return;
-                    
+
                     // Use the managed switchProfile method which updates references and saves
                     new Notice(`Switched to profile: ${profiles[newProfileId].name}`);
                     await this.plugin.switchProfile(newProfileId);
@@ -87,32 +78,32 @@ export class SettingsTab extends PluginSettingTab {
             })
             .addExtraButton((btn) => {
                 btn.setIcon("settings")
-                   .setTooltip("Manage profiles")
-                   .onClick(() => {
-                       new ProfileManagerModal(
-                           this.app,
-                           this.plugin.container.settingsService, // Access via container to get the instance
-                           // Callback on change
-                           async () => {
-                               await this.plugin.saveSettings();
-                               this.buildDom(); // Refresh dropdown
-                           }
-                       ).open();
-                   });
+                    .setTooltip("Manage profiles")
+                    .onClick(() => {
+                        new ProfileManagerModal(
+                            this.app,
+                            this.plugin.container.settingsService, // Access via container to get the instance
+                            // Callback on change
+                            async () => {
+                                await this.plugin.saveSettings();
+                                this.buildDom(); // Refresh dropdown
+                            },
+                        ).open();
+                    });
             });
 
         // Show which profile is default for current device
         const currentId = this.plugin.container.settingsService.currentProfileId;
         const isDesktopDefault = this.plugin.data.desktopProfileId === currentId;
         const isMobileDefault = this.plugin.data.mobileProfileId === currentId;
-        
+
         if (isDesktopDefault || isMobileDefault) {
-             const badges = [];
-             if (isDesktopDefault) badges.push("Desktop default");
-             if (isMobileDefault) badges.push("Mobile default");
-             
-             const infoEl = profileContainer.createEl("div", { cls: "lazy-profile-badges" });
-             infoEl.setText(`Current profile is set as: ${badges.join(", ")}`);
+            const badges = [];
+            if (isDesktopDefault) badges.push("Desktop default");
+            if (isMobileDefault) badges.push("Mobile default");
+
+            const infoEl = profileContainer.createEl("div", { cls: "lazy-profile-badges" });
+            infoEl.setText(`Current profile is set as: ${badges.join(", ")}`);
         }
 
         // --- Standard Settings ---
@@ -121,20 +112,16 @@ export class SettingsTab extends PluginSettingTab {
             .setName("Debug log output")
             .setDesc("Enable detailed logs for troubleshooting.")
             .addToggle((toggle) => {
-                toggle
-                    .setValue(this.plugin.data.showConsoleLog)
-                    .onChange((value) => {
-                        this.plugin.data.showConsoleLog = value;
-                        void (async () => {
-                            await this.plugin.saveSettings();
-                            this.plugin.configureLogger();
-                        })();
-                    });
+                toggle.setValue(this.plugin.data.showConsoleLog).onChange((value) => {
+                    this.plugin.data.showConsoleLog = value;
+                    void (async () => {
+                        await this.plugin.saveSettings();
+                        this.plugin.configureLogger();
+                    })();
+                });
             });
 
-        new Setting(this.containerEl)
-            .setName("Lazy command caching")
-            .setHeading();
+        new Setting(this.containerEl).setName("Lazy command caching").setHeading();
 
         new Setting(this.containerEl)
             .setName("Force rebuild command cache")
@@ -166,9 +153,7 @@ export class SettingsTab extends PluginSettingTab {
                     if (this.pendingPluginIds.size === 0) return;
                     this.normalizelazyOnViews();
                     await this.plugin.saveSettings();
-                    await this.plugin.applyStartupPolicyAndRestart(
-                        Array.from(this.pendingPluginIds),
-                    );
+                    await this.plugin.applyStartupPolicyAndRestart(Array.from(this.pendingPluginIds));
                     this.pendingPluginIds.clear();
                     this.updateApplyButton();
                 });
@@ -197,13 +182,10 @@ export class SettingsTab extends PluginSettingTab {
                 dropdown.addOption("", "All");
                 Object.keys(PluginModes)
                     .filter((key) => key !== "lazyOnView")
-                    .forEach((key) =>
-                        dropdown.addOption(key, PluginModes[key as PluginMode]),
-                    );
+                    .forEach((key) => dropdown.addOption(key, PluginModes[key as PluginMode]));
                 dropdown.setValue(this.filterMethod ?? "");
                 dropdown.onChange((value: string) => {
-                    this.filterMethod =
-                        value === "" ? undefined : (value as PluginMode);
+                    this.filterMethod = value === "" ? undefined : (value as PluginMode);
                     this.buildPluginList();
                 });
             });
@@ -222,60 +204,47 @@ export class SettingsTab extends PluginSettingTab {
 
             // Filter the list of plugins if there is a filter specified
             if (this.filterMethod && currentValue !== this.filterMethod) return;
-            if (
-                this.filterString &&
-                !plugin.name
-                    .toLowerCase()
-                    .includes(this.filterString.toLowerCase())
-            )
-                return;
+            if (this.filterString && !plugin.name.toLowerCase().includes(this.filterString.toLowerCase())) return;
 
             count++;
-            const setting = new Setting(this.pluginListContainer).setName(
-                plugin.name,
-            );
+            const setting = new Setting(this.pluginListContainer).setName(plugin.name);
 
             // Add gear button first (will appear on the left)
             const gearBtn = new ExtraButtonComponent(setting.controlEl)
                 .setIcon("gear")
                 .setTooltip("Advanced lazy options")
                 .onClick(() => {
-                    new LazyOptionsModal(
-                        this.app,
-                        this.plugin,
-                        plugin.id,
-                        () => {
-                            this.pendingPluginIds.add(plugin.id);
-                            this.updateApplyButton();
-                            this.buildPluginList();
-                        },
-                    ).open();
+                    new LazyOptionsModal(this.app, this.plugin, plugin.id, () => {
+                        this.pendingPluginIds.add(plugin.id);
+                        this.updateApplyButton();
+                        this.buildPluginList();
+                    }).open();
                 });
 
             // Only show for lazy modes
             const isLazy = isLazyMode(currentValue);
-            gearBtn.extraSettingsEl.style.display = isLazy
-                ? "inline-block"
-                : "none";
             gearBtn.extraSettingsEl.addClass("lazy-plugin-gear-left");
+            if (isLazy) {
+                gearBtn.extraSettingsEl.addClass("lazy-plugin-gear-visible");
+            } else {
+                gearBtn.extraSettingsEl.removeClass("lazy-plugin-gear-visible");
+            }
 
             // Then add dropdown (will appear to the right of gear)
             setting.addDropdown((dropdown) => {
                 this.dropdowns.push(dropdown);
                 this.addModeOptions(dropdown);
-                dropdown
-                    .setValue(currentValue)
-                    .onChange((value: PluginMode) => {
-                        // Update the config, and defer apply until user confirms
-                        this.pluginSettings[plugin.id] = {
-                            mode: value,
-                            userConfigured: true,
-                        };
-                        this.ensurelazyOnViewEntry(plugin.id, value);
-                        this.pendingPluginIds.add(plugin.id);
-                        this.updateApplyButton();
-                        this.buildPluginList(); // Rebuild to show/hide view types input
-                    });
+                dropdown.setValue(currentValue).onChange((value: PluginMode) => {
+                    // Update the config, and defer apply until user confirms
+                    this.pluginSettings[plugin.id] = {
+                        mode: value,
+                        userConfigured: true,
+                    };
+                    this.ensurelazyOnViewEntry(plugin.id, value);
+                    this.pendingPluginIds.add(plugin.id);
+                    this.updateApplyButton();
+                    this.buildPluginList(); // Rebuild to show/hide view types input
+                });
             });
 
             setting.then((setting) => {
@@ -347,10 +316,6 @@ export class SettingsTab extends PluginSettingTab {
         if (!this.applyButton) return;
         const count = this.pendingPluginIds.size;
         this.applyButton.setDisabled(count === 0);
-        this.applyButton.setButtonText(
-            count === 0
-                ? "Apply changes"
-                : `Apply changes (${count}) & restart Obsidian`,
-        );
+        this.applyButton.setButtonText(count === 0 ? "Apply changes" : `Apply changes (${count}) & restart Obsidian`);
     }
 }

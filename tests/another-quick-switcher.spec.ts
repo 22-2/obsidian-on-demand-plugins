@@ -1,6 +1,6 @@
+import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
 import { ensureBuilt, pluginUnderTestId, repoRoot } from "./test-utils";
-import path from "node:path";
 
 const targetPluginId = "obsidian-another-quick-switcher";
 

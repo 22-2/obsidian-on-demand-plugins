@@ -97,15 +97,13 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         },
         getManifests: () => plugin.manifests,
         getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
-        getDefaultModeForPlugin: (pluginId) =>
-            plugin.getDefaultModeForPlugin(pluginId),
+        getDefaultModeForPlugin: (pluginId) => plugin.getDefaultModeForPlugin(pluginId),
         getCommandPluginId: (commandId) => plugin.getCommandPluginId(commandId),
         getData: () => plugin.data,
         getSettings: () => plugin.settings,
         saveSettings: () => plugin.saveSettings(),
         register: plugin.register.bind(plugin),
         registerEvent: plugin.registerEvent.bind(plugin),
-        isPluginEnabledOnDisk: (pluginId) =>
-            plugin.isPluginEnabledOnDisk(pluginId),
+        isPluginEnabledOnDisk: (pluginId) => plugin.isPluginEnabledOnDisk(pluginId),
     };
 }

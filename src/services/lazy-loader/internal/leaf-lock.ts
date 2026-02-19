@@ -41,10 +41,7 @@ export class LeafLockManager {
      * @param subKey - Optional sub-key to differentiate lock types (default: "default")
      * @returns A promise that resolves to a lock release handle
      */
-    async lock(
-        leaf: WorkspaceLeaf,
-        subKey: string = "default",
-    ): Promise<LockRelease> {
+    async lock(leaf: WorkspaceLeaf, subKey: string = "default"): Promise<LockRelease> {
         let subMap = this.leafMutexes.get(leaf);
         if (!subMap) {
             subMap = new Map<string, Mutex>();

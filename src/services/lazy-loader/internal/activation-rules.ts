@@ -41,10 +41,7 @@ const DEFAULT_FILE_RULES: Record<string, FileActivationCriteria> = {
  * @param viewType - The view type to resolve (e.g., "markdown", "canvas")
  * @returns The plugin ID that should handle this view type, or null
  */
-export function resolvePluginForViewType(
-    ctx: PluginContext,
-    viewType: string,
-): string | null {
+export function resolvePluginForViewType(ctx: PluginContext, viewType: string): string | null {
     const settings = ctx.getSettings();
 
     // 1. Per-plugin lazyOptions (preferred)
@@ -54,16 +51,12 @@ export function resolvePluginForViewType(
 
         // Defer to FileLazyLoader when file rules are also present
         if (hasFileRules(ctx, pluginId)) {
-            logger.debug(
-                `[LazyPlugins] resolvePluginForViewType: ${pluginId} has view rule for ${viewType} but also has file rules. Skipping.`,
-            );
+            logger.debug(`[LazyPlugins] resolvePluginForViewType: ${pluginId} has view rule for ${viewType} but also has file rules. Skipping.`);
             continue;
         }
 
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
-        logger.debug(
-            `[LazyPlugins] resolvePluginForViewType: resolved ${pluginId} for ${viewType}`,
-        );
+        logger.debug(`[LazyPlugins] resolvePluginForViewType: resolved ${pluginId} for ${viewType}`);
         return pluginId;
     }
 
@@ -73,9 +66,7 @@ export function resolvePluginForViewType(
         if (!viewTypes.includes(viewType)) continue;
         if (hasFileRules(ctx, pluginId)) continue;
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
-        logger.debug(
-            `[LazyPlugins] resolvePluginForViewType (legacy): resolved ${pluginId} for ${viewType}`,
-        );
+        logger.debug(`[LazyPlugins] resolvePluginForViewType (legacy): resolved ${pluginId} for ${viewType}`);
         return pluginId;
     }
 
@@ -97,10 +88,7 @@ export function resolvePluginForViewType(
  * @param file - The file to check against activation criteria
  * @returns The plugin ID that should handle this file, or null
  */
-export async function resolvePluginForFile(
-    ctx: PluginContext,
-    file: TFile,
-): Promise<string | null> {
+export async function resolvePluginForFile(ctx: PluginContext, file: TFile): Promise<string | null> {
     const settings = ctx.getSettings();
 
     // 1. Per-plugin lazyOptions (preferred)
@@ -108,13 +96,8 @@ export async function resolvePluginForFile(
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
 
         const opts = pluginSettings.lazyOptions;
-        if (
-            opts?.useFile &&
-            (await matchesCriteria(ctx, file, opts.fileCriteria))
-        ) {
-            logger.debug(
-                `[LazyPlugins] resolvePluginForFile: resolved ${pluginId} for ${file.path}`,
-            );
+        if (opts?.useFile && (await matchesCriteria(ctx, file, opts.fileCriteria))) {
+            logger.debug(`[LazyPlugins] resolvePluginForFile: resolved ${pluginId} for ${file.path}`);
             return pluginId;
         }
     }
@@ -127,9 +110,7 @@ export async function resolvePluginForFile(
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
 
         if (await matchesCriteria(ctx, file, criteria)) {
-            logger.debug(
-                `[LazyPlugins] resolvePluginForFile (legacy/default): resolved ${pluginId} for ${file.path}`,
-            );
+            logger.debug(`[LazyPlugins] resolvePluginForFile (legacy/default): resolved ${pluginId} for ${file.path}`);
             return pluginId;
         }
     }
@@ -154,11 +135,7 @@ export async function resolvePluginForFile(
  * @param criteria - The activation criteria to match against
  * @returns True if the file matches any of the criteria
  */
-export async function matchesCriteria(
-    ctx: PluginContext,
-    file: TFile,
-    criteria: FileActivationCriteria,
-): Promise<boolean> {
+export async function matchesCriteria(ctx: PluginContext, file: TFile, criteria: FileActivationCriteria): Promise<boolean> {
     const { app } = ctx;
 
     // 1. Suffix check (e.g. "foo.excalidraw" for "foo.excalidraw.md")
@@ -173,9 +150,7 @@ export async function matchesCriteria(
         const cache = app.metadataCache.getFileCache(file);
         if (cache?.frontmatter) {
             for (const key of criteria.frontmatterKeys) {
-                if (
-                    Object.prototype.hasOwnProperty.call(cache.frontmatter, key)
-                ) {
+                if (Object.prototype.hasOwnProperty.call(cache.frontmatter, key)) {
                     return true;
                 }
             }
@@ -211,8 +186,7 @@ function hasFileRules(ctx: PluginContext, pluginId: string): boolean {
     if (settings.plugins[pluginId]?.lazyOptions?.useFile) return true;
 
     const lazyOnFiles = settings.lazyOnFiles || {};
-    if (lazyOnFiles[pluginId] && Object.keys(lazyOnFiles[pluginId]).length > 0)
-        return true;
+    if (lazyOnFiles[pluginId] && Object.keys(lazyOnFiles[pluginId]).length > 0) return true;
 
     if (pluginId in DEFAULT_FILE_RULES) return true;
 

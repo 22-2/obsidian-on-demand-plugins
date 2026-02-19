@@ -1,14 +1,11 @@
 import { Mutex } from "async-mutex";
 import log from "loglevel";
-import type { App, PluginManifest } from "obsidian";
-import { debounce } from "obsidian";
+import type { PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "obsidian-typings";
-import pWaitFor from "p-wait-for";
 import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
 import type { PluginContext } from "../../core/plugin-context";
 import { ProgressDialog } from "../../core/progress";
 import { saveJSON } from "../../core/storage";
-import type { PluginMode } from "../../core/types";
 import { PLUGIN_MODE } from "../../core/types";
 import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
 import type { CommandCacheService } from "../command-cache/command-cache-service";
@@ -45,23 +42,22 @@ export class StartupPolicyService {
     // Core execution
     // -------------------------------------------------------------------------
 
-    private async executeStartupPolicy(
-        pluginIds?: string[],
-        externalProgress?: ProgressDialog | null,
-    ) {
+    private async executeStartupPolicy(pluginIds?: string[], externalProgress?: ProgressDialog | null) {
         const targetIds = pluginIds?.length ? new Set(pluginIds) : null;
         const allManifests = this.ctx.getManifests();
-        const targetManifests = targetIds
-            ? allManifests.filter((p) => targetIds.has(p.id))
-            : allManifests;
+        const targetManifests = targetIds ? allManifests.filter((p) => targetIds.has(p.id)) : allManifests;
         const lazyManifests = this.getLazyManifests(targetManifests);
 
         let cancelled = false;
         const progress = externalProgress
-            ? (externalProgress.setOnCancel(() => { cancelled = true; }),
-               externalProgress.setTotal(lazyManifests.length + 2),
-               externalProgress)
-            : this.openProgressDialog(lazyManifests.length, () => { cancelled = true; });
+            ? (externalProgress.setOnCancel(() => {
+                  cancelled = true;
+              }),
+              externalProgress.setTotal(lazyManifests.length + 2),
+              externalProgress)
+            : this.openProgressDialog(lazyManifests.length, () => {
+                  cancelled = true;
+              });
 
         const lazyOnViews: Record<string, string[]> = {
             ...(this.ctx.getSettings().lazyOnViews ?? {}),
@@ -69,12 +65,7 @@ export class StartupPolicyService {
         const stopIntercepting = this.interceptViewRegistry(lazyOnViews);
 
         try {
-            await this.loadLazyPluginsWithProgress(
-                lazyManifests,
-                targetIds,
-                progress,
-                () => cancelled,
-            );
+            await this.loadLazyPluginsWithProgress(lazyManifests, targetIds, progress, () => cancelled);
         } finally {
             await this.cleanupAndReload(lazyOnViews, !cancelled, progress, stopIntercepting);
         }
@@ -101,15 +92,12 @@ export class StartupPolicyService {
         const settings = this.ctx.getSettings();
 
         viewRegistry.registerView = (type: string, creator: unknown) => {
-            const loadingId = (this.ctx.app as unknown as { plugins: Plugins })
-                .plugins.loadingPluginId as string | undefined;
+            const loadingId = (this.ctx.app as unknown as { plugins: Plugins }).plugins.loadingPluginId as string | undefined;
 
             if (loadingId && type) {
                 const mode = this.ctx.getPluginMode(loadingId);
                 const pluginSettings = settings.plugins[loadingId];
-                const isLazyWithUseView =
-                    mode === PLUGIN_MODE.LAZY &&
-                    pluginSettings?.lazyOptions?.useView === true;
+                const isLazyWithUseView = mode === PLUGIN_MODE.LAZY && pluginSettings?.lazyOptions?.useView === true;
 
                 if (isLazyWithUseView) {
                     lazyOnViews[loadingId] ??= [];
@@ -148,12 +136,7 @@ export class StartupPolicyService {
         });
     }
 
-    private async loadLazyPluginsWithProgress(
-        manifests: PluginManifest[],
-        targetIds: Set<string> | null,
-        progress: ProgressDialog | null,
-        isCancelled: () => boolean,
-    ) {
+    private async loadLazyPluginsWithProgress(manifests: PluginManifest[], targetIds: Set<string> | null, progress: ProgressDialog | null, isCancelled: () => boolean) {
         // 1. Enable each plugin sequentially
         for (let i = 0; i < manifests.length; i++) {
             if (isCancelled()) return;
@@ -161,9 +144,7 @@ export class StartupPolicyService {
             progress?.setStatus(`Loading ${plugin.name}`);
             progress?.setProgress(i + 1);
 
-            const alreadyReady =
-                isPluginLoaded(this.ctx.app, plugin.id) &&
-                isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, plugin.id);
+            const alreadyReady = isPluginLoaded(this.ctx.app, plugin.id) && isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, plugin.id);
 
             if (!alreadyReady) {
                 try {
@@ -189,18 +170,12 @@ export class StartupPolicyService {
 
         // 3. Rebuild command cache
         progress?.setStatus("Rebuilding command cache…");
-        await this.commandCacheService.refreshCommandCache(
-            targetIds ? Array.from(targetIds) : undefined,
-        );
+        await this.commandCacheService.refreshCommandCache(targetIds ? Array.from(targetIds) : undefined);
         progress?.setProgress(manifests.length + 2);
     }
 
     /** Poll until all plugin IDs are loaded, or timeout / cancelled. */
-    private async waitForPlugins(
-        ids: string[],
-        timeoutMs: number,
-        isCancelled: () => boolean,
-    ): Promise<void> {
+    private async waitForPlugins(ids: string[], timeoutMs: number, isCancelled: () => boolean): Promise<void> {
         if (!ids.length) return;
         const deadline = Date.now() + timeoutMs;
         while (true) {
@@ -214,12 +189,7 @@ export class StartupPolicyService {
     // Cleanup & persistence
     // -------------------------------------------------------------------------
 
-    private async cleanupAndReload(
-        lazyOnViews: Record<string, string[]>,
-        shouldReload: boolean,
-        progress: ProgressDialog | null,
-        stopIntercepting: () => void,
-    ) {
+    private async cleanupAndReload(lazyOnViews: Record<string, string[]>, shouldReload: boolean, progress: ProgressDialog | null, stopIntercepting: () => void) {
         stopIntercepting();
 
         // Persist lazyOnViews
@@ -242,23 +212,13 @@ export class StartupPolicyService {
         desiredEnabled.forEach((id) => this.ctx.obsidianPlugins.enabledPlugins.add(id));
 
         // Persist community-plugins file
-        const toPersist = [...desiredEnabled]
-            .filter(
-                (id) =>
-                    this.ctx.getPluginMode(id) === PLUGIN_MODE.ALWAYS_ENABLED ||
-                    id === ON_DEMAND_PLUGIN_ID,
-            )
-            .sort((a, b) => a.localeCompare(b));
+        const toPersist = [...desiredEnabled].filter((id) => this.ctx.getPluginMode(id) === PLUGIN_MODE.ALWAYS_ENABLED || id === ON_DEMAND_PLUGIN_ID).sort((a, b) => a.localeCompare(b));
 
-        await this.registry.writeCommunityPluginsFile(
-            toPersist,
-            this.ctx.getData().showConsoleLog,
-        );
+        await this.registry.writeCommunityPluginsFile(toPersist, this.ctx.getData().showConsoleLog);
 
         if (shouldReload) {
             try {
-                (this.ctx.app as unknown as { commands: Commands })
-                    .commands.executeCommandById("app:reload");
+                (this.ctx.app as unknown as { commands: Commands }).commands.executeCommandById("app:reload");
             } catch (error) {
                 logger.warn("Failed to reload app after apply", error);
             }

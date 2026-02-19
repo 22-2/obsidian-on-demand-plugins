@@ -63,10 +63,7 @@ export class LazyCommandRunner implements PluginLoader {
             });
         } catch (error) {
             if (this.ctx.getData().showConsoleLog) {
-                logger.error(
-                    `Error executing lazy command ${commandId}:`,
-                    error,
-                );
+                logger.error(`Error executing lazy command ${commandId}:`, error);
             }
         }
     }
@@ -77,10 +74,7 @@ export class LazyCommandRunner implements PluginLoader {
         return await mutex.runExclusive(async () => {
             try {
                 const loaded = isPluginLoaded(this.ctx.app, pluginId);
-                const enabled = isPluginEnabled(
-                    this.ctx.obsidianPlugins.enabledPlugins,
-                    pluginId,
-                );
+                const enabled = isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, pluginId);
 
                 if (enabled && loaded) {
                     this.commandRegistry.syncCommandWrappersForPlugin(pluginId);
@@ -103,10 +97,7 @@ export class LazyCommandRunner implements PluginLoader {
         });
     }
 
-    async waitForCommand(
-        commandId: string,
-        timeoutMs = 8000,
-    ): Promise<boolean> {
+    async waitForCommand(commandId: string, timeoutMs = 8000): Promise<boolean> {
         if (this.isCommandExecutable(commandId)) return true;
 
         try {
@@ -115,15 +106,13 @@ export class LazyCommandRunner implements PluginLoader {
             });
             return true;
         } catch (error) {
-            // Timeout or other error
+            logger.warn(`Timeout waiting for command ${commandId} to become ready ${error}`);
             return false;
         }
     }
 
     private async createCommandReadyPromise(commandId: string): Promise<void> {
-        const viewRegistry = (
-            this.ctx.app as unknown as { viewRegistry?: ViewRegistry }
-        ).viewRegistry;
+        const viewRegistry = (this.ctx.app as unknown as { viewRegistry?: ViewRegistry }).viewRegistry;
 
         // Immediate check
         if (this.isCommandExecutable(commandId)) return;
@@ -156,10 +145,7 @@ export class LazyCommandRunner implements PluginLoader {
         }
     }
 
-    async waitForPluginLoaded(
-        pluginId: string,
-        timeoutMs = 8000,
-    ): Promise<boolean> {
+    async waitForPluginLoaded(pluginId: string, timeoutMs = 8000): Promise<boolean> {
         try {
             await pTimeout(
                 pWaitFor(() => isPluginLoaded(this.ctx.app, pluginId), {
@@ -171,7 +157,7 @@ export class LazyCommandRunner implements PluginLoader {
             );
             return true;
         } catch (error) {
-            // Timeout
+            logger.error(`Timeout waiting for plugin ${pluginId} to load`, error);
             return false;
         }
     }
@@ -196,34 +182,23 @@ export class LazyCommandRunner implements PluginLoader {
             if (activeEditor instanceof MarkdownView) {
                 const view = activeEditor;
                 const activeEl = activeDocument.activeElement;
-                if (
-                    view.inlineTitleEl?.contains(activeEl) ||
-                    view.titleEl?.contains(activeEl)
-                ) {
+                if (view.inlineTitleEl?.contains(activeEl) || view.titleEl?.contains(activeEl)) {
                     return false;
                 }
             }
 
-            if (
-                !command.allowProperties &&
-                activeDocument.activeElement?.closest(".metadata-container")
-            ) {
+            if (!command.allowProperties && activeDocument.activeElement?.closest(".metadata-container")) {
                 return false;
             }
 
-            if (
-                !command.allowPreview &&
-                (activeEditor as MarkdownView).getMode?.() === "preview"
-            ) {
+            if (!command.allowPreview && (activeEditor as MarkdownView).getMode?.() === "preview") {
                 return false;
             }
 
             if (typeof command.editorCheckCallback === "function") {
                 if (command.editorCheckCallback(true, editor, activeEditor)) {
                     if (this.ctx.getData().showConsoleLog) {
-                        logger.debug(
-                            `Executing editorCheckCallback for: ${commandId}`,
-                        );
+                        logger.debug(`Executing editorCheckCallback for: ${commandId}`);
                     }
                     command.editorCheckCallback(false, editor, activeEditor);
                     return true;
@@ -263,9 +238,7 @@ export class LazyCommandRunner implements PluginLoader {
     }
 
     isCommandExecutable(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as
-            | Command
-            | undefined;
+        const command = this.ctx.obsidianCommands.commands[commandId] as Command | undefined;
 
         if (!command) return false;
 
@@ -275,11 +248,6 @@ export class LazyCommandRunner implements PluginLoader {
             return false;
         }
 
-        return (
-            typeof command.callback === "function" ||
-            typeof command.checkCallback === "function" ||
-            typeof command.editorCallback === "function" ||
-            typeof command.editorCheckCallback === "function"
-        );
+        return typeof command.callback === "function" || typeof command.checkCallback === "function" || typeof command.editorCallback === "function" || typeof command.editorCheckCallback === "function";
     }
 }

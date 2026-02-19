@@ -16,11 +16,7 @@ const logger = log.getLogger("OnDemandPlugin/ViewLazyLoader");
  * plugin is loaded and commands are synchronized.
  */
 export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
-    private debouncedInitializeLazyViewForLeaf = debounce(
-        this.initializeLazyViewForLeaf.bind(this),
-        100,
-        true,
-    );
+    private debouncedInitializeLazyViewForLeaf = debounce(this.initializeLazyViewForLeaf.bind(this), 100, true);
 
     constructor(
         ctx: PluginContext,
@@ -34,12 +30,7 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
     }
 
     registerActiveLeafReload(): void {
-        this.ctx.registerEvent(
-            this.ctx.app.workspace.on(
-                "active-leaf-change",
-                this.debouncedInitializeLazyViewForLeaf,
-            ),
-        );
+        this.ctx.registerEvent(this.ctx.app.workspace.on("active-leaf-change", this.debouncedInitializeLazyViewForLeaf));
 
         // Initial load
         this.ctx.app.workspace.onLayoutReady(() =>
@@ -56,23 +47,15 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
         const viewType = leaf.view.getViewType();
         const leafId = this.getLeafId(leaf);
 
-        logger.debug(
-            `[LazyPlugins] initializeLazyViewForLeaf: started for leaf ${leafId}, viewType: ${viewType}`,
-        );
+        logger.debug(`[LazyPlugins] initializeLazyViewForLeaf: started for leaf ${leafId}, viewType: ${viewType}`);
 
         // Check visibility and re-entry guard before acquiring lock
         if (!isLeafVisible(leaf)) {
-            logger.debug(
-                `[LazyPlugins] initializeLazyViewForLeaf: skipped (not visible) for leaf ${leafId}`,
-            );
+            logger.debug(`[LazyPlugins] initializeLazyViewForLeaf: skipped (not visible) for leaf ${leafId}`);
             return;
         }
 
-        await this.loadPluginWithLock(
-            { leaf, viewType },
-            async () => resolvePluginForViewType(this.ctx, viewType),
-            { leafId, description: `viewType: ${viewType}` },
-        );
+        await this.loadPluginWithLock({ leaf, viewType }, async () => resolvePluginForViewType(this.ctx, viewType), { leafId, description: `viewType: ${viewType}` });
 
         // Sync commands and update re-entry guard
         const pluginId = resolvePluginForViewType(this.ctx, viewType);

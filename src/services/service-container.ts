@@ -9,20 +9,17 @@ import type { PluginManifest, WorkspaceLeaf } from "obsidian";
 import PQueue from "p-queue";
 import type { PluginContext } from "../core/plugin-context";
 import { ProgressDialog } from "../core/progress";
+import { PLUGIN_MODE } from "../core/types";
 import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
 import { patchSetViewState } from "../patches/view-state";
 import { CommandCacheService } from "./command-cache/command-cache-service";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
-import {
-    LeafLockManager,
-    LeafViewLockStrategy
-} from "./lazy-loader/internal/leaf-lock";
+import { LeafLockManager, LeafViewLockStrategy } from "./lazy-loader/internal/leaf-lock";
 import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
 import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
-import { PLUGIN_MODE } from "../core/types";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;
@@ -54,11 +51,7 @@ export class ServiceContainer {
         this.lazyRunner.setCommandRegistry(this.commandCache);
 
         // 6. StartupPolicyService (needs ctx + commandCache + registry)
-        this.startupPolicy = new StartupPolicyService(
-            ctx,
-            this.commandCache,
-            this.registry,
-        );
+        this.startupPolicy = new StartupPolicyService(ctx, this.commandCache, this.registry);
 
         // --- View & File Loading Support ---
 
@@ -66,12 +59,7 @@ export class ServiceContainer {
         const lockManager = new LeafLockManager();
 
         // 7. ViewLazyLoader (needs ctx + pluginLoader + commandRegistry)
-        this.viewLoader = new ViewLazyLoader(
-            ctx,
-            this.lazyRunner,
-            this.commandCache,
-            new LeafViewLockStrategy(lockManager),
-        );
+        this.viewLoader = new ViewLazyLoader(ctx, this.lazyRunner, this.commandCache, new LeafViewLockStrategy(lockManager));
 
         // 8. FileLazyLoader (needs ctx + pluginLoader)
         this.fileLoader = new FileLazyLoader(
@@ -79,8 +67,7 @@ export class ServiceContainer {
             this.lazyRunner,
             // Delegate to the shared manager with the "leaf-generic" subKey
             {
-                lock: (leaf: WorkspaceLeaf) =>
-                    lockManager.lock(leaf, "leaf-generic"),
+                lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic"),
             },
         );
 
@@ -94,9 +81,7 @@ export class ServiceContainer {
      */
     async initialize() {
         // Load enabled-plugins list from disk
-        await this.registry.loadEnabledPluginsFromDisk(
-            this.settingsService.data.showConsoleLog,
-        );
+        await this.registry.loadEnabledPluginsFromDisk(this.settingsService.data.showConsoleLog);
 
         // Load command cache from persisted data
         this.commandCache.loadFromData();
@@ -107,8 +92,7 @@ export class ServiceContainer {
 
         patchSetViewState({
             register: this.ctx.register.bind(this.ctx),
-            onViewType: (viewType: string) =>
-                this.viewLoader.checkViewTypeForLazyLoading(viewType),
+            onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
         });
 
         this.viewLoader.registerActiveLeafReload();
@@ -126,23 +110,11 @@ export class ServiceContainer {
     private async onLayoutReady() {
         const manifests = this.ctx.getManifests();
 
-        const toLoad = manifests.filter(
-            (m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY,
-        );
+        const toLoad = manifests.filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
 
         if (toLoad.length === 0) return;
 
-        const tasks = toLoad.map((manifest) =>
-            this.layoutReadyQueue.add(() =>
-                this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) =>
-                    console.error(
-                        "Failed loading plugin onLayoutReady",
-                        manifest.id,
-                        err,
-                    ),
-                ),
-            ),
-        );
+        const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
 
         await Promise.all(tasks);
     }
@@ -155,9 +127,7 @@ export class ServiceContainer {
         // Show a progress dialog early to cover the command cache rebuild and the
         // subsequent startup policy apply steps.
         const manifests = this.ctx.getManifests();
-        const lazyCount = manifests.filter(
-            (p) => this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_ENABLED && this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_DISABLED,
-        ).length;
+        const lazyCount = manifests.filter((p) => this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_ENABLED && this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_DISABLED).length;
 
         const progress = new ProgressDialog(this.ctx.app, {
             title: "Rebuilding command cache",
@@ -168,14 +138,10 @@ export class ServiceContainer {
         });
         progress.open();
 
-        await this.commandCache.refreshCommandCache(
-            undefined,
-            force,
-            (current, total, plugin) => {
-                progress.setStatus(`Rebuilding ${plugin.name}`);
-                progress.setProgress(current, total);
-            },
-        );
+        await this.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
+            progress.setStatus(`Rebuilding ${plugin.name}`);
+            progress.setProgress(current, total);
+        });
 
         // Reuse the same progress dialog for the startup policy apply step so
         // the user sees a continuous progress experience.
@@ -190,19 +156,11 @@ export class ServiceContainer {
         pluginIds: string[],
         options?: {
             force?: boolean;
-            onProgress?: (
-                current: number,
-                total: number,
-                plugin: PluginManifest,
-            ) => void;
+            onProgress?: (current: number, total: number, plugin: PluginManifest) => void;
         },
     ) {
         const force = options?.force ?? false;
-        await this.commandCache.refreshCommandCache(
-            pluginIds,
-            force,
-            options?.onProgress,
-        );
+        await this.commandCache.refreshCommandCache(pluginIds, force, options?.onProgress);
         this.commandCache.registerCachedCommands();
     }
 

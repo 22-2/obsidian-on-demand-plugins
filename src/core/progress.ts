@@ -88,9 +88,7 @@ export class ProgressDialog extends Modal {
     }
 
     private updateCounter() {
-        const pct = this.total
-            ? Math.round((this.current / this.total) * 100)
-            : 0;
+        const pct = this.total ? Math.round((this.current / this.total) * 100) : 0;
         this.counterEl.setText(`${pct}%`);
     }
 }

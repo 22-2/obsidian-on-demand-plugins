@@ -1,8 +1,5 @@
 import log from "loglevel";
-import type {
-    App,
-    PluginManifest
-} from "obsidian";
+import type { App, PluginManifest } from "obsidian";
 import { normalizePath, Platform } from "obsidian";
 import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
 
@@ -21,9 +18,7 @@ export class PluginRegistry {
     ) {}
 
     getCommunityPluginsConfigFilePath(): string {
-        return normalizePath(
-            this.app.vault.configDir + "/community-plugins.json",
-        );
+        return normalizePath(this.app.vault.configDir + "/community-plugins.json");
     }
 
     updateManifests() {
@@ -36,16 +31,11 @@ export class PluginRegistry {
                     // Filter out desktop-only plugins from mobile
                     !(Platform.isMobile && plugin.isDesktopOnly),
             )
-            .sort((a: PluginManifest, b: PluginManifest) =>
-                a.name.localeCompare(b.name),
-            );
+            .sort((a: PluginManifest, b: PluginManifest) => a.name.localeCompare(b.name));
     }
 
     isPluginEnabledOnDisk(pluginId: string): boolean {
-        return (
-            this.enabledPluginsFromDisk.has(pluginId) ||
-            this.obsidianPlugins.enabledPlugins.has(pluginId)
-        );
+        return this.enabledPluginsFromDisk.has(pluginId) || this.obsidianPlugins.enabledPlugins.has(pluginId);
     }
 
     async loadEnabledPluginsFromDisk(showConsoleLog?: boolean) {
@@ -58,8 +48,7 @@ export class PluginRegistry {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
                 parsed.forEach((id) => {
-                    if (typeof id === "string")
-                        this.enabledPluginsFromDisk.add(id);
+                    if (typeof id === "string") this.enabledPluginsFromDisk.add(id);
                 });
             }
         } catch (error) {
@@ -69,10 +58,7 @@ export class PluginRegistry {
         }
     }
 
-    async writeCommunityPluginsFile(
-        enabledPlugins: string[],
-        showConsoleLog?: boolean,
-    ) {
+    async writeCommunityPluginsFile(enabledPlugins: string[], showConsoleLog?: boolean) {
         const adapter = this.app.vault.adapter;
         const path = this.getCommunityPluginsConfigFilePath();
         const content = JSON.stringify(enabledPlugins, null, "\t");

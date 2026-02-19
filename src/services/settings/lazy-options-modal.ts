@@ -25,15 +25,11 @@ export class LazyOptionsModal extends Modal {
                   useView: settings?.mode === "lazyOnView",
                   viewTypes: this.plugin.settings.lazyOnViews?.[pluginId] || [],
                   useFile: false,
-                  fileCriteria:
-                      this.plugin.settings.lazyOnFiles?.[pluginId] || {},
+                  fileCriteria: this.plugin.settings.lazyOnFiles?.[pluginId] || {},
               };
 
         // Special case for Excalidraw if not configured
-        if (
-            pluginId === "obsidian-excalidraw-plugin" &&
-            !settings?.lazyOptions
-        ) {
+        if (pluginId === "obsidian-excalidraw-plugin" && !settings?.lazyOptions) {
             this.options.useFile = true;
             this.options.fileCriteria = {
                 suffixes: [".excalidraw"],
@@ -78,9 +74,7 @@ export class LazyOptionsModal extends Modal {
         // --- File Settings ---
         new Setting(contentEl)
             .setName("Lazy on file")
-            .setDesc(
-                "Load plugin when specific files are opened (by suffix, etc.).",
-            )
+            .setDesc("Load plugin when specific files are opened (by suffix, etc.).")
             .addToggle((toggle) =>
                 toggle.setValue(this.options.useFile).onChange((value) => {
                     this.options.useFile = value;
@@ -91,16 +85,11 @@ export class LazyOptionsModal extends Modal {
         if (this.options.useFile) {
             new Setting(contentEl)
                 .setName("File Suffixes")
-                .setDesc(
-                    "Matches the end of the filename (basename). e.g., '.excalidraw' for 'file.excalidraw.md'",
-                )
+                .setDesc("Matches the end of the filename (basename). e.g., '.excalidraw' for 'file.excalidraw.md'")
                 .addTextArea((text) =>
                     text
                         .setPlaceholder(".excalidraw")
-                        .setValue(
-                            this.options.fileCriteria.suffixes?.join("\n") ||
-                                "",
-                        )
+                        .setValue(this.options.fileCriteria.suffixes?.join("\n") || "")
                         .onChange((value) => {
                             this.options.fileCriteria.suffixes = value
                                 .split(/[\n,]/)
@@ -138,27 +127,18 @@ export class LazyOptionsModal extends Modal {
         });
 
         new Setting(buttonContainer)
-            .addButton((btn) =>
-                btn.setButtonText("Cancel").onClick(() => this.close()),
-            )
+            .addButton((btn) => btn.setButtonText("Cancel").onClick(() => this.close()))
             .addButton((btn) =>
                 btn
                     .setButtonText("Save Options")
                     .setCta()
                     .onClick(async () => {
-                        const pluginSettings =
-                            this.plugin.settings.plugins[this.pluginId];
+                        const pluginSettings = this.plugin.settings.plugins[this.pluginId];
                         if (pluginSettings) {
                             pluginSettings.lazyOptions = this.options;
                             // For backward compatibility during transition, also update the global maps
-                            this.plugin.settings.lazyOnViews[this.pluginId] =
-                                this.options.useView
-                                    ? this.options.viewTypes
-                                    : [];
-                            this.plugin.settings.lazyOnFiles[this.pluginId] =
-                                this.options.useFile
-                                    ? this.options.fileCriteria
-                                    : {};
+                            this.plugin.settings.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
+                            this.plugin.settings.lazyOnFiles[this.pluginId] = this.options.useFile ? this.options.fileCriteria : {};
 
                             await this.plugin.saveSettings();
                         }
@@ -167,10 +147,7 @@ export class LazyOptionsModal extends Modal {
                             this.onSave?.();
                         } catch (e) {
                             new Notice("Error in onSave callback: " + e);
-                            logger.error(
-                                "Error in LazyOptionsModal onSave callback",
-                                e,
-                            );
+                            logger.error("Error in LazyOptionsModal onSave callback", e);
                         }
                         this.close();
                     }),

@@ -26,10 +26,7 @@ export class CommandCacheService {
 
     loadFromData() {
         // Load command cache from vault-scoped store (store2) only.
-        const commandCacheSource = loadJSON<CommandCache>(
-            this.ctx.app,
-            "commandCache",
-        );
+        const commandCacheSource = loadJSON<CommandCache>(this.ctx.app, "commandCache");
         if (!commandCacheSource) return;
 
         this.commandCache.clear();
@@ -56,27 +53,13 @@ export class CommandCacheService {
      * @param force - Force refresh even if cache is valid
      * @param onProgress - Optional callback for progress updates
      */
-    async refreshCommandCache(
-        pluginIds?: string[],
-        force = false,
-        onProgress?: (
-            current: number,
-            total: number,
-            plugin: PluginManifest,
-        ) => void,
-    ) {
+    async refreshCommandCache(pluginIds?: string[], force = false, onProgress?: (current: number, total: number, plugin: PluginManifest) => void) {
         let lazyManifests = this.getLazyManifests();
         if (pluginIds?.length) {
-            lazyManifests = lazyManifests.filter((plugin) =>
-                pluginIds.includes(plugin.id),
-            );
+            lazyManifests = lazyManifests.filter((plugin) => pluginIds.includes(plugin.id));
         }
 
-        const pluginsToRefresh = force
-            ? lazyManifests
-            : lazyManifests.filter(
-                  (plugin) => !this.isCommandCacheValid(plugin.id),
-              );
+        const pluginsToRefresh = force ? lazyManifests : lazyManifests.filter((plugin) => !this.isCommandCacheValid(plugin.id));
 
         const total = lazyManifests.length;
         let hasChanges = false;
@@ -97,9 +80,7 @@ export class CommandCacheService {
      * Return only manifests whose mode is `lazy` or `lazyOnView`.
      */
     private getLazyManifests() {
-        return this.ctx
-            .getManifests()
-            .filter((plugin) => this.isLazyMode(plugin.id));
+        return this.ctx.getManifests().filter((plugin) => this.isLazyMode(plugin.id));
     }
 
     private isLazyMode(pluginId: string) {
@@ -122,8 +103,7 @@ export class CommandCacheService {
     }
 
     async getCommandsForPlugin(pluginId: string): Promise<CachedCommand[]> {
-        const wasEnabled =
-            this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
+        const wasEnabled = this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
         if (!wasEnabled) {
             await this.ctx.obsidianPlugins.enablePlugin(pluginId);
         }
@@ -132,14 +112,9 @@ export class CommandCacheService {
             await this.pluginLoader.waitForPluginLoaded(pluginId);
         }
 
-        const commands = Object.values(
-            this.ctx.obsidianCommands.commands,
-        ) as CachedCommand[];
+        const commands = Object.values(this.ctx.obsidianCommands.commands) as CachedCommand[];
         const pluginCommands = commands
-            .filter(
-                (command) =>
-                    this.ctx.getCommandPluginId(command.id) === pluginId,
-            )
+            .filter((command) => this.ctx.getCommandPluginId(command.id) === pluginId)
             .map((command) => ({
                 id: command.id,
                 name: command.name,
@@ -155,11 +130,7 @@ export class CommandCacheService {
     }
 
     ensureCommandsCached(pluginId: string) {
-        return this.isCommandCacheValid(pluginId)
-            ? Promise.resolve()
-            : this.refreshCommandsForPlugin(pluginId).then(() =>
-                  this.persistCommandCache(),
-              );
+        return this.isCommandCacheValid(pluginId) ? Promise.resolve() : this.refreshCommandsForPlugin(pluginId).then(() => this.persistCommandCache());
     }
 
     registerCachedCommands() {
@@ -275,20 +246,13 @@ export class CommandCacheService {
 
     isCommandCacheValid(pluginId: string): boolean {
         if (!this.pluginCommandIndex.has(pluginId)) return false;
-        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[
-            pluginId
-        ];
+        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
         if (!Array.isArray(cached) || cached.length === 0) return false;
 
-        const manifest = this.ctx
-            .getManifests()
-            .find((plugin) => plugin.id === pluginId);
+        const manifest = this.ctx.getManifests().find((plugin) => plugin.id === pluginId);
         if (!manifest) return false;
 
-        const cachedVersion = loadJSON<Record<string, string>>(
-            this.ctx.app,
-            "commandCacheVersions",
-        )?.[pluginId];
+        const cachedVersion = loadJSON<Record<string, string>>(this.ctx.app, "commandCacheVersions")?.[pluginId];
         if (!cachedVersion) return false;
 
         return cachedVersion === (manifest.version ?? "");
@@ -317,9 +281,7 @@ export class CommandCacheService {
     }
 
     clear() {
-        this.registeredWrappers.forEach((commandId) =>
-            this.removeCommandWrapper(commandId),
-        );
+        this.registeredWrappers.forEach((commandId) => this.removeCommandWrapper(commandId));
         this.registeredWrappers.clear();
         this.commandCache.clear();
         this.pluginCommandIndex.clear();

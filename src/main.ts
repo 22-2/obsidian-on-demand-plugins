@@ -71,11 +71,7 @@ export default class OnDemandPlugin extends Plugin {
                 continue;
             }
 
-            if (
-                !current.userConfigured &&
-                current.mode === PLUGIN_MODE.ALWAYS_DISABLED &&
-                this.isPluginEnabledOnDisk(plugin.id)
-            ) {
+            if (!current.userConfigured && current.mode === PLUGIN_MODE.ALWAYS_DISABLED && this.isPluginEnabledOnDisk(plugin.id)) {
                 this.settings.plugins[plugin.id] = {
                     mode: PLUGIN_MODE.ALWAYS_ENABLED,
                     userConfigured: false,
@@ -108,10 +104,7 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     getPluginMode(pluginId: string): PluginMode {
-        return (
-            this.settings.plugins?.[pluginId]?.mode ??
-            this.getDefaultModeForPlugin(pluginId)
-        );
+        return this.settings.plugins?.[pluginId]?.mode ?? this.getDefaultModeForPlugin(pluginId);
     }
 
     getDefaultModeForPlugin(pluginId: string): PluginMode {
@@ -135,11 +128,7 @@ export default class OnDemandPlugin extends Plugin {
         pluginIds: string[],
         options?: {
             force?: boolean;
-            onProgress?: (
-                current: number,
-                total: number,
-                plugin: PluginManifest,
-            ) => void;
+            onProgress?: (current: number, total: number, plugin: PluginManifest) => void;
         },
     ) {
         await this.container.rebuildCommandCache(pluginIds, options);
@@ -147,9 +136,7 @@ export default class OnDemandPlugin extends Plugin {
 
     getCommandPluginId(commandId: string): string | null {
         const [prefix] = commandId.split(":");
-        return this.manifests.some((plugin) => plugin.id === prefix)
-            ? prefix
-            : null;
+        return this.manifests.some((plugin) => plugin.id === prefix) ? prefix : null;
     }
 
     async applyStartupPolicyAndRestart(pluginIds?: string[]) {

@@ -1,9 +1,10 @@
+import log from "loglevel";
 import { around } from "monkey-around";
 import type { Plugins } from "obsidian-typings";
 import type { PluginContext } from "../core/plugin-context";
+import type { PluginMode } from "../core/types";
+import { PLUGIN_MODE } from "../core/types";
 import type { CommandCacheService } from "../services/command-cache/command-cache-service";
-import { PLUGIN_MODE, PluginMode } from "../core/types";
-import log from "loglevel";
 
 const logger = log.getLogger("OnDemandPlugin/Patches/PluginEnableDisable");
 
@@ -19,10 +20,7 @@ const logger = log.getLogger("OnDemandPlugin/Patches/PluginEnableDisable");
  *   - Changing their mode on a UI toggle would lose the user's lazy configuration.
  *   - On next startup, the lazy mode will be applied correctly regardless.
  */
-export function patchPluginEnableDisable(
-    ctx: PluginContext,
-    commandCacheService: CommandCacheService,
-): void {
+export function patchPluginEnableDisable(ctx: PluginContext, commandCacheService: CommandCacheService): void {
     const obsidianPlugins = ctx.obsidianPlugins as unknown as Plugins;
 
     ctx.register(
@@ -67,11 +65,7 @@ async function syncModeOnDisable(ctx: PluginContext, pluginId: string): Promise<
     logger.debug(`[LazyPlugins] Synced settings: ${pluginId} alwaysEnabled → alwaysDisabled`);
 }
 
-async function updatePluginMode(
-    ctx: PluginContext,
-    pluginId: string,
-    mode: PluginMode,
-): Promise<void> {
+async function updatePluginMode(ctx: PluginContext, pluginId: string, mode: PluginMode): Promise<void> {
     ctx.getSettings().plugins[pluginId] = { mode, userConfigured: true };
     await ctx.saveSettings();
 }

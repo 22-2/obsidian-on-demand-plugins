@@ -21,7 +21,6 @@ interface ViewWithFile extends View {
  */
 interface ViewState {
     file?: string;
-    [key: string]: any;
 }
 
 /**
@@ -85,10 +84,7 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
         }
     }
 
-    private async checkFileForLazyLoading(
-        file: TFile,
-        leaf: WorkspaceLeaf,
-    ): Promise<void> {
+    private async checkFileForLazyLoading(file: TFile, leaf: WorkspaceLeaf): Promise<void> {
         const leafId = this.getLeafId(leaf);
 
         await this.loadPluginWithLock(
@@ -98,18 +94,14 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
             async (wasNewlyLoaded) => {
                 // Only rebuild if the plugin was newly loaded
                 if (!wasNewlyLoaded) {
-                    logger.debug(
-                        `skipping rebuildLeafView for ${file.path} - plugin was not newly loaded`,
-                    );
+                    logger.debug(`skipping rebuildLeafView for ${file.path} - plugin was not newly loaded`);
                     return;
                 }
 
                 // Check if the view has already been transformed by the plugin
                 const viewTypeAfterLoad = leaf.view.getViewType();
                 if (viewTypeAfterLoad !== "markdown") {
-                    logger.debug(
-                        `skipping rebuildLeafView for ${file.path} - view already transformed to ${viewTypeAfterLoad}`,
-                    );
+                    logger.debug(`skipping rebuildLeafView for ${file.path} - view already transformed to ${viewTypeAfterLoad}`);
                     return;
                 }
 

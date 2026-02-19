@@ -25,12 +25,7 @@ export abstract class BaseLazyLoader<TLockTarget> {
      * Subclasses should implement the specific resolution logic.
      * @returns true if the plugin was newly loaded, false if it was already loaded or failed to load
      */
-    protected async loadPluginWithLock(
-        lockTarget: TLockTarget,
-        getPluginId: () => Promise<string | null>,
-        context: { leafId: string; description: string },
-        actionInsideLock?: (wasNewlyLoaded: boolean) => Promise<void>,
-    ): Promise<boolean> {
+    protected async loadPluginWithLock(lockTarget: TLockTarget, getPluginId: () => Promise<string | null>, context: { leafId: string; description: string }, actionInsideLock?: (wasNewlyLoaded: boolean) => Promise<void>): Promise<boolean> {
         const release = await this.lockStrategy.lock(lockTarget);
         try {
             const wasNewlyLoaded = await this.loadPlugin(getPluginId, context);
@@ -47,13 +42,8 @@ export abstract class BaseLazyLoader<TLockTarget> {
      * Core plugin loading logic shared by all lazy loaders.
      * @returns true if the plugin was newly loaded, false if it was already loaded or failed to load
      */
-    private async loadPlugin(
-        getPluginId: () => Promise<string | null>,
-        context: { leafId: string; description: string },
-    ): Promise<boolean> {
-        logger.debug(
-            `started for ${context.description} in leaf ${context.leafId}`,
-        );
+    private async loadPlugin(getPluginId: () => Promise<string | null>, context: { leafId: string; description: string }): Promise<boolean> {
+        logger.debug(`started for ${context.description} in leaf ${context.leafId}`);
 
         const pluginId = await getPluginId();
         if (!pluginId) {
@@ -84,34 +74,23 @@ export abstract class BaseLazyLoader<TLockTarget> {
     /**
      * Rebuilds the view for a leaf and logs the result.
      */
-    protected async rebuildLeafViewWithLogging(
-        leaf: WorkspaceLeaf,
-        leafId: string,
-    ): Promise<void> {
+    protected async rebuildLeafViewWithLogging(leaf: WorkspaceLeaf, leafId: string): Promise<void> {
         const oldViewType = leaf.view.getViewType();
-        logger.debug(
-            `triggering rebuildLeafView for leaf ${leafId}. Current viewType: ${oldViewType}`,
-        );
+        logger.debug(`triggering rebuildLeafView for leaf ${leafId}. Current viewType: ${oldViewType}`);
 
         await rebuildLeafView(leaf);
 
         const newViewType = leaf.view.getViewType();
-        logger.debug(
-            `rebuildLeafView completed for leaf ${leafId}. New viewType: ${newViewType}`,
-        );
+        logger.debug(`rebuildLeafView completed for leaf ${leafId}. New viewType: ${newViewType}`);
 
         // Fallback: if view type didn't change and is still markdown, try forceful setViewState
         if (newViewType === oldViewType && oldViewType === "markdown") {
-            logger.debug(
-                `View type remains 'markdown'. Trying forceful setViewState fallback...`,
-            );
+            logger.debug(`View type remains 'markdown'. Trying forceful setViewState fallback...`);
             const state = leaf.getViewState();
             await leaf.setViewState(state);
 
             const finalViewType = leaf.view.getViewType();
-            logger.debug(
-                `after setViewState fallback, viewType is: ${finalViewType}`,
-            );
+            logger.debug(`after setViewState fallback, viewType is: ${finalViewType}`);
         }
     }
 
