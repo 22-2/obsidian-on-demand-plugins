@@ -28,7 +28,6 @@
 		"async-mutex": "^0.5.0",
 		"loglevel": "^1.9.2",
 		"monkey-around": "^3.0.0",
-		"obsidian-typings": "^4.99.0",
 		"p-event": "^7.1.0",
 		"p-queue": "^9.1.0",
 		"p-timeout": "^7.0.1",
@@ -38,20 +37,20 @@
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.58.2",
-		"@types/node": "^25.2.3",
+		"@types/node": "^25.3.5",
 		"builtin-modules": "5.0.0",
 		"esbuild": "0.27.3",
-		"eslint": "^10.0.0",
+		"eslint": "^10.0.3",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-path": "^2.0.3",
-		"globals": "^17.3.0",
+		"globals": "^17.4.0",
 		"jiti": "^2.6.1",
-		"obsidian": "latest",
 		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.71",
+		"obsidian-typings": "^4.110.0",
 		"playwright": "^1.58.2",
 		"prettier": "^3.8.1",
 		"tslib": "2.8.1",
 		"typescript": "5.9.3",
-		"typescript-eslint": "^8.56.0"
+		"typescript-eslint": "^8.56.1"
 	}
 }
