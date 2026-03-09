@@ -70,6 +70,24 @@
     gap: 8px;
 }
 
-.lazy-sync-container .setting-item:has(.sync-button) {
-    padding-bottom: var(--size-4-4)!important;
+.callout.lazy-sync {
+    margin-top: 0;
+    margin-bottom: 1em;
+}
+
+.callout.lazy-sync .callout-title {
+    padding-bottom: var(--size-4-8);
+}
+
+.lazy-sync-summary {
+    white-space: pre-wrap;
+    margin: 0;
+}
+
+.lazy-tools-modal .setting-item-control:has(.replace-button) {
+    width: 100%;        
+}
+
+.lazy-tools-modal .setting-item-control .replace-button {
+    margin-right: auto;
 }

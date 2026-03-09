@@ -35,7 +35,7 @@ importers:
     devDependencies:
       '@22-2/esbuild-plugin-obsidian-copy':
         specifier: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git
-        version: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#040e72e46b0be3cf01a4b00489d694a771c752fc
+        version: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.3(jiti@2.6.1))
@@ -99,8 +99,8 @@ importers:
 
 packages:
 
-  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#040e72e46b0be3cf01a4b00489d694a771c752fc':
-    resolution: {commit: 040e72e46b0be3cf01a4b00489d694a771c752fc, repo: https://github.com/22-2/esbuild-plugin-obsidian-copy.git, type: git}
+  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916':
+    resolution: {commit: 3677bb62f4af684968629eb8fc508260240fb916, repo: https://github.com/22-2/esbuild-plugin-obsidian-copy.git, type: git}
     version: 0.1.0
 
   '@antfu/install-pkg@1.1.0':
@@ -2409,7 +2409,7 @@ packages:
 
 snapshots:
 
-  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#040e72e46b0be3cf01a4b00489d694a771c752fc': {}
+  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916': {}
 
   '@antfu/install-pkg@1.1.0':
     dependencies:

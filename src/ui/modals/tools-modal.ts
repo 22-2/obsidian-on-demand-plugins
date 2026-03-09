@@ -1,9 +1,13 @@
-import { App, DropdownComponent, Modal, Notice, Setting } from "obsidian";
+import { App, DropdownComponent, Modal, Notice, Setting, setIcon } from "obsidian";
 import { PLUGIN_MODE, PluginMode, PluginModes } from "../../core/types";
 import type OnDemandPlugin from "../../main";
 import type { SyncDirection, SyncPreviewResult, SyncResult } from "../../services/maintenance/maintenance-service";
 
 export class ToolsModal extends Modal {
+    private fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;
+    private toMode: PluginMode = PLUGIN_MODE.LAZY;
+    private confirmTimeout: number | null = null;
+
     constructor(
         app: App,
         private plugin: OnDemandPlugin,
@@ -15,10 +19,66 @@ export class ToolsModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.createEl("h2", { text: "Tools" });
+        contentEl.setAttr("class", "lazy-tools-modal");
 
         this.buildSyncSettingsSection(contentEl);
         this.buildRebuildCacheSection(contentEl);
         this.buildBatchReplaceModeSection(contentEl);
+
+        new Setting(contentEl).addButton((btn) =>
+            btn.setButtonText("Replace all").setClass("replace-button").onClick(async () => {
+                if (this.fromMode === this.toMode) {
+                    new Notice("Source and target modes are the same");
+                    return;
+                }
+
+                if (btn.buttonEl.innerText === "Replace all") {
+                    btn.setButtonText("Click to confirm").setWarning();
+                    if (this.confirmTimeout) window.clearTimeout(this.confirmTimeout);
+                    this.confirmTimeout = window.setTimeout(() => {
+                        btn.setButtonText("Replace all");
+                        btn.buttonEl.removeClass("mod-warning");
+                    }, 3000);
+                    return;
+                }
+
+                if (this.confirmTimeout) {
+                    window.clearTimeout(this.confirmTimeout);
+                    this.confirmTimeout = null;
+                }
+
+                const changed = this.plugin.container.maintenance.applyBatchModeReplace(
+                    this.fromMode,
+                    this.toMode
+                );
+                if (changed > 0) {
+                    await this.plugin.saveSettings();
+                    new Notice(
+                        `Updated ${changed} plugins from ${
+                            PluginModes[this.fromMode]
+                        } to ${PluginModes[this.toMode]}`
+                    );
+                    this.onComplete();
+                } else {
+                    new Notice(
+                        `No plugins found with mode: ${
+                            PluginModes[this.fromMode]
+                        }`
+                    );
+                }
+
+                btn.setButtonText("Replace all");
+                btn.buttonEl.removeClass("mod-warning");
+            })
+        );
+
+        const closeButtonContainer = contentEl.createDiv({
+            cls: "modal-button-container",
+        });
+
+        new Setting(closeButtonContainer).addButton((btn) =>
+            btn.setButtonText("Close").onClick(() => this.close())
+        );
     }
 
     onClose() {
@@ -30,23 +90,26 @@ export class ToolsModal extends Modal {
     // -------------------------------------------------------------------------
 
     private buildSyncSettingsSection(container: HTMLElement) {
-        container.createEl("h3", { text: "Sync settings" });
+        new Setting(container).setName("Sync options").setHeading();
+
+        const calloutEl = container.createDiv({ cls: ["callout", "lazy-sync"], attr: { "data-callout": "info" } });
+        
+        const calloutTitle = calloutEl.createDiv({ cls: "callout-title" });
+        const calloutIcon = calloutTitle.createDiv({ cls: "callout-icon" });
+        setIcon(calloutIcon, "info");
+        
+        const previewEl = calloutTitle.createDiv({ cls: "callout-title-inner" });
+        const calloutContent = calloutEl.createDiv({ cls: "callout-content" });
+        const summaryEl = calloutContent.createDiv({ cls: "lazy-sync-summary" });
+
         const syncContainer = container.createDiv("lazy-sync-container");
 
         let syncDirection: SyncDirection = "coreToLazy";
-
-        const previewEl = syncContainer.createEl("div", {
-            cls: "lazy-sync-preview",
-        });
-        const summaryEl = syncContainer.createEl("div", {
-            cls: "lazy-sync-summary",
-        });
 
         const refreshPreview = async () => {
             const result = await this.plugin.container.maintenance.buildSyncPreview(syncDirection);
             previewEl.setText(result.label);
             summaryEl.setText(result.summary);
-            summaryEl.style.whiteSpace = "pre-wrap";
         };
 
         refreshPreview();
@@ -80,6 +143,7 @@ export class ToolsModal extends Modal {
     }
 
     private buildRebuildCacheSection(container: HTMLElement) {
+        new Setting(container).setName("Maintenance").setHeading();
         new Setting(container)
             .setName("Force rebuild command cache")
             .setDesc("Force a rebuild of the cached commands for lazy plugins.")
@@ -104,50 +168,30 @@ export class ToolsModal extends Modal {
     }
 
     private buildBatchReplaceModeSection(container: HTMLElement) {
-        container.createEl("h3", { text: "Batch replace modes" });
+        new Setting(container).setName("Batch replace").setHeading();
         const batchContainer = container.createDiv(
             "lazy-batch-replace-container"
         );
 
-        let fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;
-        let toMode: PluginMode = PLUGIN_MODE.LAZY;
-
         new Setting(batchContainer)
             .setName("From mode")
             .addDropdown((dd) =>
-                this.addModeOptions(dd).setValue(fromMode).onChange((val: PluginMode) => {
-                    fromMode = val;
-                })
+                this.addModeOptions(dd)
+                    .setValue(this.fromMode)
+                    .onChange((val: PluginMode) => {
+                        this.fromMode = val;
+                    })
             );
 
         new Setting(batchContainer)
             .setName("To mode")
             .addDropdown((dd) =>
-                this.addModeOptions(dd).setValue(toMode).onChange((val: PluginMode) => {
-                    toMode = val;
-                })
+                this.addModeOptions(dd)
+                    .setValue(this.toMode)
+                    .onChange((val: PluginMode) => {
+                        this.toMode = val;
+                    })
             );
-
-        new Setting(batchContainer).addButton((btn) =>
-            btn.setButtonText("Replace all").onClick(async () => {
-                if (fromMode === toMode) {
-                    new Notice("Source and target modes are the same");
-                    return;
-                }
-                const changed = this.plugin.container.maintenance.applyBatchModeReplace(fromMode, toMode);
-                if (changed > 0) {
-                    await this.plugin.saveSettings();
-                    new Notice(
-                        `Updated ${changed} plugins from ${PluginModes[fromMode]} to ${PluginModes[toMode]}`
-                    );
-                    this.onComplete();
-                } else {
-                    new Notice(
-                        `No plugins found with mode: ${PluginModes[fromMode]}`
-                    );
-                }
-            })
-        );
     }
 
     private addModeOptions(dropdown: DropdownComponent): DropdownComponent {
