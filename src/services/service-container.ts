@@ -13,6 +13,7 @@ import { PLUGIN_MODE } from "../core/types";
 import { patchSettingTabOpen } from "../patches/setting-tab";
 import { patchSetViewState } from "../patches/view-state";
 import { CommandCacheService } from "./command-cache/command-cache-service";
+import { MaintenanceService } from "./maintenance/maintenance-service";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
 import { LeafLockManager, LeafViewLockStrategy } from "./lazy-loader/internal/leaf-lock";
 import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
@@ -29,6 +30,7 @@ export class ServiceContainer {
     readonly startupPolicy: StartupPolicyService;
     readonly viewLoader: ViewLazyLoader;
     readonly fileLoader: FileLazyLoader;
+    readonly maintenance: MaintenanceService;
     private layoutReadyQueue: PQueue;
 
     constructor(private ctx: PluginContext) {
@@ -70,6 +72,9 @@ export class ServiceContainer {
                 lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic"),
             },
         );
+
+        // 9. MaintenanceService
+        this.maintenance = new MaintenanceService(ctx, this.registry);
 
         // Queue used to limit concurrency when loading plugins on layout ready
         this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });

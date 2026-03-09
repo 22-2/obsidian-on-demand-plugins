@@ -1,18 +1,7 @@
-import { App, Modal, Setting, Notice, DropdownComponent } from "obsidian";
+import { App, DropdownComponent, Modal, Notice, Setting } from "obsidian";
+import { PLUGIN_MODE, PluginMode, PluginModes } from "../../core/types";
 import type OnDemandPlugin from "../../main";
-import { PluginMode, PluginModes, PLUGIN_MODE } from "../../core/types";
-
-type SyncDirection = "coreToLazy" | "lazyToCore";
-
-interface SyncPreviewResult {
-    label: string;
-    summary: string;
-}
-
-interface SyncResult {
-    changed: number;
-    message: string;
-}
+import type { SyncDirection, SyncPreviewResult, SyncResult } from "../../services/maintenance/maintenance-service";
 
 export class ToolsModal extends Modal {
     constructor(
@@ -54,7 +43,7 @@ export class ToolsModal extends Modal {
         });
 
         const refreshPreview = async () => {
-            const result = await this.buildSyncPreview(syncDirection);
+            const result = await this.plugin.container.maintenance.buildSyncPreview(syncDirection);
             previewEl.setText(result.label);
             summaryEl.setText(result.summary);
             summaryEl.style.whiteSpace = "pre-wrap";
@@ -82,7 +71,7 @@ export class ToolsModal extends Modal {
                 .setClass("sync-button")
                 .setCta()
                 .onClick(async () => {
-                    const result = await this.executeSync(syncDirection);
+                    const result = await this.plugin.container.maintenance.executeSync(syncDirection);
                     new Notice(result.message);
                     if (result.changed > 0) this.onComplete();
                     await refreshPreview();
@@ -145,7 +134,7 @@ export class ToolsModal extends Modal {
                     new Notice("Source and target modes are the same");
                     return;
                 }
-                const changed = this.applyBatchModeReplace(fromMode, toMode);
+                const changed = this.plugin.container.maintenance.applyBatchModeReplace(fromMode, toMode);
                 if (changed > 0) {
                     await this.plugin.saveSettings();
                     new Notice(
@@ -161,182 +150,6 @@ export class ToolsModal extends Modal {
         );
     }
 
-    // -------------------------------------------------------------------------
-    // Sync logic
-    // -------------------------------------------------------------------------
-
-    private async buildSyncPreview(
-        direction: SyncDirection
-    ): Promise<SyncPreviewResult> {
-        await this.plugin.container.registry.loadEnabledPluginsFromDisk(
-            this.plugin.data.showConsoleLog
-        );
-        const onDisk = this.plugin.container.registry.enabledPluginsFromDisk;
-        const manifests = this.plugin.manifests;
-
-        if (direction === "coreToLazy") {
-            const toEnable = manifests.filter(
-                (m) =>
-                    onDisk.has(m.id) &&
-                    this.plugin.getPluginMode(m.id) === PLUGIN_MODE.ALWAYS_DISABLED
-            );
-            const toDisable = manifests.filter(
-                (m) =>
-                    !onDisk.has(m.id) &&
-                    this.plugin.getPluginMode(m.id) === PLUGIN_MODE.ALWAYS_ENABLED
-            );
-
-            return {
-                label: "📂 community-plugins.json ➔ ⚙️ On-Demand Plugins",
-                summary: this.buildDiffSummary(
-                    `Enabled on disk: ${onDisk.size} plugins`,
-                    toEnable.map((m) => m.name),
-                    toDisable.map((m) => m.name)
-                ),
-            };
-        } else {
-            const alwaysEnabled = this.getAlwaysEnabledIds();
-            const toAdd = alwaysEnabled.filter((id) => !onDisk.has(id));
-            const toRemove = Array.from(onDisk).filter(
-                (id) =>
-                    !alwaysEnabled.includes(id) &&
-                    manifests.some((m) => m.id === id)
-            );
-
-            return {
-                label: "⚙️ On-Demand Plugins ➔ 📂 community-plugins.json",
-                summary: this.buildDiffSummary(
-                    `Always Enabled in On-Demand: ${alwaysEnabled.length} plugins`,
-                    toAdd,
-                    toRemove
-                ),
-            };
-        }
-    }
-
-    private async executeSync(direction: SyncDirection): Promise<SyncResult> {
-        await this.plugin.container.registry.loadEnabledPluginsFromDisk(
-            this.plugin.data.showConsoleLog
-        );
-
-        if (direction === "coreToLazy") {
-            return this.syncCoreToLazy();
-        } else {
-            return this.syncLazyToCore();
-        }
-    }
-
-    private syncCoreToLazy(): SyncResult {
-        const onDisk = this.plugin.container.registry.enabledPluginsFromDisk;
-        let changed = 0;
-
-        for (const manifest of this.plugin.manifests) {
-            const isOnDisk = onDisk.has(manifest.id);
-            const currentMode = this.plugin.getPluginMode(manifest.id);
-
-            const targetMode: PluginMode | null =
-                isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_DISABLED
-                    ? PLUGIN_MODE.ALWAYS_ENABLED
-                    : !isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_ENABLED
-                    ? PLUGIN_MODE.ALWAYS_DISABLED
-                    : null;
-
-            if (targetMode) {
-                this.plugin.settings.plugins[manifest.id] = {
-                    mode: targetMode,
-                    userConfigured: true,
-                };
-                changed++;
-            }
-        }
-
-        if (changed > 0) {
-            this.plugin.saveSettings();
-            return { changed, message: `Synced ${changed} plugins TO On-Demand Plugins` };
-        }
-        return { changed: 0, message: "On-Demand Plugins is already in sync with Obsidian config" };
-    }
-
-    private async syncLazyToCore(): Promise<SyncResult> {
-        const alwaysEnabled = this.getAlwaysEnabledIds();
-        const currentOnDisk = Array.from(
-            this.plugin.container.registry.enabledPluginsFromDisk
-        );
-        const isSame =
-            alwaysEnabled.length === currentOnDisk.length &&
-            alwaysEnabled.every((id) => currentOnDisk.includes(id));
-
-        if (!isSame) {
-            await this.plugin.container.registry.writeCommunityPluginsFile(
-                alwaysEnabled,
-                this.plugin.data.showConsoleLog
-            );
-            await this.plugin.container.registry.loadEnabledPluginsFromDisk(
-                this.plugin.data.showConsoleLog
-            );
-            return {
-                changed: 1,
-                message: "Updated community-plugins.json based on Plugin data",
-            };
-        }
-        return {
-            changed: 0,
-            message: "Obsidian config is already in sync with Plugin data",
-        };
-    }
-
-    // -------------------------------------------------------------------------
-    // Batch replace logic
-    // -------------------------------------------------------------------------
-
-    private applyBatchModeReplace(fromMode: PluginMode, toMode: PluginMode): number {
-        let changed = 0;
-        for (const manifest of this.plugin.manifests) {
-            if (this.plugin.getPluginMode(manifest.id) === fromMode) {
-                this.plugin.settings.plugins[manifest.id] = {
-                    mode: toMode,
-                    userConfigured: true,
-                };
-                changed++;
-            }
-        }
-        return changed;
-    }
-
-    // -------------------------------------------------------------------------
-    // Utilities
-    // -------------------------------------------------------------------------
-
-    private getAlwaysEnabledIds(): string[] {
-        const ids = this.plugin.manifests
-            .filter((m) => this.plugin.getPluginMode(m.id) === PLUGIN_MODE.ALWAYS_ENABLED)
-            .map((m) => m.id);
-
-        if (!ids.includes(this.plugin.manifest.id)) {
-            ids.push(this.plugin.manifest.id);
-        }
-        return ids;
-    }
-
-    private buildDiffSummary(
-        header: string,
-        toAdd: string[],
-        toRemove: string[]
-    ): string {
-        const preview = (items: string[]) =>
-            `${items.slice(0, 3).join(", ")}${items.length > 3 ? "..." : ""}`;
-
-        let summary = `${header}\n`;
-        if (toAdd.length > 0)
-            summary += `➕ Will enable: ${toAdd.length} (${preview(toAdd)})\n`;
-        if (toRemove.length > 0)
-            summary += `➖ Will disable: ${toRemove.length} (${preview(toRemove)})\n`;
-        if (toAdd.length === 0 && toRemove.length === 0)
-            summary += "✅ Already in sync";
-
-        return summary;
-    }
-
     private addModeOptions(dropdown: DropdownComponent): DropdownComponent {
         Object.keys(PluginModes)
             .filter((key) => key !== "lazyOnView")
@@ -346,3 +159,4 @@ export class ToolsModal extends Modal {
         return dropdown;
     }
 }
+
