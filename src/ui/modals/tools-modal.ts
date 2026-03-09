@@ -9,6 +9,8 @@ export class ToolsModal extends Modal {
     private fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;
     private toMode: PluginMode = PLUGIN_MODE.LAZY;
     private confirmTimeout: number | null = null;
+    private activeTabId: string = "sync";
+    private tabContentEl!: HTMLElement;
 
     constructor(
         app: App,
@@ -20,15 +22,166 @@ export class ToolsModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
-        new Setting(contentEl).setName("Tools").setHeading();
         contentEl.setAttr("class", "lazy-tools-modal");
 
-        this.buildSyncSettingsSection(contentEl);
-        this.buildRebuildCacheSection(contentEl);
-        this.buildBatchReplaceModeSection(contentEl);
-        this.buildDebugSection(contentEl);
+        new Setting(contentEl).setName("Tools").setHeading();
 
-        new Setting(contentEl).addButton((btn) =>
+        const tabHeader = contentEl.createDiv({ cls: "lazy-tab-header" });
+        this.tabContentEl = contentEl.createDiv({ cls: "lazy-tab-content" });
+
+        this.createTab(tabHeader, "sync", "Sync", "refresh-cw");
+        this.createTab(tabHeader, "batch", "Replace", "switch");
+        this.createTab(tabHeader, "maintenance", "Maintenance", "database");
+        this.createTab(tabHeader, "debug", "Debug", "command");
+
+        this.renderActiveTab();
+
+        const closeButtonContainer = contentEl.createDiv({
+            cls: "modal-button-container",
+        });
+
+        new Setting(closeButtonContainer).addButton((btn) => btn.setButtonText("Close").onClick(() => this.close()));
+    }
+
+    private createTab(headerEl: HTMLElement, id: string, label: string, icon: string) {
+        const tabBtn = headerEl.createEl("button", {
+            cls: ["lazy-tab-button", this.activeTabId === id ? "is-active" : ""],
+        });
+        
+        const iconSpan = tabBtn.createSpan({ cls: "lazy-tab-button-icon" });
+        setIcon(iconSpan, icon);
+        tabBtn.createSpan({ text: label, cls: "lazy-tab-button-text" });
+
+        tabBtn.onclick = () => {
+            if (this.activeTabId === id) return;
+            
+            headerEl.querySelectorAll(".lazy-tab-button").forEach(el => el.removeClass("is-active"));
+            tabBtn.addClass("is-active");
+            
+            this.activeTabId = id;
+            this.renderActiveTab();
+        };
+    }
+
+    private renderActiveTab() {
+        this.tabContentEl.empty();
+
+        switch (this.activeTabId) {
+            case "sync":
+                this.buildSyncSettingsSection(this.tabContentEl);
+                break;
+            case "batch":
+                this.buildBatchReplaceModeSection(this.tabContentEl);
+                break;
+            case "maintenance":
+                this.buildRebuildCacheSection(this.tabContentEl);
+                break;
+            case "debug":
+                this.buildDebugSection(this.tabContentEl);
+                break;
+        }
+    }
+
+    onClose() {
+        this.contentEl.empty();
+    }
+
+    // -------------------------------------------------------------------------
+    // Section builders
+    // -------------------------------------------------------------------------
+
+    private buildSyncSettingsSection(container: HTMLElement) {
+        new Setting(container).setName("Synchronize settings").setHeading();
+        const previewContainer = container.createDiv({ cls: "lazy-sync-preview" });
+        const previewLabel = previewContainer.createDiv({ cls: "lazy-sync-preview-label" });
+        const previewSummary = previewContainer.createDiv({ cls: "lazy-sync-preview-summary" });
+
+        const syncContainer = container.createDiv("lazy-sync-container");
+
+        let syncDirection: SyncDirection = "lazyToCore";
+
+        const refreshPreview = async () => {
+            const result = await this.plugin.container.maintenance.buildSyncPreview(syncDirection);
+            previewLabel.setText(result.label);
+            previewSummary.setText(result.summary);
+        };
+
+        refreshPreview();
+
+        new Setting(syncContainer)
+            .setName("Sync direction")
+            .setDesc("Choose which source should update the other.")
+            .addDropdown((dropdown) => {
+                dropdown
+                .addOption("lazyToCore", "Plugin data ➔ Obsidian config")
+                .addOption("coreToLazy", "Obsidian config ➔ Plugin data")
+                    .setValue(syncDirection)
+                    .onChange((val: SyncDirection) => {
+                        syncDirection = val;
+                        refreshPreview();
+                    });
+            });
+
+        new Setting(syncContainer).addButton((btn) =>
+            btn
+                .setButtonText("Sync now")
+                .setClass("sync-button")
+                .setCta()
+                .onClick(async () => {
+                    const result = await this.plugin.container.maintenance.executeSync(syncDirection);
+                    new Notice(result.message);
+                    if (result.changed > 0) this.onComplete();
+                    await refreshPreview();
+                }),
+        );
+    }
+
+    private buildRebuildCacheSection(container: HTMLElement) {
+        new Setting(container).setName("Cache maintenance").setHeading();
+        new Setting(container)
+            .setName("Force rebuild command cache")
+            .setDesc("Force a rebuild of the cached commands for lazy plugins.")
+            .addButton((btn) =>
+                btn
+                    .setButtonText("Rebuild cache")
+                    .setWarning()
+                    .onClick(async () => {
+                        btn.setDisabled(true);
+                        try {
+                            await this.plugin.rebuildAndApplyCommandCache({
+                                force: true,
+                            });
+                            new Notice("Command cache rebuilt successfully");
+                        } catch {
+                            new Notice("Failed to rebuild command cache");
+                        } finally {
+                            btn.setDisabled(false);
+                        }
+                    }),
+            );
+    }
+
+    private buildBatchReplaceModeSection(container: HTMLElement) {
+        new Setting(container).setName("Batch replace mode").setHeading();
+        const batchContainer = container.createDiv("lazy-batch-replace-container");
+
+        new Setting(batchContainer).setName("From mode").addDropdown((dd) =>
+            this.addModeOptions(dd)
+                .setValue(this.fromMode)
+                .onChange((val: PluginMode) => {
+                    this.fromMode = val;
+                }),
+        );
+
+        new Setting(batchContainer).setName("To mode").addDropdown((dd) =>
+            this.addModeOptions(dd)
+                .setValue(this.toMode)
+                .onChange((val: PluginMode) => {
+                    this.toMode = val;
+                }),
+        );
+        
+        new Setting(container).addButton((btn) =>
             btn
                 .setButtonText("Replace all")
                 .setClass("replace-button")
@@ -63,119 +216,6 @@ export class ToolsModal extends Modal {
 
                     btn.setButtonText("Replace all");
                     btn.buttonEl.removeClass("mod-warning");
-                }),
-        );
-
-        const closeButtonContainer = contentEl.createDiv({
-            cls: "modal-button-container",
-        });
-
-        new Setting(closeButtonContainer).addButton((btn) => btn.setButtonText("Close").onClick(() => this.close()));
-    }
-
-    onClose() {
-        this.contentEl.empty();
-    }
-
-    // -------------------------------------------------------------------------
-    // Section builders
-    // -------------------------------------------------------------------------
-
-    private buildSyncSettingsSection(container: HTMLElement) {
-        new Setting(container).setName("Sync options").setHeading();
-
-        const calloutEl = container.createDiv({ cls: ["callout", "lazy-sync"], attr: { "data-callout": "info" } });
-
-        const calloutTitle = calloutEl.createDiv({ cls: "callout-title" });
-        const calloutIcon = calloutTitle.createDiv({ cls: "callout-icon" });
-        setIcon(calloutIcon, "info");
-
-        const previewEl = calloutTitle.createDiv({ cls: "callout-title-inner" });
-        const calloutContent = calloutEl.createDiv({ cls: "callout-content" });
-        const summaryEl = calloutContent.createDiv({ cls: "lazy-sync-summary" });
-
-        const syncContainer = container.createDiv("lazy-sync-container");
-
-        let syncDirection: SyncDirection = "lazyToCore";
-
-        const refreshPreview = async () => {
-            const result = await this.plugin.container.maintenance.buildSyncPreview(syncDirection);
-            previewEl.setText(result.label);
-            summaryEl.setText(result.summary);
-        };
-
-        refreshPreview();
-
-        new Setting(syncContainer)
-            .setName("Sync direction")
-            .setDesc("Choose which source should update the other.")
-            .addDropdown((dropdown) => {
-                dropdown
-                .addOption("lazyToCore", "Plugin data ➔ Obsidian config")
-                .addOption("coreToLazy", "Obsidian config ➔ Plugin data")
-                    .setValue(syncDirection)
-                    .onChange((val: SyncDirection) => {
-                        syncDirection = val;
-                        refreshPreview();
-                    });
-            });
-
-        new Setting(syncContainer).addButton((btn) =>
-            btn
-                .setButtonText("Sync now")
-                .setClass("sync-button")
-                .setCta()
-                .onClick(async () => {
-                    const result = await this.plugin.container.maintenance.executeSync(syncDirection);
-                    new Notice(result.message);
-                    if (result.changed > 0) this.onComplete();
-                    await refreshPreview();
-                }),
-        );
-    }
-
-    private buildRebuildCacheSection(container: HTMLElement) {
-        new Setting(container).setName("Maintenance").setHeading();
-        new Setting(container)
-            .setName("Force rebuild command cache")
-            .setDesc("Force a rebuild of the cached commands for lazy plugins.")
-            .addButton((btn) =>
-                btn
-                    .setButtonText("Rebuild cache")
-                    .setWarning()
-                    .onClick(async () => {
-                        btn.setDisabled(true);
-                        try {
-                            await this.plugin.rebuildAndApplyCommandCache({
-                                force: true,
-                            });
-                            new Notice("Command cache rebuilt successfully");
-                        } catch {
-                            new Notice("Failed to rebuild command cache");
-                        } finally {
-                            btn.setDisabled(false);
-                        }
-                    }),
-            );
-    }
-
-    private buildBatchReplaceModeSection(container: HTMLElement) {
-        new Setting(container).setName("Batch replace").setHeading();
-        const batchContainer = container.createDiv("lazy-batch-replace-container");
-
-        new Setting(batchContainer).setName("From mode").addDropdown((dd) =>
-            this.addModeOptions(dd)
-                .setValue(this.fromMode)
-                .onChange((val: PluginMode) => {
-                    this.fromMode = val;
-                }),
-        );
-
-        new Setting(batchContainer).setName("To mode").addDropdown((dd) =>
-            this.addModeOptions(dd)
-                .setValue(this.toMode)
-                .onChange((val: PluginMode) => {
-                    this.toMode = val;
                 }),
         );
     }
