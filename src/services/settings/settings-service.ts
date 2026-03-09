@@ -36,7 +36,14 @@ export class SettingsService {
             this.currentProfileId = defaultId;
         }
 
-        // 5. Set the active settings reference
+        // 5. Ensure all profiles have all required settings (like defaultMode)
+        Object.values(this.data.profiles).forEach((profile) => {
+            if (profile.settings.defaultMode === undefined) {
+                profile.settings.defaultMode = DEFAULT_DEVICE_SETTINGS.defaultMode;
+            }
+        });
+
+        // 6. Set the active settings reference
         this.settings = this.data.profiles[this.currentProfileId].settings;
 
         // 6. Legacy: Hydrate lazyOnViews from store2 (if applicable)

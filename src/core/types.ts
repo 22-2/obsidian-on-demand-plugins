@@ -3,6 +3,27 @@
  * These types are used across multiple features/services.
  */
 
+export const PLUGIN_MODE = {
+    ALWAYS_DISABLED: "alwaysDisabled",
+    LAZY: "lazy",
+    ALWAYS_ENABLED: "alwaysEnabled",
+    /**
+     * @deprecated
+     */
+    LAZY_ON_VIEW: "lazyOnView",
+    LAZY_ON_LAYOUT_READY: "lazyOnLayoutReady",
+} as const;
+
+export type PluginMode = (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE];
+
+export const PluginModes: Record<PluginMode, string> = {
+    [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",
+    [PLUGIN_MODE.LAZY]: "🤲 Lazy on demand",
+    [PLUGIN_MODE.LAZY_ON_VIEW]: "Lazy on command/view (legacy)",
+    [PLUGIN_MODE.LAZY_ON_LAYOUT_READY]: "🚀 Lazy on layout ready",
+    [PLUGIN_MODE.ALWAYS_ENABLED]: "✅ Always enabled",
+};
+
 export interface LazyOptions {
     useView: boolean;
     viewTypes: string[];
@@ -24,7 +45,7 @@ export interface FileActivationCriteria {
 
 // Settings per device (desktop/mobile)
 export interface DeviceSettings {
-    // defaultMode: PluginMode;
+    defaultMode: PluginMode;
     showDescriptions: boolean;
     plugins: { [pluginId: string]: PluginSettings };
     lazyOnViews: { [pluginId: string]: string[] };
@@ -32,7 +53,7 @@ export interface DeviceSettings {
 }
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
-    // defaultMode: "disabled",
+    defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
     showDescriptions: true,
     plugins: {},
     lazyOnViews: {},
@@ -93,24 +114,3 @@ export interface CachedCommandEntry {
 
 export type CommandCache = Record<string, CachedCommandEntry[]>;
 export type CommandCacheVersions = Record<string, string>;
-
-export const PLUGIN_MODE = {
-    ALWAYS_DISABLED: "alwaysDisabled",
-    LAZY: "lazy",
-    ALWAYS_ENABLED: "alwaysEnabled",
-    /**
-     * @deprecated
-     */
-    LAZY_ON_VIEW: "lazyOnView",
-    LAZY_ON_LAYOUT_READY: "lazyOnLayoutReady",
-} as const;
-
-export type PluginMode = (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE];
-
-export const PluginModes: Record<PluginMode, string> = {
-    [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",
-    [PLUGIN_MODE.LAZY]: "🤲 Lazy on demand",
-    [PLUGIN_MODE.LAZY_ON_VIEW]: "Lazy on command/view (legacy)",
-    [PLUGIN_MODE.LAZY_ON_LAYOUT_READY]: "🚀 Lazy on layout ready",
-    [PLUGIN_MODE.ALWAYS_ENABLED]: "✅ Always enabled",
-};

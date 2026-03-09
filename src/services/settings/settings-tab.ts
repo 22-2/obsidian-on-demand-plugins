@@ -7,6 +7,7 @@ import { isLazyMode } from "../../core/utils";
 import type OnDemandPlugin from "../../main";
 import { LazyOptionsModal } from "./lazy-options-modal";
 import { ProfileManagerModal } from "./profile-manager-modal";
+import { ToolsModal } from "../../ui/modals/tools-modal";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsTab");
 
@@ -124,22 +125,25 @@ export class SettingsTab extends PluginSettingTab {
         new Setting(this.containerEl).setName("Lazy command caching").setHeading();
 
         new Setting(this.containerEl)
-            .setName("Force rebuild command cache")
-            .setDesc("Force a rebuild of the cached commands for lazy plugins.")
+            .setName("Default mode")
+            .setDesc("Specify the default mode for newly discovered plugins or those not yet configured.")
+            .addDropdown((dropdown) => {
+                this.addModeOptions(dropdown);
+                dropdown.setValue(this.plugin.settings.defaultMode).onChange(async (value: PluginMode) => {
+                    this.plugin.settings.defaultMode = value;
+                    await this.plugin.saveSettings();
+                });
+            });
+
+        new Setting(this.containerEl)
+            .setName("Maintenance & Batch operations")
+            .setDesc("Rebuild command cache, sync with Obsidian settings, or batch-update plugin modes.")
             .addButton((button) => {
-                button.setButtonText("Rebuild cache");
-                button.onClick(async () => {
-                    button.setDisabled(true);
-                    try {
-                        await this.plugin.rebuildAndApplyCommandCache({
-                            force: true,
-                        });
-                    } catch (e) {
-                        new Notice("Failed to rebuild command cache");
-                        logger.error(e);
-                    } finally {
-                        button.setDisabled(false);
-                    }
+                button.setButtonText("Open Tools");
+                button.onClick(() => {
+                    new ToolsModal(this.app, this.plugin, () => {
+                        this.buildDom();
+                    }).open();
                 });
             });
 
@@ -162,7 +166,7 @@ export class SettingsTab extends PluginSettingTab {
 
         // Plugin list header: results count, keyword filter, and filter dropdown (dropdown placed to the right of the keyword input)
         new Setting(this.containerEl)
-            .setName("Plugins (register lazy ones here)")
+            .setName("Plugins")
             .setHeading()
             .setDesc("Filter by: ")
             .then((setting) => {

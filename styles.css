@@ -69,3 +69,7 @@
     display: flex;
     gap: 8px;
 }
+
+.lazy-sync-container .setting-item:has(.sync-button) {
+    padding-bottom: var(--size-4-4)!important;
+}
