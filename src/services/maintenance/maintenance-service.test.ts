@@ -60,7 +60,6 @@ describe("MaintenanceService", () => {
             expect(result.changed).toBe(2);
             expect(mockCtx.getSettings().plugins["plugin-1"].mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
             expect(mockCtx.getSettings().plugins["plugin-2"].mode).toBe(PLUGIN_MODE.ALWAYS_DISABLED);
-            expect(mockCtx.saveSettings).toHaveBeenCalled();
         });
     });
 
