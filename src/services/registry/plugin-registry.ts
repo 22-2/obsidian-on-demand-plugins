@@ -16,7 +16,8 @@ export class PluginRegistry {
             enabledPlugins: Set<string>;
         },
     ) {}
-    updateManifests() {
+
+    reloadManifests() {
         const manifests = Object.values(this.obsidianPlugins.manifests);
         this.manifests = manifests
             .filter(
@@ -31,6 +32,10 @@ export class PluginRegistry {
 
     isPluginEnabledOnDisk(pluginId: string): boolean {
         return this.enabledPluginsFromDisk.has(pluginId) || this.obsidianPlugins.enabledPlugins.has(pluginId);
+    }
+
+    getCommunityPluginsConfigFilePath() {
+        return this.app.vault.getConfigFile("community-plugins");
     }
 
     async loadEnabledPluginsFromDisk(showConsoleLog?: boolean) {

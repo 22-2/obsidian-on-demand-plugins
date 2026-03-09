@@ -133,6 +133,7 @@ describe("CommandExecutor", () => {
         });
 
         it("should return false if active element is title element", () => {
+            // @ts-expect-error
             const view = new MarkdownView();
             (view as any).inlineTitleEl = { contains: vi.fn().mockReturnValue(true) };
             mockCtx.app.workspace.activeEditor = view;

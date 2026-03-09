@@ -38,7 +38,7 @@ describe("PluginRegistry", () => {
 
     describe("updateManifests", () => {
         it("should filter out lazy loader and sort by name", () => {
-            registry.updateManifests();
+            registry.reloadManifests();
             expect(registry.manifests).toHaveLength(2);
             expect(registry.manifests[0].id).toBe("plugin-a");
             expect(registry.manifests[1].id).toBe("plugin-b");
@@ -48,7 +48,7 @@ describe("PluginRegistry", () => {
             vi.mocked(Platform).isMobile = true;
             mockObsidianPlugins.manifests["desktop-only"] = { id: "desktop-only", name: "Zebra", isDesktopOnly: true };
             
-            registry.updateManifests();
+            registry.reloadManifests();
             
             expect(registry.manifests.find(p => p.id === "desktop-only")).toBeUndefined();
             vi.mocked(Platform).isMobile = false;
@@ -93,7 +93,7 @@ describe("PluginRegistry", () => {
 
     describe("clear", () => {
         it("should clear everything", () => {
-            registry.updateManifests();
+            registry.reloadManifests();
             registry.enabledPluginsFromDisk.add("test");
             
             registry.clear();

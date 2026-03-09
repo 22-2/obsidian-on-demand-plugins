@@ -26,7 +26,7 @@ export default class OnDemandPlugin extends Plugin {
         this.configureLogger();
 
         // Registry needs to update manifests after settings are loaded
-        this.container.registry.updateManifests();
+        this.container.registry.reloadManifests();
         this.updateManifests();
 
         // Full initialization (patches, command cache, view loader, etc.)
@@ -100,7 +100,7 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     updateManifests() {
-        this.container.registry.updateManifests();
+        this.container.registry.reloadManifests();
         this.manifests = this.container.registry.manifests;
     }
 
