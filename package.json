@@ -35,10 +35,12 @@
 		"store2": "^2.14.4"
 	},
 	"devDependencies": {
+		"@22-2/esbuild-plugin-obsidian-copy": "git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git",
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.58.2",
 		"@types/node": "^25.3.5",
 		"builtin-modules": "5.0.0",
+		"dotenv": "^17.3.1",
 		"esbuild": "0.27.3",
 		"eslint": "^10.0.3",
 		"eslint-config-prettier": "^10.1.8",

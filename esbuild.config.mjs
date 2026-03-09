@@ -1,6 +1,17 @@
+// @ts-check
+
 import esbuild from "esbuild";
 import process from "process";
 import builtins from "builtin-modules";
+import { obsidianCopyPlugin } from "@22-2/esbuild-plugin-obsidian-copy";
+import dotenv from "dotenv";
+dotenv.config();
+
+const pluginsPath = process.env.PLUGINS_PATH;
+
+if (!pluginsPath) {
+	throw new Error("PLUGINS_PATH is not defined");
+}
 
 const banner =
 `/*
@@ -36,6 +47,13 @@ const context = await esbuild.context({
 	target: "esnext",
 	logLevel: "info",
 	minify: prod,
+	plugins: [
+		obsidianCopyPlugin({
+			pluginsDir: pluginsPath,
+            targetDirName: "obsidian-lazy-plugins",
+            force: true,
+		}),
+	],
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
 	outfile: "main.js",

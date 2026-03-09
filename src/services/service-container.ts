@@ -10,7 +10,7 @@ import PQueue from "p-queue";
 import type { PluginContext } from "../core/plugin-context";
 import { ProgressDialog } from "../core/progress";
 import { PLUGIN_MODE } from "../core/types";
-import { patchPluginEnableDisable } from "../patches/plugin-enable-disable";
+import { patchSettingTabOpen } from "../patches/setting-tab";
 import { patchSetViewState } from "../patches/view-state";
 import { CommandCacheService } from "./command-cache/command-cache-service";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
@@ -88,7 +88,7 @@ export class ServiceContainer {
         this.commandCache.registerCachedCommands();
 
         // Apply monkey-patches
-        patchPluginEnableDisable(this.ctx, this.commandCache);
+        patchSettingTabOpen(this.ctx);
 
         patchSetViewState({
             register: this.ctx.register.bind(this.ctx),

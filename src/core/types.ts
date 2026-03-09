@@ -50,6 +50,9 @@ export interface Profile {
 export interface LazySettings {
     showConsoleLog: boolean;
 
+    // Global settings for the plugin
+    suppressPluginManagementNotice: boolean;
+
     // Profile Management
     profiles: Record<string, Profile>;
     desktopProfileId: string;
@@ -70,6 +73,7 @@ export const DEFAULT_PROFILE_ID = "Default";
 
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
+    suppressPluginManagementNotice: false,
     profiles: {
         [DEFAULT_PROFILE_ID]: {
             id: DEFAULT_PROFILE_ID,

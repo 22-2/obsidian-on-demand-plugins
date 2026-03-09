@@ -33,6 +33,9 @@ importers:
         specifier: ^2.14.4
         version: 2.14.4
     devDependencies:
+      '@22-2/esbuild-plugin-obsidian-copy':
+        specifier: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git
+        version: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.3(jiti@2.6.1))
@@ -45,6 +48,9 @@ importers:
       builtin-modules:
         specifier: 5.0.0
         version: 5.0.0
+      dotenv:
+        specifier: ^17.3.1
+        version: 17.3.1
       esbuild:
         specifier: 0.27.3
         version: 0.27.3
@@ -86,6 +92,10 @@ importers:
         version: 8.56.1(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3)
 
 packages:
+
+  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916':
+    resolution: {commit: 3677bb62f4af684968629eb8fc508260240fb916, repo: https://github.com/22-2/esbuild-plugin-obsidian-copy.git, type: git}
+    version: 0.1.0
 
   '@antfu/install-pkg@1.1.0':
     resolution: {integrity: sha512-MGQsmw10ZyI+EJo45CdSER4zEb+p31LpDAFp2Z3gkSd1yqVZGi0Ebx++YTEMonJy4oChEMLsxZ64j8FH6sSqtQ==}
@@ -1213,6 +1223,10 @@ packages:
     resolution: {integrity: sha512-6obghkliLdmKa56xdbLOpUZ43pAR6xFy1uOrxBaIDjT+yaRuuybLjGS9eVBoSR/UPU5fq3OXClEHLJNGvbxKpQ==}
     engines: {node: '>=20'}
 
+  dotenv@17.3.1:
+    resolution: {integrity: sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA==}
+    engines: {node: '>=12'}
+
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
@@ -2041,6 +2055,8 @@ packages:
     engines: {node: '>=12.20'}
 
 snapshots:
+
+  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916': {}
 
   '@antfu/install-pkg@1.1.0':
     dependencies:
@@ -3162,6 +3178,8 @@ snapshots:
   dompurify@3.3.2:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
+
+  dotenv@17.3.1: {}
 
   dunder-proto@1.0.1:
     dependencies:
