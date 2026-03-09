@@ -24,7 +24,7 @@ export class ToolsModal extends Modal {
         const { contentEl } = this;
         contentEl.setAttr("class", "lazy-tools-modal");
 
-        new Setting(contentEl).setName("Tools").setHeading();
+        new Setting(contentEl).setName("Maintenance tools").setHeading();
 
         const tabHeader = contentEl.createDiv({ cls: "lazy-tab-header" });
         this.tabContentEl = contentEl.createDiv({ cls: "lazy-tab-content" });
