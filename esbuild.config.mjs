@@ -8,9 +8,17 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const pluginsPath = process.env.PLUGINS_PATH;
+const isCI = !!process.env.CI;
 
-if (!pluginsPath) {
-	throw new Error("PLUGINS_PATH is not defined");
+const plugins = [];
+if (!isCI && pluginsPath) {
+	plugins.push(
+		obsidianCopyPlugin({
+			pluginsDir: pluginsPath,
+			targetDirName: "obsidian-lazy-plugins",
+			force: true,
+		}),
+	);
 }
 
 const banner =
@@ -47,13 +55,7 @@ const context = await esbuild.context({
 	target: "esnext",
 	logLevel: "info",
 	minify: prod,
-	plugins: [
-		obsidianCopyPlugin({
-			pluginsDir: pluginsPath,
-            targetDirName: "obsidian-lazy-plugins",
-            force: true,
-		}),
-	],
+	plugins,
 	sourcemap: prod ? false : "inline",
 	treeShaking: true,
 	outfile: "main.js",
