@@ -5,7 +5,7 @@ import type { Commands, Plugins } from "obsidian-typings";
 import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
 import type { PluginContext } from "../../core/plugin-context";
 import { ProgressDialog } from "../../core/progress";
-import { saveJSON } from "../../core/storage";
+import { saveLocalStorage } from "../../core/storage";
 import { PLUGIN_MODE } from "../../core/types";
 import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
 import type { CommandCacheService } from "../command-cache/command-cache-service";
@@ -196,7 +196,7 @@ export class StartupPolicyService {
         const settings = this.ctx.getSettings();
         settings.lazyOnViews = lazyOnViews;
         await this.ctx.saveSettings();
-        saveJSON(this.ctx.app, "lazyOnViews", lazyOnViews);
+        saveLocalStorage(this.ctx.app, "lazyOnViews", lazyOnViews);
 
         // Compute the desired enabled set (always-enabled + self)
         const desiredEnabled = new Set<string>(

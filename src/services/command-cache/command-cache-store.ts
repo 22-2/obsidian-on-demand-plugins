@@ -1,7 +1,7 @@
 import type { PluginManifest } from "obsidian";
 import type { CachedCommand } from "../../core/interfaces";
 import type { PluginContext } from "../../core/plugin-context";
-import { loadJSON, saveJSON } from "../../core/storage";
+import { loadLocalStorage, saveLocalStorage } from "../../core/storage";
 import type { CommandCache } from "../../core/types";
 
 export class CommandCacheStore {
@@ -32,7 +32,7 @@ export class CommandCacheStore {
     }
 
     loadFromData(): void {
-        const commandCacheSource = loadJSON<CommandCache>(this.ctx.app, "commandCache");
+        const commandCacheSource = loadLocalStorage<CommandCache>(this.ctx.app, "commandCache");
         if (!commandCacheSource) return;
 
         this.commandCache.clear();
@@ -72,20 +72,20 @@ export class CommandCacheStore {
             }
         });
 
-        saveJSON(this.ctx.app, "commandCache", cache);
-        saveJSON(this.ctx.app, "commandCacheVersions", versions);
+        saveLocalStorage(this.ctx.app, "commandCache", cache);
+        saveLocalStorage(this.ctx.app, "commandCacheVersions", versions);
     }
 
     isValid(pluginId: string): boolean {
         if (!this.pluginCommandIndex.has(pluginId)) return false;
 
-        const cached = loadJSON<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
+        const cached = loadLocalStorage<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
         if (!Array.isArray(cached) || cached.length === 0) return false;
 
         const manifest = this.ctx.getManifests().find((p) => p.id === pluginId);
         if (!manifest) return false;
 
-        const cachedVersion = loadJSON<Record<string, string>>(this.ctx.app, "commandCacheVersions")?.[pluginId];
+        const cachedVersion = loadLocalStorage<Record<string, string>>(this.ctx.app, "commandCacheVersions")?.[pluginId];
         if (!cachedVersion) return false;
 
         return cachedVersion === (manifest.version ?? "");

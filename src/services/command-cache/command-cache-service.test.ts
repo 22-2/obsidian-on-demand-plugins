@@ -146,7 +146,7 @@ describe("CommandCacheService", () => {
     describe("ensureCommandsCached", () => {
         it("should do nothing if valid", async () => {
             // Mock store valid state via setup
-            vi.mocked(storageMs.loadJSON).mockImplementation((app, key) => {
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((app, key) => {
                 if (key === "commandCache") return { "test-plugin": [{ id: "cmd1" }] };
                 if (key === "commandCacheVersions") return { "test-plugin": "1.0.0" };
                 return null;
@@ -217,7 +217,7 @@ describe("CommandCacheService", () => {
             await service.refreshCommandCache(undefined, true, onProgress);
 
             expect(onProgress).toHaveBeenCalledTimes(1);
-            expect(storageMs.saveJSON).toHaveBeenCalled();
+            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
         });
     });
 

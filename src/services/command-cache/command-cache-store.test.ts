@@ -48,7 +48,7 @@ describe("CommandCacheStore", () => {
 
     describe("loadFromData", () => {
         it("should load cache from storage", () => {
-            vi.mocked(storageMs.loadJSON).mockReturnValue({
+            vi.mocked(storageMs.loadLocalStorage).mockReturnValue({
                 "test-plugin": [
                     { id: "cmd1", name: "Cmd 1", icon: "icon1" },
                 ],
@@ -56,14 +56,14 @@ describe("CommandCacheStore", () => {
 
             store.loadFromData();
 
-            expect(storageMs.loadJSON).toHaveBeenCalledWith(mockCtx.app, "commandCache");
+            expect(storageMs.loadLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCache");
             expect(store.has("test-plugin")).toBe(true);
             const cached = store.get("cmd1");
             expect(cached).toEqual({ id: "cmd1", name: "Cmd 1", icon: "icon1", pluginId: "test-plugin" });
         });
 
         it("should do nothing if storage is empty", () => {
-            vi.mocked(storageMs.loadJSON).mockReturnValue(null);
+            vi.mocked(storageMs.loadLocalStorage).mockReturnValue(null);
             
             store.set("existing", [{ id: "cmd", name: "cmd", icon: "", pluginId: "existing" }]);
             store.loadFromData();
@@ -81,11 +81,11 @@ describe("CommandCacheStore", () => {
 
             await store.persist();
 
-            expect(storageMs.saveJSON).toHaveBeenCalledTimes(2);
-            expect(storageMs.saveJSON).toHaveBeenNthCalledWith(1, mockCtx.app, "commandCache", {
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledTimes(2);
+            expect(storageMs.saveLocalStorage).toHaveBeenNthCalledWith(1, mockCtx.app, "commandCache", {
                 "test-plugin": [{ id: "cmd1", name: "Cmd 1", icon: "icon1" }]
             });
-            expect(storageMs.saveJSON).toHaveBeenNthCalledWith(2, mockCtx.app, "commandCacheVersions", {
+            expect(storageMs.saveLocalStorage).toHaveBeenNthCalledWith(2, mockCtx.app, "commandCacheVersions", {
                 "test-plugin": "1.0.0"
             });
         });
@@ -98,7 +98,7 @@ describe("CommandCacheStore", () => {
 
         it("should return false if cache has no data for plugin", () => {
             store.set("test-plugin", []); // empty
-            vi.mocked(storageMs.loadJSON).mockImplementation((app, key) => {
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((app, key) => {
                 if (key === "commandCache") return {};
                 return null;
             });
@@ -107,7 +107,7 @@ describe("CommandCacheStore", () => {
 
         it("should return false if version doesnt match", () => {
             store.set("test-plugin", [{ id: "cmd1", name: "", icon: "", pluginId: "test-plugin" }]);
-            vi.mocked(storageMs.loadJSON).mockImplementation((app, key) => {
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((app, key) => {
                 if (key === "commandCache") return { "test-plugin": [{ id: "cmd1" }] };
                 if (key === "commandCacheVersions") return { "test-plugin": "0.9.0" }; // Different version
                 return null;
@@ -117,7 +117,7 @@ describe("CommandCacheStore", () => {
 
         it("should return true if version matches", () => {
             store.set("test-plugin", [{ id: "cmd1", name: "", icon: "", pluginId: "test-plugin" }]);
-            vi.mocked(storageMs.loadJSON).mockImplementation((app, key) => {
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((app, key) => {
                 if (key === "commandCache") return { "test-plugin": [{ id: "cmd1" }] };
                 if (key === "commandCacheVersions") return { "test-plugin": "1.0.0" }; // Matching version
                 return null;

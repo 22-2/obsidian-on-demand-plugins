@@ -1,5 +1,5 @@
 import { Platform } from "obsidian";
-import { loadJSON } from "../../core/storage";
+import { loadLocalStorage } from "../../core/storage";
 import type { DeviceSettings, LazySettings, Profile } from "../../core/types";
 import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS } from "../../core/types";
 import type OnDemandPlugin from "../../main";
@@ -55,7 +55,7 @@ export class SettingsService {
         // but generally profiles should store this now.
         // The original code merged `loadJSON(app, "lazyOnViews")`.
         // We can keep this behavior for the active profile to maintain continuity.
-        const storedViews = loadJSON<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
+        const storedViews = loadLocalStorage<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
         if (storedViews && Object.keys(storedViews).length > 0) {
             this.settings.lazyOnViews = {
                 ...(this.settings.lazyOnViews ?? {}),

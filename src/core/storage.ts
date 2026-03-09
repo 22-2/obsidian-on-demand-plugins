@@ -19,7 +19,7 @@ export function vaultKey(app: App, prefix: string) {
     return `on-demand:${prefix}:${appId}`;
 }
 
-export function loadJSON<T = unknown>(app: App, prefix: string): T | undefined {
+export function loadLocalStorage<T = unknown>(app: App, prefix: string): T | undefined {
     try {
         const key = vaultKey(app, prefix);
         return store.get(key) as T | undefined;
@@ -29,7 +29,7 @@ export function loadJSON<T = unknown>(app: App, prefix: string): T | undefined {
     }
 }
 
-export function saveJSON<T = unknown>(app: App, prefix: string, value: T) {
+export function saveLocalStorage<T = unknown>(app: App, prefix: string, value: T) {
     try {
         const key = vaultKey(app, prefix);
         store.set(key, value);
