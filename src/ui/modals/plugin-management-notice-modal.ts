@@ -1,8 +1,12 @@
-import { App, Modal, Setting } from "obsidian";
+import type { App } from "obsidian";
+import { Modal, Setting } from "obsidian";
 import type { PluginContext } from "../../core/plugin-context";
 
 export class PluginManagementNoticeModal extends Modal {
-    constructor(app: App, private ctx: PluginContext) {
+    constructor(
+        app: App,
+        private ctx: PluginContext,
+    ) {
         super(app);
     }
 
@@ -18,12 +22,10 @@ export class PluginManagementNoticeModal extends Modal {
             .setName("Don't show this again")
             .setDesc("Checking this will suppress this warning in the future.")
             .addToggle((toggle) =>
-                toggle
-                    .setValue(this.ctx.getData().suppressPluginManagementNotice)
-                    .onChange(async (value) => {
-                        this.ctx.getData().suppressPluginManagementNotice = value;
-                        await this.ctx.saveSettings();
-                    })
+                toggle.setValue(this.ctx.getData().suppressPluginManagementNotice).onChange(async (value) => {
+                    this.ctx.getData().suppressPluginManagementNotice = value;
+                    await this.ctx.saveSettings();
+                }),
             );
 
         new Setting(contentEl)
@@ -35,14 +37,12 @@ export class PluginManagementNoticeModal extends Modal {
                         (this.app as any).setting.open();
                         (this.app as any).setting.openTabById(this.ctx._plugin.manifest.id);
                         this.close();
-                    })
+                    }),
             )
             .addButton((btn) =>
-                btn
-                    .setButtonText("Proceed anyway")
-                    .onClick(() => {
-                        this.close();
-                    })
+                btn.setButtonText("Proceed anyway").onClick(() => {
+                    this.close();
+                }),
             );
     }
 

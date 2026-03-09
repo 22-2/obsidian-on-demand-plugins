@@ -1,4 +1,3 @@
-import type { PluginManifest } from "obsidian";
 import type { CachedCommand } from "../../core/interfaces";
 import type { PluginContext } from "../../core/plugin-context";
 import { loadLocalStorage, saveLocalStorage } from "../../core/storage";

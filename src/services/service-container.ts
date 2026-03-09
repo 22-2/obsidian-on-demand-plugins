@@ -12,16 +12,16 @@ import { ProgressDialog } from "../core/progress";
 import { PLUGIN_MODE } from "../core/types";
 import { patchSettingTabOpen } from "../patches/setting-tab";
 import { patchSetViewState } from "../patches/view-state";
+import { BackupService } from "./backup/backup-service";
 import { CommandCacheService } from "./command-cache/command-cache-service";
-import { MaintenanceService } from "./maintenance/maintenance-service";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
 import { LeafLockManager, LeafViewLockStrategy } from "./lazy-loader/internal/leaf-lock";
 import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
 import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
+import { MaintenanceService } from "./maintenance/maintenance-service";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
-import { BackupService } from "./backup/backup-service";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;
@@ -121,25 +121,25 @@ export class ServiceContainer {
         if (this.settingsService.isFirstLoad) {
             const profileId = "initial-backup";
             const currentPlugins = Array.from(this.registry.enabledPluginsFromDisk);
-            
+
             // Generate a safe copy of default settings
             const { DEFAULT_DEVICE_SETTINGS } = await import("../core/types");
             const backupSettings = JSON.parse(JSON.stringify(DEFAULT_DEVICE_SETTINGS));
-            
+
             // Set all currently enabled plugins to ALWAYS_ENABLED in this profile
-            currentPlugins.forEach(id => {
+            currentPlugins.forEach((id) => {
                 backupSettings.plugins[id] = {
                     mode: PLUGIN_MODE.ALWAYS_ENABLED,
-                    userConfigured: true
+                    userConfigured: true,
                 };
             });
 
             this.settingsService.data.profiles[profileId] = {
                 id: profileId,
                 name: "Backup: Initial State",
-                settings: backupSettings
+                settings: backupSettings,
             };
-            
+
             // Create an initial file backup
             await this.ctx.saveSettings();
             return;
@@ -149,7 +149,7 @@ export class ServiceContainer {
         const LAZY_VERSION_KEY = "lastLazyPluginVersion";
         const currentVersion = this.ctx._plugin.manifest.version;
         const savedVersion = (this.settingsService.data as any)[LAZY_VERSION_KEY];
-        
+
         if (savedVersion !== currentVersion) {
             (this.settingsService.data as any)[LAZY_VERSION_KEY] = currentVersion;
             await this.ctx.saveSettings();

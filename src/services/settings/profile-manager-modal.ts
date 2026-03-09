@@ -115,7 +115,7 @@ export class ProfileManagerModal extends Modal {
                                     new Notice("Cannot delete a default profile. Assign another default first.");
                                     return;
                                 }
-                                
+
                                 let warningMessage = `Are you sure you want to delete profile "${profile.name}"?`;
                                 if (id === "initial-backup") {
                                     warningMessage = `WARNING: "${profile.name}" is your failsafe initial backup. It is highly recommended to keep it. Are you absolutely sure you want to delete it?`;

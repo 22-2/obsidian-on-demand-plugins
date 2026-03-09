@@ -15,16 +15,17 @@ export function normalizePath(path: string): string {
 
 export const moment = () => {
     return {
-        format: () => "20260309-150000"
+        format: () => "20260309-150000",
     };
 };
 
 export const Platform = {
     isDesktop: true,
-    isMobile: false
+    isMobile: false,
 };
 
 export const MarkdownView = class {
-    getMode() { return "source"; }
+    getMode() {
+        return "source";
+    }
 };
-

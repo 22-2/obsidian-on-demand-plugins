@@ -1,7 +1,7 @@
 import log from "loglevel";
+import { moment, normalizePath } from "obsidian";
 import type { PluginContext } from "../../core/plugin-context";
 import type { PluginRegistry } from "../registry/plugin-registry";
-import { normalizePath, moment } from "obsidian";
 
 const logger = log.getLogger("OnDemandPlugin/BackupService");
 
@@ -10,7 +10,7 @@ export class BackupService {
 
     constructor(
         private ctx: PluginContext,
-        private registry: PluginRegistry
+        private registry: PluginRegistry,
     ) {
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
@@ -34,7 +34,7 @@ export class BackupService {
 
         let dataContent = "";
         let communityContent = "";
-        
+
         try {
             dataContent = await adapter.read(dataPath);
             communityContent = await adapter.read(communityPath);
@@ -50,7 +50,7 @@ export class BackupService {
                 logger.warn("Invalid data.json for backup, skipping validation failed.");
                 return;
             }
-        } catch(e) {
+        } catch (e) {
             logger.warn("Failed to parse data.json for backup", e);
             return;
         }
@@ -58,10 +58,10 @@ export class BackupService {
         try {
             const communityParsed = JSON.parse(communityContent);
             if (!Array.isArray(communityParsed)) {
-               logger.warn("Invalid community-plugins.json for backup, skipping");
-               return; 
+                logger.warn("Invalid community-plugins.json for backup, skipping");
+                return;
             }
-        } catch(e) {
+        } catch (e) {
             logger.warn("Failed to parse community-plugins.json for backup", e);
             return;
         }
@@ -75,7 +75,7 @@ export class BackupService {
             await adapter.write(dataBackupPath, dataContent);
             await adapter.write(communityBackupPath, communityContent);
             logger.info(`Created backup at ${timestamp}`);
-        } catch(e) {
+        } catch (e) {
             logger.error("Failed to write backup files", e);
             return;
         }
@@ -92,10 +92,10 @@ export class BackupService {
         } catch (e) {
             return;
         }
-        
-        const dataBackups = result.files.filter(f => f.includes("data_") && f.endsWith(".json")).sort();
-        const communityBackups = result.files.filter(f => f.includes("community-plugins_") && f.endsWith(".json")).sort();
-        
+
+        const dataBackups = result.files.filter((f) => f.includes("data_") && f.endsWith(".json")).sort();
+        const communityBackups = result.files.filter((f) => f.includes("community-plugins_") && f.endsWith(".json")).sort();
+
         while (dataBackups.length > 3) {
             const oldest = dataBackups.shift();
             if (oldest) await adapter.remove(oldest);

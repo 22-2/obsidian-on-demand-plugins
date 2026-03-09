@@ -39,19 +39,13 @@ export class CommandCacheService {
     // Cache refresh
     // ---------------------------------------------------------------------------
 
-    async refreshCommandCache(
-        pluginIds?: string[],
-        force = false,
-        onProgress?: (current: number, total: number, plugin: PluginManifest) => void,
-    ): Promise<void> {
+    async refreshCommandCache(pluginIds?: string[], force = false, onProgress?: (current: number, total: number, plugin: PluginManifest) => void): Promise<void> {
         let lazyManifests = this.getLazyManifests();
         if (pluginIds?.length) {
             lazyManifests = lazyManifests.filter((p) => pluginIds.includes(p.id));
         }
 
-        const pluginsToRefresh = force
-            ? lazyManifests
-            : lazyManifests.filter((p) => !this.store.isValid(p.id));
+        const pluginsToRefresh = force ? lazyManifests : lazyManifests.filter((p) => !this.store.isValid(p.id));
 
         let hasChanges = false;
         for (const plugin of pluginsToRefresh) {

@@ -1,6 +1,5 @@
 import { Mutex } from "async-mutex";
 import log from "loglevel";
-import type { MarkdownFileInfo } from "obsidian";
 import type { ViewRegistry } from "obsidian-typings";
 import { pEvent } from "p-event";
 import pTimeout from "p-timeout";

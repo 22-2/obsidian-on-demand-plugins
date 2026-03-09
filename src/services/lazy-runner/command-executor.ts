@@ -98,11 +98,6 @@ export class CommandExecutor {
             return false;
         }
 
-        return (
-            typeof command.callback === "function" ||
-            typeof command.checkCallback === "function" ||
-            typeof command.editorCallback === "function" ||
-            typeof command.editorCheckCallback === "function"
-        );
+        return typeof command.callback === "function" || typeof command.checkCallback === "function" || typeof command.editorCallback === "function" || typeof command.editorCheckCallback === "function";
     }
 }

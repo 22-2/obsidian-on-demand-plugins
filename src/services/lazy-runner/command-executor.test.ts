@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, vi, type Mocked } from "vitest";
-import { CommandExecutor } from "./command-executor";
-import type { PluginContext } from "../../core/plugin-context";
-import type { CommandRegistry } from "../../core/interfaces";
 import { MarkdownView } from "obsidian";
+import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
+import type { CommandRegistry } from "../../core/interfaces";
+import type { PluginContext } from "../../core/plugin-context";
+import { CommandExecutor } from "./command-executor";
 
 describe("CommandExecutor", () => {
     let executor: CommandExecutor;
@@ -16,20 +16,20 @@ describe("CommandExecutor", () => {
         (global as any).activeDocument = {
             activeElement: {
                 closest: vi.fn().mockReturnValue(null),
-                contains: vi.fn().mockReturnValue(false)
-            }
+                contains: vi.fn().mockReturnValue(false),
+            },
         };
 
         mockCtx = {
             app: {
-                workspace: { 
-                    activeEditor: null 
-                }
+                workspace: {
+                    activeEditor: null,
+                },
             },
-            obsidianCommands: { 
-                commands: {} 
+            obsidianCommands: {
+                commands: {},
             },
-            getData: vi.fn().mockReturnValue({ showConsoleLog: false })
+            getData: vi.fn().mockReturnValue({ showConsoleLog: false }),
         };
 
         mockRegistry = {
@@ -70,7 +70,7 @@ describe("CommandExecutor", () => {
                 editorCheckCallback: vi.fn((checking: boolean) => {
                     if (!checking) spy();
                     return true;
-                })
+                }),
             };
             mockCtx.obsidianCommands.commands["cmd1"] = cmd;
             mockCtx.app.workspace.activeEditor = { editor: {} };
@@ -84,7 +84,7 @@ describe("CommandExecutor", () => {
 
         it("should fallback to editorCallback", () => {
             const cmd = {
-                editorCallback: vi.fn()
+                editorCallback: vi.fn(),
             };
             mockCtx.obsidianCommands.commands["cmd1"] = cmd;
             mockCtx.app.workspace.activeEditor = { editor: {} };
@@ -100,7 +100,7 @@ describe("CommandExecutor", () => {
                 checkCallback: vi.fn((checking: boolean) => {
                     if (!checking) spy();
                     return true;
-                })
+                }),
             };
             mockCtx.obsidianCommands.commands["cmd1"] = cmd;
 
@@ -113,7 +113,7 @@ describe("CommandExecutor", () => {
 
         it("should fallback to simple callback", () => {
             const cmd = {
-                callback: vi.fn()
+                callback: vi.fn(),
             };
             mockCtx.obsidianCommands.commands["cmd1"] = cmd;
 
@@ -124,7 +124,7 @@ describe("CommandExecutor", () => {
 
         it("should return false if editorCheckCallback returns false", () => {
             const cmd = {
-                editorCheckCallback: vi.fn(() => false)
+                editorCheckCallback: vi.fn(() => false),
             };
             mockCtx.obsidianCommands.commands["cmd1"] = cmd;
             mockCtx.app.workspace.activeEditor = { editor: {} };
@@ -150,9 +150,9 @@ describe("CommandExecutor", () => {
             mockCtx.app.workspace.activeEditor = { editor: {} };
             (activeDocument.activeElement?.closest as any).mockReturnValue({}); // in a container
 
-            const cmd = { 
+            const cmd = {
                 callback: vi.fn(),
-                allowProperties: false 
+                allowProperties: false,
             };
             mockCtx.obsidianCommands.commands["cmd1"] = cmd;
 

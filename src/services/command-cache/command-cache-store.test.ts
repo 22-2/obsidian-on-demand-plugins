@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach, vi, type Mocked } from "vitest";
-import { CommandCacheStore } from "./command-cache-store";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginContext } from "../../core/plugin-context";
 import * as storageMs from "../../core/storage";
+import { CommandCacheStore } from "./command-cache-store";
 
 vi.mock("../../core/storage");
 
@@ -49,9 +49,7 @@ describe("CommandCacheStore", () => {
     describe("loadFromData", () => {
         it("should load cache from storage", () => {
             vi.mocked(storageMs.loadLocalStorage).mockReturnValue({
-                "test-plugin": [
-                    { id: "cmd1", name: "Cmd 1", icon: "icon1" },
-                ],
+                "test-plugin": [{ id: "cmd1", name: "Cmd 1", icon: "icon1" }],
             });
 
             store.loadFromData();
@@ -64,7 +62,7 @@ describe("CommandCacheStore", () => {
 
         it("should do nothing if storage is empty", () => {
             vi.mocked(storageMs.loadLocalStorage).mockReturnValue(null);
-            
+
             store.set("existing", [{ id: "cmd", name: "cmd", icon: "", pluginId: "existing" }]);
             store.loadFromData();
 
@@ -75,18 +73,16 @@ describe("CommandCacheStore", () => {
 
     describe("persist", () => {
         it("should save current cache to storage", async () => {
-            store.set("test-plugin", [
-                { id: "cmd1", name: "Cmd 1", icon: "icon1", pluginId: "test-plugin" }
-            ]);
+            store.set("test-plugin", [{ id: "cmd1", name: "Cmd 1", icon: "icon1", pluginId: "test-plugin" }]);
 
             await store.persist();
 
             expect(storageMs.saveLocalStorage).toHaveBeenCalledTimes(2);
             expect(storageMs.saveLocalStorage).toHaveBeenNthCalledWith(1, mockCtx.app, "commandCache", {
-                "test-plugin": [{ id: "cmd1", name: "Cmd 1", icon: "icon1" }]
+                "test-plugin": [{ id: "cmd1", name: "Cmd 1", icon: "icon1" }],
             });
             expect(storageMs.saveLocalStorage).toHaveBeenNthCalledWith(2, mockCtx.app, "commandCacheVersions", {
-                "test-plugin": "1.0.0"
+                "test-plugin": "1.0.0",
             });
         });
     });
@@ -130,9 +126,9 @@ describe("CommandCacheStore", () => {
         it("should clear all data", () => {
             store.set("test-plugin", [{ id: "cmd1", name: "", icon: "", pluginId: "test-plugin" }]);
             expect(store.has("test-plugin")).toBe(true);
-            
+
             store.clear();
-            
+
             expect(store.has("test-plugin")).toBe(false);
             expect(store.get("cmd1")).toBeUndefined();
         });

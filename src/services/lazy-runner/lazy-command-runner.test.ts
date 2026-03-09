@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, vi, type Mocked } from "vitest";
-import { LazyCommandRunner } from "./lazy-command-runner";
-import type { PluginContext } from "../../core/plugin-context";
-import type { CommandRegistry } from "../../core/interfaces";
-import * as utilsMs from "../../core/utils";
 import pWaitFor from "p-wait-for";
+import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
+import type { CommandRegistry } from "../../core/interfaces";
+import type { PluginContext } from "../../core/plugin-context";
+import * as utilsMs from "../../core/utils";
+import { LazyCommandRunner } from "./lazy-command-runner";
 
 vi.mock("../../core/utils", () => ({
     isPluginLoaded: vi.fn(),
-    isPluginEnabled: vi.fn()
+    isPluginEnabled: vi.fn(),
 }));
 vi.mock("p-wait-for");
 
@@ -23,14 +23,14 @@ describe("LazyCommandRunner", () => {
             app: {
                 workspace: {
                     on: vi.fn(),
-                    off: vi.fn()
-                }
+                    off: vi.fn(),
+                },
             },
             obsidianPlugins: {
                 enabledPlugins: new Set(),
-                enablePlugin: vi.fn().mockResolvedValue(undefined)
+                enablePlugin: vi.fn().mockResolvedValue(undefined),
             },
-            getData: vi.fn().mockReturnValue({ showConsoleLog: false })
+            getData: vi.fn().mockReturnValue({ showConsoleLog: false }),
         };
 
         mockRegistry = {
@@ -83,10 +83,10 @@ describe("LazyCommandRunner", () => {
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
             vi.mocked(pWaitFor).mockResolvedValue(undefined as any);
 
-            // First call will trigger enablePlugin. 
+            // First call will trigger enablePlugin.
             // Second call (serialized by mutex) should see it's already loaded and skip enablePlugin.
             mockCtx.obsidianPlugins.enablePlugin.mockImplementation(async () => {
-                await new Promise(r => setTimeout(r, 50));
+                await new Promise((r) => setTimeout(r, 50));
                 vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
                 vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);
             });
@@ -105,18 +105,18 @@ describe("LazyCommandRunner", () => {
     describe("runLazyCommand", () => {
         it("should do nothing if command is not cached", async () => {
             mockRegistry.getCachedCommand.mockReturnValue(undefined);
-            
+
             await runner.runLazyCommand("unknown");
-            
+
             expect(mockCtx.obsidianPlugins.enablePlugin).not.toHaveBeenCalled();
         });
 
         it("should load plugin and execute command", async () => {
-            mockRegistry.getCachedCommand.mockReturnValue({ 
-                id: "cmd1", 
-                pluginId: "test-plugin", 
-                name: "Cmd 1", 
-                icon: "" 
+            mockRegistry.getCachedCommand.mockReturnValue({
+                id: "cmd1",
+                pluginId: "test-plugin",
+                name: "Cmd 1",
+                icon: "",
             });
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
             vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);

@@ -1,14 +1,14 @@
 import log from "loglevel";
 import type { App, ButtonComponent, DropdownComponent } from "obsidian";
 import { ExtraButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
+import { showConfirmModal } from "../../core/confirm-modal";
 import type { PluginMode, PluginSettings } from "../../core/types";
 import { PluginModes } from "../../core/types";
 import { isLazyMode } from "../../core/utils";
 import type OnDemandPlugin from "../../main";
-import { showConfirmModal } from "../../core/confirm-modal";
+import { ToolsModal } from "../../ui/modals/tools-modal";
 import { LazyOptionsModal } from "./lazy-options-modal";
 import { ProfileManagerModal } from "./profile-manager-modal";
-import { ToolsModal } from "../../ui/modals/tools-modal";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsTab");
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BackupService } from "./backup-service";
 
@@ -14,24 +14,24 @@ describe("BackupService", () => {
             read: vi.fn(),
             write: vi.fn(),
             list: vi.fn(),
-            remove: vi.fn()
+            remove: vi.fn(),
         };
 
         mockCtx = {
             _plugin: {
                 manifest: {
-                    dir: "mock/plugin/dir"
-                }
+                    dir: "mock/plugin/dir",
+                },
             },
             app: {
                 vault: {
-                    adapter: mockAdapter
-                }
-            }
+                    adapter: mockAdapter,
+                },
+            },
         };
 
         mockRegistry = {
-            getCommunityPluginsConfigFilePath: vi.fn().mockReturnValue("mock/vault/.obsidian/community-plugins.json")
+            getCommunityPluginsConfigFilePath: vi.fn().mockReturnValue("mock/vault/.obsidian/community-plugins.json"),
         };
     });
 
@@ -44,9 +44,9 @@ describe("BackupService", () => {
     it("should create backup folder if it doesn't exist", async () => {
         mockAdapter.exists.mockResolvedValue(false);
         const backupService = new BackupService(mockCtx, mockRegistry);
-        
+
         await backupService.ensureBackupFolder();
-        
+
         expect(mockAdapter.exists).toHaveBeenCalledWith("mock/plugin/dir/backups");
         expect(mockAdapter.mkdir).toHaveBeenCalledWith("mock/plugin/dir/backups");
     });
@@ -95,13 +95,13 @@ describe("BackupService", () => {
         mockAdapter.exists.mockResolvedValue(true);
         const validData = '{"profiles": {}}';
         const validCommunity = '["plugin1", "plugin2"]';
-        
+
         mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return Promise.resolve(validData);
             if (path.includes("community-plugins.json")) return Promise.resolve(validCommunity);
             return Promise.resolve("");
         });
-        
+
         // Mock list returning empty array so rotation doesn't fail
         mockAdapter.list.mockResolvedValue({ folders: [], files: [] });
 
@@ -109,13 +109,13 @@ describe("BackupService", () => {
         await backupService.createBackup();
 
         expect(mockAdapter.write).toHaveBeenCalledTimes(2);
-        
+
         const dataWriteCall = mockAdapter.write.mock.calls.find((call: any[]) => call[0].includes("data_"));
         const communityWriteCall = mockAdapter.write.mock.calls.find((call: any[]) => call[0].includes("community-plugins_"));
-        
+
         expect(dataWriteCall).toBeDefined();
         expect(communityWriteCall).toBeDefined();
-        
+
         expect(dataWriteCall[1]).toBe(validData);
         expect(communityWriteCall[1]).toBe(validCommunity);
     });
@@ -123,8 +123,8 @@ describe("BackupService", () => {
     it("should rotate old backups keeping only the latest 3", async () => {
         mockAdapter.exists.mockResolvedValue(true);
         const validData = '{"profiles": {}}';
-        const validCommunity = '[]';
-        
+        const validCommunity = "[]";
+
         mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return Promise.resolve(validData);
             if (path.includes("community-plugins.json")) return Promise.resolve(validCommunity);
@@ -139,13 +139,13 @@ describe("BackupService", () => {
                 "mock/plugin/dir/backups/data_20260309-120000.json", // Should be kept
                 "mock/plugin/dir/backups/data_20260309-130000.json", // Should be kept
                 "mock/plugin/dir/backups/data_20260309-140000.json", // Will be added during createBackup, making total 5
-                
+
                 "mock/plugin/dir/backups/community-plugins_20260309-100000.json", // Should be removed
                 "mock/plugin/dir/backups/community-plugins_20260309-110000.json",
                 "mock/plugin/dir/backups/community-plugins_20260309-120000.json",
                 "mock/plugin/dir/backups/community-plugins_20260309-130000.json",
                 "mock/plugin/dir/backups/community-plugins_20260309-140000.json",
-            ]
+            ],
         });
 
         const backupService = new BackupService(mockCtx, mockRegistry);
@@ -154,7 +154,7 @@ describe("BackupService", () => {
 
         // Length starts at 5, we keep 3, so we remove 2 data and 2 community = 4 removes
         expect(mockAdapter.remove).toHaveBeenCalledTimes(4);
-        
+
         // Assert the oldest ones are the ones we requested to remove
         expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/data_20260309-100000.json");
         expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/data_20260309-110000.json");
