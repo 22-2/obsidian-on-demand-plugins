@@ -127,17 +127,6 @@ export class SettingsTab extends PluginSettingTab {
 
         // --- Standard Settings ---
 
-        new Setting(this.containerEl)
-            .setName("Debug log output")
-            .setDesc("Enable detailed logs for troubleshooting.")
-            .addToggle((toggle) => {
-                toggle.setValue(this.plugin.data.showConsoleLog).onChange((value) => {
-                    this.plugin.data.showConsoleLog = value;
-                    this.isDirty = true;
-                    this.updateApplyButton();
-                });
-            });
-
         new Setting(this.containerEl).setName("General behavior").setHeading();
 
         new Setting(this.containerEl)

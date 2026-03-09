@@ -26,6 +26,7 @@ export class ToolsModal extends Modal {
         this.buildSyncSettingsSection(contentEl);
         this.buildRebuildCacheSection(contentEl);
         this.buildBatchReplaceModeSection(contentEl);
+        this.buildDebugSection(contentEl);
 
         new Setting(contentEl).addButton((btn) =>
             btn
@@ -184,5 +185,19 @@ export class ToolsModal extends Modal {
             .filter((key) => key !== "lazyOnView")
             .forEach((key) => dropdown.addOption(key, PluginModes[key as PluginMode]));
         return dropdown;
+    }
+
+    private buildDebugSection(container: HTMLElement) {
+        new Setting(container).setName("Debug options").setHeading();
+        new Setting(container)
+            .setName("Debug log output")
+            .setDesc("Enable detailed logs for troubleshooting.")
+            .addToggle((toggle) => {
+                toggle.setValue(this.plugin.data.showConsoleLog).onChange(async (value) => {
+                    this.plugin.data.showConsoleLog = value;
+                    this.plugin.configureLogger();
+                    await this.plugin.saveSettings();
+                });
+            });
     }
 }
