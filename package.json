@@ -36,7 +36,7 @@
 		"store2": "^2.14.4"
 	},
 	"devDependencies": {
-		"@22-2/esbuild-plugin-obsidian-copy": "git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git",
+		"@22-2/esbuild-plugin-obsidian-copy": "git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916",
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.58.2",
 		"@types/node": "^25.3.5",
@@ -50,7 +50,7 @@
 		"eslint-plugin-path": "^2.0.3",
 		"globals": "^17.4.0",
 		"jiti": "^2.6.1",
-		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#0.1.71",
+		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#d370e91687da22fce5ddadca9e64cca95761a211",
 		"obsidian-typings": "^4.110.0",
 		"playwright": "^1.58.2",
 		"prettier": "^3.8.1",
