@@ -23,3 +23,8 @@ export const Platform = {
     isDesktop: true,
     isMobile: false
 };
+
+export const MarkdownView = class {
+    getMode() { return "source"; }
+};
+
