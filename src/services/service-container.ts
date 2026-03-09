@@ -21,6 +21,7 @@ import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
+import { BackupService } from "./backup/backup-service";
 
 export class ServiceContainer {
     readonly registry: PluginRegistry;
@@ -31,6 +32,7 @@ export class ServiceContainer {
     readonly viewLoader: ViewLazyLoader;
     readonly fileLoader: FileLazyLoader;
     readonly maintenance: MaintenanceService;
+    readonly backupService: BackupService;
     private layoutReadyQueue: PQueue;
 
     constructor(private ctx: PluginContext) {
@@ -76,6 +78,9 @@ export class ServiceContainer {
         // 9. MaintenanceService
         this.maintenance = new MaintenanceService(ctx, this.registry);
 
+        // 10. BackupService
+        this.backupService = new BackupService(ctx, this.registry);
+
         // Queue used to limit concurrency when loading plugins on layout ready
         this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });
     }
@@ -87,6 +92,9 @@ export class ServiceContainer {
     async initialize() {
         // Load enabled-plugins list from disk
         await this.registry.loadEnabledPluginsFromDisk(this.settingsService.data.showConsoleLog);
+
+        // Handle initial load profile creation & backups
+        await this.handleInstallationAndBackups();
 
         // Load command cache from persisted data
         this.commandCache.loadFromData();
@@ -106,6 +114,46 @@ export class ServiceContainer {
         this.fileLoader.register();
 
         this.registerLayoutReadyLoader();
+    }
+
+    private async handleInstallationAndBackups() {
+        // Initial setup
+        if (this.settingsService.isFirstLoad) {
+            const profileId = "initial-backup";
+            const currentPlugins = Array.from(this.registry.enabledPluginsFromDisk);
+            
+            // Generate a safe copy of default settings
+            const { DEFAULT_DEVICE_SETTINGS } = await import("../core/types");
+            const backupSettings = JSON.parse(JSON.stringify(DEFAULT_DEVICE_SETTINGS));
+            
+            // Set all currently enabled plugins to ALWAYS_ENABLED in this profile
+            currentPlugins.forEach(id => {
+                backupSettings.plugins[id] = {
+                    mode: PLUGIN_MODE.ALWAYS_ENABLED,
+                    userConfigured: true
+                };
+            });
+
+            this.settingsService.data.profiles[profileId] = {
+                id: profileId,
+                name: "Backup: Initial State",
+                settings: backupSettings
+            };
+            
+            // Create an initial file backup
+            await this.ctx.saveSettings();
+            return;
+        }
+
+        // Version update backup check
+        const LAZY_VERSION_KEY = "lastLazyPluginVersion";
+        const currentVersion = this.ctx._plugin.manifest.version;
+        const savedVersion = (this.settingsService.data as any)[LAZY_VERSION_KEY];
+        
+        if (savedVersion !== currentVersion) {
+            (this.settingsService.data as any)[LAZY_VERSION_KEY] = currentVersion;
+            await this.ctx.saveSettings();
+        }
     }
 
     private registerLayoutReadyLoader() {

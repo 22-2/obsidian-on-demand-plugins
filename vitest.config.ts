@@ -7,4 +7,9 @@ export default defineConfig({
         include: ["src/**/*.test.ts"],
         exclude: ["node_modules", "dist", ".obsidian", "tests"],
     },
+    resolve: {
+        alias: {
+            obsidian: "./src/__mocks__/obsidian.ts"
+        }
+    }
 });

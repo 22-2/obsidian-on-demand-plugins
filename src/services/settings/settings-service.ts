@@ -10,12 +10,15 @@ export class SettingsService {
     settings: DeviceSettings;
     /** ID of the currently active profile */
     currentProfileId: string;
+    /** True if no previous data.json was found during load */
+    isFirstLoad = false;
 
     constructor(private plugin: OnDemandPlugin) {}
 
     async load() {
         // 1. Load raw data
         const loaded = (await this.plugin.loadData()) || {};
+        this.isFirstLoad = Object.keys(loaded).length === 0;
 
         // 2. Merge with defaults (shallow merge at top level)
         // We need to be careful not to overwrite existing profiles if they exist
