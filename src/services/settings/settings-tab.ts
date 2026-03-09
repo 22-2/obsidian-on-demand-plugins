@@ -138,7 +138,7 @@ export class SettingsTab extends PluginSettingTab {
                 });
             });
 
-        new Setting(this.containerEl).setName("Lazy command caching").setHeading();
+        new Setting(this.containerEl).setName("General behavior").setHeading();
 
         new Setting(this.containerEl)
             .setName("Default mode")
