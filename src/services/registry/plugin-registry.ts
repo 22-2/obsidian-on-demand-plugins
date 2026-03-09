@@ -1,6 +1,6 @@
 import log from "loglevel";
 import type { App, PluginManifest } from "obsidian";
-import { normalizePath, Platform } from "obsidian";
+import { Platform } from "obsidian";
 import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
 
 const logger = log.getLogger("OnDemandPlugin/PluginRegistry");
@@ -16,11 +16,6 @@ export class PluginRegistry {
             enabledPlugins: Set<string>;
         },
     ) {}
-
-    getCommunityPluginsConfigFilePath(): string {
-        return normalizePath(this.app.vault.configDir + "/community-plugins.json");
-    }
-
     updateManifests() {
         const manifests = Object.values(this.obsidianPlugins.manifests);
         this.manifests = manifests
@@ -39,34 +34,28 @@ export class PluginRegistry {
     }
 
     async loadEnabledPluginsFromDisk(showConsoleLog?: boolean) {
-        const adapter = this.app.vault.adapter;
-        const path = this.getCommunityPluginsConfigFilePath();
         this.enabledPluginsFromDisk.clear();
 
         try {
-            const raw = await adapter.read(path);
-            const parsed = JSON.parse(raw);
+            const parsed = await this.app.vault.readConfigJson("community-plugins");
             if (Array.isArray(parsed)) {
-                parsed.forEach((id) => {
+                parsed.forEach((id: unknown) => {
                     if (typeof id === "string") this.enabledPluginsFromDisk.add(id);
                 });
             }
         } catch (error) {
             if (showConsoleLog) {
-                logger.warn("Failed to read community-plugins.json", error);
+                logger.warn("Failed to read community-plugins.json using readConfigJson", error);
             }
         }
     }
 
     async writeCommunityPluginsFile(enabledPlugins: string[], showConsoleLog?: boolean) {
-        const adapter = this.app.vault.adapter;
-        const path = this.getCommunityPluginsConfigFilePath();
-        const content = JSON.stringify(enabledPlugins, null, "\t");
         try {
-            await adapter.write(path, content);
+            await this.app.vault.writeConfigJson("community-plugins", enabledPlugins);
         } catch (error) {
             if (showConsoleLog) {
-                logger.error("Failed to write community-plugins.json", error);
+                logger.error("Failed to write community-plugins.json using writeConfigJson", error);
             }
         }
     }
