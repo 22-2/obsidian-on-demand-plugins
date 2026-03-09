@@ -52,11 +52,8 @@ export class ToolsModal extends Modal {
                     this.toMode
                 );
                 if (changed > 0) {
-                    await this.plugin.saveSettings();
                     new Notice(
-                        `Updated ${changed} plugins from ${
-                            PluginModes[this.fromMode]
-                        } to ${PluginModes[this.toMode]}`
+                        `Staged ${changed} plugin changes. Click "Save" in settings to apply.`
                     );
                     this.onComplete();
                 } else {

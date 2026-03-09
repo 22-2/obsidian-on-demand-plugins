@@ -5,6 +5,7 @@ import type { PluginMode, PluginSettings } from "../../core/types";
 import { PluginModes } from "../../core/types";
 import { isLazyMode } from "../../core/utils";
 import type OnDemandPlugin from "../../main";
+import { showConfirmModal } from "../../core/confirm-modal";
 import { LazyOptionsModal } from "./lazy-options-modal";
 import { ProfileManagerModal } from "./profile-manager-modal";
 import { ToolsModal } from "../../ui/modals/tools-modal";
@@ -21,7 +22,9 @@ export class SettingsTab extends PluginSettingTab {
     pluginListContainer: HTMLElement;
     pluginSettings: { [pluginId: string]: PluginSettings } = {};
     pendingPluginIds = new Set<string>();
+    isDirty = false;
     applyButton?: ButtonComponent;
+    discardButton?: ButtonComponent;
     resultsCountEl?: HTMLElement;
 
     constructor(app: App, plugin: OnDemandPlugin) {
@@ -70,11 +73,26 @@ export class SettingsTab extends PluginSettingTab {
                 });
                 dropdown.setValue(this.plugin.container.settingsService.currentProfileId);
                 dropdown.onChange(async (newProfileId) => {
-                    if (newProfileId === this.plugin.container.settingsService.currentProfileId) return;
+                    const currentId = this.plugin.container.settingsService.currentProfileId;
+                    if (newProfileId === currentId) return;
+
+                    // If dirty, ask for confirmation
+                    if (this.isDirty || this.pendingPluginIds.size > 0) {
+                        const confirm = await showConfirmModal(this.app, {
+                            message: "You have unsaved changes in the current profile. If you switch now, these changes will be lost. Switch anyway?",
+                        });
+                        if (confirm !== true) {
+                            dropdown.setValue(currentId);
+                            return;
+                        }
+                    }
 
                     // Use the managed switchProfile method which updates references and saves
+                    this.isDirty = false;
+                    this.pendingPluginIds.clear();
                     new Notice(`Switched to profile: ${profiles[newProfileId].name}`);
                     await this.plugin.switchProfile(newProfileId);
+                    this.display(); // Rebuild everything for the new profile
                 });
             })
             .addExtraButton((btn) => {
@@ -115,10 +133,8 @@ export class SettingsTab extends PluginSettingTab {
             .addToggle((toggle) => {
                 toggle.setValue(this.plugin.data.showConsoleLog).onChange((value) => {
                     this.plugin.data.showConsoleLog = value;
-                    void (async () => {
-                        await this.plugin.saveSettings();
-                        this.plugin.configureLogger();
-                    })();
+                    this.isDirty = true;
+                    this.updateApplyButton();
                 });
             });
 
@@ -129,9 +145,10 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc("Specify the default mode for newly discovered plugins or those not yet configured.")
             .addDropdown((dropdown) => {
                 this.addModeOptions(dropdown);
-                dropdown.setValue(this.plugin.settings.defaultMode).onChange(async (value: PluginMode) => {
+                dropdown.setValue(this.plugin.settings.defaultMode).onChange((value: PluginMode) => {
                     this.plugin.settings.defaultMode = value;
-                    await this.plugin.saveSettings();
+                    this.isDirty = true;
+                    this.updateApplyButton();
                 });
             });
 
@@ -148,21 +165,45 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         new Setting(this.containerEl)
-            .setName("Apply pending changes")
-            .setDesc("Plugin mode changes are queued until you apply them.")
+            .setName("Profile changes")
+            .setDesc("Settings and plugin mode changes are queued until you save them.")
             .addButton((button) => {
                 this.applyButton = button;
-                button.setButtonText("Apply changes");
+                button.setButtonText("Save changes");
+                button.setCta();
                 button.onClick(async () => {
-                    if (this.pendingPluginIds.size === 0) return;
+                    const count = this.pendingPluginIds.size;
                     this.normalizelazyOnViews();
                     await this.plugin.saveSettings();
-                    await this.plugin.applyStartupPolicyAndRestart(Array.from(this.pendingPluginIds));
+                    this.plugin.configureLogger(); // Apply log level immediately
+
+                    if (count > 0) {
+                        await this.plugin.applyStartupPolicyAndRestart(Array.from(this.pendingPluginIds));
+                    } else {
+                        new Notice("Settings saved");
+                    }
+
+                    this.isDirty = false;
                     this.pendingPluginIds.clear();
                     this.updateApplyButton();
                 });
-                this.updateApplyButton();
+            })
+            .addButton((button) => {
+                this.discardButton = button;
+                button.setButtonText("Discard");
+                button.setTooltip("Discard unsaved changes");
+                button.onClick(async () => {
+                    if (await showConfirmModal(this.app, { message: "Are you sure you want to discard all unsaved changes?" })) {
+                        await this.plugin.loadSettings();
+                        this.isDirty = false;
+                        this.pendingPluginIds.clear();
+                        this.display();
+                        new Notice("Changes discarded");
+                    }
+                });
             });
+
+        this.updateApplyButton();
 
         // Plugin list header: results count, keyword filter, and filter dropdown (dropdown placed to the right of the keyword input)
         new Setting(this.containerEl)
@@ -246,6 +287,7 @@ export class SettingsTab extends PluginSettingTab {
                     };
                     this.ensurelazyOnViewEntry(plugin.id, value);
                     this.pendingPluginIds.add(plugin.id);
+                    this.isDirty = true;
                     this.updateApplyButton();
                     this.buildPluginList(); // Rebuild to show/hide view types input
                 });
@@ -317,9 +359,19 @@ export class SettingsTab extends PluginSettingTab {
      */
 
     updateApplyButton() {
-        if (!this.applyButton) return;
+        if (!this.applyButton || !this.discardButton) return;
         const count = this.pendingPluginIds.size;
-        this.applyButton.setDisabled(count === 0);
-        this.applyButton.setButtonText(count === 0 ? "Apply changes" : `Apply changes (${count}) & restart Obsidian`);
+        const hasChanges = this.isDirty || count > 0;
+
+        this.applyButton.setDisabled(!hasChanges);
+        this.discardButton.setDisabled(!hasChanges);
+
+        if (count > 0) {
+            this.applyButton.setButtonText(`Save & Apply (${count}) & restart Obsidian`);
+            this.applyButton.setWarning();
+        } else {
+            this.applyButton.setButtonText("Save changes");
+            this.applyButton.buttonEl.removeClass("mod-warning");
+        }
     }
 }

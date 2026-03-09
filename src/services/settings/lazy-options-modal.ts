@@ -139,8 +139,6 @@ export class LazyOptionsModal extends Modal {
                             // For backward compatibility during transition, also update the global maps
                             this.plugin.settings.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
                             this.plugin.settings.lazyOnFiles[this.pluginId] = this.options.useFile ? this.options.fileCriteria : {};
-
-                            await this.plugin.saveSettings();
                         }
                         // Notify caller (SettingsTab) so it can mark this plugin as pending
                         try {
