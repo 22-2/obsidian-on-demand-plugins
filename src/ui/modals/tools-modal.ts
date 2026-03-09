@@ -95,7 +95,7 @@ export class ToolsModal extends Modal {
 
         const syncContainer = container.createDiv("lazy-sync-container");
 
-        let syncDirection: SyncDirection = "coreToLazy";
+        let syncDirection: SyncDirection = "lazyToCore";
 
         const refreshPreview = async () => {
             const result = await this.plugin.container.maintenance.buildSyncPreview(syncDirection);
@@ -110,8 +110,8 @@ export class ToolsModal extends Modal {
             .setDesc("Choose which source should update the other.")
             .addDropdown((dropdown) => {
                 dropdown
-                    .addOption("coreToLazy", "Obsidian config ➔ Plugin data")
-                    .addOption("lazyToCore", "Plugin data ➔ Obsidian config")
+                .addOption("lazyToCore", "Plugin data ➔ Obsidian config")
+                .addOption("coreToLazy", "Obsidian config ➔ Plugin data")
                     .setValue(syncDirection)
                     .onChange((val: SyncDirection) => {
                         syncDirection = val;
