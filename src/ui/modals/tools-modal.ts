@@ -18,7 +18,7 @@ export class ToolsModal extends Modal {
 
     onOpen() {
         const { contentEl } = this;
-        contentEl.createEl("h2", { text: "Tools" });
+        new Setting(contentEl).setName("Tools").setHeading();
         contentEl.setAttr("class", "lazy-tools-modal");
 
         this.buildSyncSettingsSection(contentEl);

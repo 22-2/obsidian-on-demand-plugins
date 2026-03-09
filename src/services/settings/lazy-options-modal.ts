@@ -41,7 +41,7 @@ export class LazyOptionsModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        contentEl.createEl("h2", { text: `Lazy options: ${this.pluginId}` });
+        new Setting(contentEl).setName(`Lazy options: ${this.pluginId}`).setHeading();
         contentEl.createEl("p", {
             text: "Configure advanced activation rules for this plugin. Note: Plugins are also automatically loaded when their commands are executed.",
             cls: "setting-item-description",

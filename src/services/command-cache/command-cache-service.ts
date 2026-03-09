@@ -129,8 +129,10 @@ export class CommandCacheService {
         return pluginCommands;
     }
 
-    ensureCommandsCached(pluginId: string) {
-        return this.isCommandCacheValid(pluginId) ? Promise.resolve() : this.refreshCommandsForPlugin(pluginId).then(() => this.persistCommandCache());
+    async ensureCommandsCached(pluginId: string) {
+        if (this.isCommandCacheValid(pluginId)) return;
+        await this.refreshCommandsForPlugin(pluginId);
+        await this.persistCommandCache();
     }
 
     registerCachedCommands() {

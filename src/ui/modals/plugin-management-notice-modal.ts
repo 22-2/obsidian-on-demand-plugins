@@ -9,7 +9,7 @@ export class PluginManagementNoticeModal extends Modal {
     onOpen() {
         const { contentEl } = this;
 
-        contentEl.createEl("h2", { text: "⚠️ Always use On-Demand Plugins for management" });
+        new Setting(contentEl).setName("⚠️ Always use On-Demand Plugins for management").setHeading();
         contentEl.createEl("p", {
             text: "This plugin manages other plugins' load states. Changing plugin states (enable/disable) in the standard Obsidian menu may cause unexpected behavior or lose your lazy-loading settings.",
         });

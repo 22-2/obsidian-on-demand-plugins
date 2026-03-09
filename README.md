@@ -1,4 +1,4 @@
-# 🦥 Lazy Loader
+# 🦥 On‑Demand Plugins
 
 Lazy load plugins by caching their commands. Plugins are enabled on-demand when you trigger their commands (or open specific views), keeping startup fast.
 

@@ -136,7 +136,7 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         new Setting(this.containerEl)
-            .setName("Maintenance & Batch operations")
+            .setName("Maintenance & batch operations")
             .setDesc("Rebuild command cache, sync with Obsidian settings, or batch-update plugin modes.")
             .addButton((button) => {
                 button.setButtonText("Open Tools");
