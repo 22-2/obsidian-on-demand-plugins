@@ -51,7 +51,7 @@ export default class OnDemandPlugin extends Plugin {
 
     async saveSettings() {
         await this.container.settingsService.save();
-        await this.container.backupService.createBackup();
+        await this.container.backupFeature.createBackup();
     }
 
     // ─── Plugin configuration ──────────────────────────────────

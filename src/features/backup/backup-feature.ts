@@ -1,19 +1,24 @@
 import log from "loglevel";
-import { moment, normalizePath } from "obsidian";
+import type { AppFeature } from "../../core/feature";
 import type { PluginContext } from "../../core/plugin-context";
-import type { PluginRegistry } from "../registry/plugin-registry";
 
-const logger = log.getLogger("OnDemandPlugin/BackupService");
+// Needed dynamic import from obsidian
+import { moment, normalizePath } from "obsidian";
 
-export class BackupService {
-    private backupDir: string;
+const logger = log.getLogger("OnDemandPlugin/BackupFeature");
 
-    constructor(
-        private ctx: PluginContext,
-        private registry: PluginRegistry,
-    ) {
+export class BackupFeature implements AppFeature {
+    private backupDir!: string;
+    private ctx!: PluginContext;
+
+    onload(ctx: PluginContext) {
+        this.ctx = ctx;
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
+    }
+
+    onunload() {
+        // No teardown necessary
     }
 
     async ensureBackupFolder() {
@@ -25,12 +30,14 @@ export class BackupService {
     }
 
     async createBackup() {
+        if (!this.ctx) return;
+        
         await this.ensureBackupFolder();
         const adapter = this.ctx.app.vault.adapter;
 
         // 1. Read files
         const dataPath = normalizePath(`${this.ctx._plugin.manifest.dir}/data.json`);
-        const communityPath = this.registry.getCommunityPluginsConfigFilePath();
+        const communityPath = this.ctx.app.vault.getConfigFile("community-plugins");
 
         let dataContent = "";
         let communityContent = "";

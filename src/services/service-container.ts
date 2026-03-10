@@ -12,7 +12,7 @@ import { ProgressDialog } from "../core/progress";
 import { PLUGIN_MODE } from "../core/types";
 import { patchSettingTabOpen } from "../patches/setting-tab";
 import { patchSetViewState } from "../patches/view-state";
-import { BackupService } from "./backup/backup-service";
+import { BackupFeature } from "../features/backup/backup-feature";
 import { CommandCacheService } from "./command-cache/command-cache-service";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
 import { LeafLockManager, LeafViewLockStrategy } from "./lazy-loader/internal/leaf-lock";
@@ -32,7 +32,7 @@ export class ServiceContainer {
     readonly viewLoader: ViewLazyLoader;
     readonly fileLoader: FileLazyLoader;
     readonly maintenance: MaintenanceService;
-    readonly backupService: BackupService;
+    readonly backupFeature: BackupFeature;
     private layoutReadyQueue: PQueue;
 
     constructor(private ctx: PluginContext) {
@@ -78,8 +78,9 @@ export class ServiceContainer {
         // 9. MaintenanceService
         this.maintenance = new MaintenanceService(ctx, this.registry);
 
-        // 10. BackupService
-        this.backupService = new BackupService(ctx, this.registry);
+        // 10. BackupFeature
+        this.backupFeature = new BackupFeature();
+        this.backupFeature.onload(ctx);
 
         // Queue used to limit concurrency when loading plugins on layout ready
         this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });

@@ -1,11 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { BackupFeature } from "./backup-feature";
 
-import { BackupService } from "./backup-service";
-
-describe("BackupService", () => {
+describe("BackupFeature", () => {
     let mockAdapter: any;
     let mockCtx: any;
-    let mockRegistry: any;
 
     beforeEach(() => {
         mockAdapter = {
@@ -26,26 +24,28 @@ describe("BackupService", () => {
             app: {
                 vault: {
                     adapter: mockAdapter,
+                    getConfigFile: vi.fn().mockImplementation((name) => {
+                        if (name === "community-plugins") return "mock/vault/.obsidian/community-plugins.json";
+                        return "";
+                    }),
                 },
             },
         };
-
-        mockRegistry = {
-            getCommunityPluginsConfigFilePath: vi.fn().mockReturnValue("mock/vault/.obsidian/community-plugins.json"),
-        };
     });
 
-    it("should initialize the backup directory correctly", () => {
-        const backupService = new BackupService(mockCtx, mockRegistry);
+    it("should initialize the backup directory correctly after onload", () => {
+        const backupFeature = new BackupFeature();
+        backupFeature.onload(mockCtx);
         // Using any to access private property for testing
-        expect((backupService as any).backupDir).toBe("mock/plugin/dir/backups");
+        expect((backupFeature as any).backupDir).toBe("mock/plugin/dir/backups");
     });
 
     it("should create backup folder if it doesn't exist", async () => {
         mockAdapter.exists.mockResolvedValue(false);
-        const backupService = new BackupService(mockCtx, mockRegistry);
+        const backupFeature = new BackupFeature();
+        backupFeature.onload(mockCtx);
 
-        await backupService.ensureBackupFolder();
+        await backupFeature.ensureBackupFolder();
 
         expect(mockAdapter.exists).toHaveBeenCalledWith("mock/plugin/dir/backups");
         expect(mockAdapter.mkdir).toHaveBeenCalledWith("mock/plugin/dir/backups");
@@ -58,8 +58,9 @@ describe("BackupService", () => {
             return Promise.resolve("[]");
         });
 
-        const backupService = new BackupService(mockCtx, mockRegistry);
-        await backupService.createBackup();
+        const backupFeature = new BackupFeature();
+        backupFeature.onload(mockCtx);
+        await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
     });
@@ -71,8 +72,9 @@ describe("BackupService", () => {
             return Promise.resolve("[]");
         });
 
-        const backupService = new BackupService(mockCtx, mockRegistry);
-        await backupService.createBackup();
+        const backupFeature = new BackupFeature();
+        backupFeature.onload(mockCtx);
+        await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
     });
@@ -85,8 +87,9 @@ describe("BackupService", () => {
             return Promise.resolve("");
         });
 
-        const backupService = new BackupService(mockCtx, mockRegistry);
-        await backupService.createBackup();
+        const backupFeature = new BackupFeature();
+        backupFeature.onload(mockCtx);
+        await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
     });
@@ -105,8 +108,9 @@ describe("BackupService", () => {
         // Mock list returning empty array so rotation doesn't fail
         mockAdapter.list.mockResolvedValue({ folders: [], files: [] });
 
-        const backupService = new BackupService(mockCtx, mockRegistry);
-        await backupService.createBackup();
+        const backupFeature = new BackupFeature();
+        backupFeature.onload(mockCtx);
+        await backupFeature.createBackup();
 
         expect(mockAdapter.write).toHaveBeenCalledTimes(2);
 
@@ -148,9 +152,10 @@ describe("BackupService", () => {
             ],
         });
 
-        const backupService = new BackupService(mockCtx, mockRegistry);
+        const backupFeature = new BackupFeature();
+        backupFeature.onload(mockCtx);
         // Using any to directly test the rotate logic
-        await (backupService as any).rotateBackups();
+        await (backupFeature as any).rotateBackups();
 
         // Length starts at 5, we keep 3, so we remove 2 data and 2 community = 4 removes
         expect(mockAdapter.remove).toHaveBeenCalledTimes(4);
