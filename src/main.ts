@@ -35,8 +35,8 @@ export default class OnDemandPlugin extends Plugin {
         this.features = new FeatureManager(ctx, this.core, this.events);
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
-        this.features.register(new StartupPolicyFeature());
         this.features.register(new LazyEngineFeature());
+        this.features.register(new StartupPolicyFeature());
 
         await this.loadSettings();
         this.configureLogger();
