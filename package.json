@@ -47,7 +47,6 @@
 		"esbuild": "0.27.3",
 		"eslint": "^10.0.3",
 		"eslint-config-prettier": "^10.1.8",
-		"eslint-plugin-path": "^2.0.3",
 		"globals": "^17.4.0",
 		"jiti": "^2.6.1",
 		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#d370e91687da22fce5ddadca9e64cca95761a211",

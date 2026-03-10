@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PluginContext } from "../../../core/plugin-context";
-import * as storageMs from "../../../core/storage";
-import { CommandCacheStore } from "./command-cache-store";
+import type { PluginContext } from "src/core/plugin-context";
+import * as storageMs from "src/core/storage";
+import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
 
 vi.mock("../../../core/storage");
 

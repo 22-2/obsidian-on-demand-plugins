@@ -1,17 +1,16 @@
-import log from "loglevel";
 import type { App, ButtonComponent, DropdownComponent } from "obsidian";
 import { ExtraButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
-import { showConfirmModal } from "../../core/confirm-modal";
-import type { PluginMode, PluginSettings } from "../../core/types";
-import { PluginModes } from "../../core/types";
-import { isLazyMode } from "../../core/utils";
-import type OnDemandPlugin from "../../main";
-import { ToolsModal } from "../../ui/modals/tools-modal";
-import { LazyOptionsModal } from "./lazy-options-modal";
-import { ProfileManagerModal } from "./profile-manager-modal";
-import { FeatureEvents } from "../../core/event-bus";
+import { showConfirmModal } from "src/core/confirm-modal";
+import type { PluginMode, PluginSettings } from "src/core/types";
+import { PluginModes } from "src/core/types";
+import { isLazyMode } from "src/core/utils";
+import type OnDemandPlugin from "src/main";
+import { ToolsModal } from "src/ui/modals/tools-modal";
+import { LazyOptionsModal } from "src/services/settings/lazy-options-modal";
+import { ProfileManagerModal } from "src/services/settings/profile-manager-modal";
+import { FeatureEvents } from "src/core/event-bus";
 
-const logger = log.getLogger("OnDemandPlugin/SettingsTab");
+
 
 export class SettingsTab extends PluginSettingTab {
     app: App;
@@ -19,7 +18,6 @@ export class SettingsTab extends PluginSettingTab {
     dropdowns: DropdownComponent[] = [];
     filterMethod: PluginMode | undefined;
     filterString: string | undefined;
-    containerEl: HTMLElement;
     pluginListContainer: HTMLElement;
     pluginSettings: { [pluginId: string]: PluginSettings } = {};
     pendingPluginIds = new Set<string>();

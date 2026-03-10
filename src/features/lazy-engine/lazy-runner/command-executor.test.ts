@@ -1,8 +1,8 @@
 import { MarkdownView } from "obsidian";
 import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
-import type { CommandRegistry } from "../../../core/interfaces";
-import type { PluginContext } from "../../../core/plugin-context";
-import { CommandExecutor } from "./command-executor";
+import type { CommandRegistry } from "src/core/interfaces";
+import type { PluginContext } from "src/core/plugin-context";
+import { CommandExecutor } from "src/features/lazy-engine/lazy-runner/command-executor";
 
 describe("CommandExecutor", () => {
     let executor: CommandExecutor;

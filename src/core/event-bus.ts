@@ -1,4 +1,4 @@
-export type EventHandler<T = any> = (payload: T) => void | Promise<void>;
+export type EventHandler<T = unknown> = (payload: T) => void | Promise<void>;
 
 /**
  * Simple, type-safe EventBus for inter-feature communication.
@@ -10,7 +10,7 @@ export class EventBus {
     /**
      * Subscribe to an event.
      */
-    on<T = any>(event: string, handler: EventHandler<T>): void {
+    on<T = unknown>(event: string, handler: EventHandler<T>): void {
         if (!this.handlers.has(event)) {
             this.handlers.set(event, new Set());
         }
@@ -20,18 +20,18 @@ export class EventBus {
     /**
      * Unsubscribe from an event.
      */
-    off<T = any>(event: string, handler: EventHandler<T>): void {
+    off<T = unknown>(event: string, handler: EventHandler<T>): void {
         this.handlers.get(event)?.delete(handler);
     }
 
     /**
      * Emit an event and wait for all handlers to complete.
      */
-    async emit<T = any>(event: string, payload: T): Promise<void> {
+    async emit<T = unknown>(event: string, payload: T): Promise<void> {
         const set = this.handlers.get(event);
         if (!set) return;
 
-        const promises: Promise<void | any>[] = [];
+        const promises: Promise<void | unknown>[] = [];
         for (const handler of set) {
             try {
                 const result = handler(payload);

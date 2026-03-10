@@ -1,10 +1,10 @@
 import type { App, DropdownComponent } from "obsidian";
 import { Modal, Notice, setIcon, Setting } from "obsidian";
-import type { PluginMode } from "../../core/types";
-import { PluginModes, PLUGIN_MODE } from "../../core/types";
-import type OnDemandPlugin from "../../main";
-import type { SyncDirection } from "../../features/maintenance/maintenance-feature";
-import { MaintenanceFeature } from "../../features/maintenance/maintenance-feature";
+import type { PluginMode } from "src/core/types";
+import { PluginModes, PLUGIN_MODE } from "src/core/types";
+import type OnDemandPlugin from "src/main";
+import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
+import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 
 export class ToolsModal extends Modal {
     private fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;

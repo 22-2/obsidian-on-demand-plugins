@@ -1,11 +1,12 @@
-import type { AppFeature } from "../../core/feature";
-import type { PluginContext } from "../../core/plugin-context";
-import type { PluginMode } from "../../core/types";
-import { PLUGIN_MODE } from "../../core/types";
-import type { CoreContainer } from "../../services/core-container";
-import type { PluginRegistry } from "../../services/registry/plugin-registry";
-import { FeatureManager } from "../../core/feature-manager";
-import { EventBus, FeatureEvents } from "../../core/event-bus";
+import type { AppFeature } from "src/core/feature";
+import type { PluginContext } from "src/core/plugin-context";
+import type { PluginMode } from "src/core/types";
+import { PLUGIN_MODE } from "src/core/types";
+import type { CoreContainer } from "src/services/core-container";
+import type { PluginRegistry } from "src/services/registry/plugin-registry";
+import type { FeatureManager } from "src/core/feature-manager";
+import type { EventBus} from "src/core/event-bus";
+import { FeatureEvents } from "src/core/event-bus";
 
 export type SyncDirection = "coreToLazy" | "lazyToCore";
 

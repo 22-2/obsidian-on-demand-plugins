@@ -1,6 +1,5 @@
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
-import pathPlugin from "eslint-plugin-path";
 import { defineConfig } from "eslint/config";
 import globals from "globals";
 import tseslint from "typescript-eslint";
@@ -8,12 +7,10 @@ import tseslint from "typescript-eslint";
 export default defineConfig([
     {
         files: ["**/*.{js,mjs,cjs,ts,mts,cts}"],
-        // @ts-expect-error
-        plugins: { js, path: pathPlugin },
+        plugins: { js },
         extends: ["js/recommended"],
         languageOptions: { globals: { ...globals.browser, ...globals.node } },
         rules: {
-            "path/no-relative-imports": "error",
             "@typescript-eslint/consistent-type-imports": [
                 "error",
                 {
@@ -23,6 +20,13 @@ export default defineConfig([
             ],
         },
     },
+
     tseslint.configs.recommended,
     prettier,
+    {
+        files: ["**/*.test.ts"],
+        rules: {
+            "@typescript-eslint/no-explicit-any": "off",
+        },
+    },
 ]);

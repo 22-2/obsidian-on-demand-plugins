@@ -1,19 +1,19 @@
 import log from "loglevel";
 import type { PluginManifest } from "obsidian";
 import { Plugin } from "obsidian";
-import { createPluginContext } from "./core/plugin-context";
-import type { DeviceSettings, LazySettings, PluginMode } from "./core/types";
-import { PLUGIN_MODE } from "./core/types";
-import { toggleLoggerBy } from "./core/utils";
-import { FeatureManager } from "./core/feature-manager";
-import { EventBus, FeatureEvents } from "./core/event-bus";
-import { ProgressDialog } from "./core/progress";
-import { BackupFeature } from "./features/backup/backup-feature";
-import { MaintenanceFeature } from "./features/maintenance/maintenance-feature";
-import { StartupPolicyFeature } from "./features/startup-policy/startup-policy-feature";
-import { LazyEngineFeature } from "./features/lazy-engine/lazy-engine-feature";
-import { CoreContainer } from "./services/core-container";
-import { SettingsTab } from "./services/settings/settings-tab";
+import { createPluginContext } from "src/core/plugin-context";
+import type { DeviceSettings, LazySettings, PluginMode } from "src/core/types";
+import { PLUGIN_MODE } from "src/core/types";
+import { toggleLoggerBy } from "src/core/utils";
+import { FeatureManager } from "src/core/feature-manager";
+import { EventBus, FeatureEvents } from "src/core/event-bus";
+import { ProgressDialog } from "src/core/progress";
+import { BackupFeature } from "src/features/backup/backup-feature";
+import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
+import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
+import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
+import { CoreContainer } from "src/services/core-container";
+import { SettingsTab } from "src/services/settings/settings-tab";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
 

@@ -1,9 +1,9 @@
 import log from "loglevel";
-import type { CoreContainer } from "../../services/core-container";
-import type { AppFeature } from "../../core/feature";
-import type { EventBus } from "../../core/event-bus";
-import type { FeatureManager } from "../../core/feature-manager";
-import type { PluginContext } from "../../core/plugin-context";
+import type { CoreContainer } from "src/services/core-container";
+import type { AppFeature } from "src/core/feature";
+import type { EventBus } from "src/core/event-bus";
+import type { FeatureManager } from "src/core/feature-manager";
+import type { PluginContext } from "src/core/plugin-context";
 
 // Needed dynamic import from obsidian
 import { moment, normalizePath } from "obsidian";
@@ -14,7 +14,8 @@ export class BackupFeature implements AppFeature {
     private backupDir!: string;
     private ctx!: PluginContext;
 
-    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    onload(ctx: PluginContext, _core: CoreContainer, _features: FeatureManager, _events: EventBus) {
         this.ctx = ctx;
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
@@ -48,8 +49,8 @@ export class BackupFeature implements AppFeature {
         const dataPath = normalizePath(`${this.ctx._plugin.manifest.dir}/data.json`);
         const communityPath = this.ctx.app.vault.getConfigFile("community-plugins");
 
-        let dataContent = "";
-        let communityContent = "";
+        let dataContent: string;
+        let communityContent: string;
 
         try {
             dataContent = await adapter.read(dataPath);
@@ -105,7 +106,7 @@ export class BackupFeature implements AppFeature {
         let result;
         try {
             result = await adapter.list(this.backupDir);
-        } catch (e) {
+        } catch {
             return;
         }
 

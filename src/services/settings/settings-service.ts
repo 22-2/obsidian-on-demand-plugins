@@ -1,8 +1,8 @@
 import { Platform } from "obsidian";
-import { loadLocalStorage } from "../../core/storage";
-import type { DeviceSettings, LazySettings, Profile } from "../../core/types";
-import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS } from "../../core/types";
-import type OnDemandPlugin from "../../main";
+import { loadLocalStorage } from "src/core/storage";
+import type { DeviceSettings, LazySettings, Profile } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS } from "src/core/types";
+import type OnDemandPlugin from "src/main";
 
 export class SettingsService {
     data: LazySettings;

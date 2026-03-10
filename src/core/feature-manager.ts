@@ -1,7 +1,7 @@
-import type { CoreContainer } from "../services/core-container";
-import type { EventBus } from "./event-bus";
-import type { AppFeature } from "./feature";
-import type { PluginContext } from "./plugin-context";
+import type { CoreContainer } from "src/services/core-container";
+import type { EventBus } from "src/core/event-bus";
+import type { AppFeature } from "src/core/feature";
+import type { PluginContext } from "src/core/plugin-context";
 
 export class FeatureManager {
     private features: AppFeature[] = [];
@@ -17,7 +17,7 @@ export class FeatureManager {
         return feature;
     }
 
-    get<T extends AppFeature>(FeatureClass: new (...args: any[]) => T): T | undefined {
+    get<T extends AppFeature>(FeatureClass: new (...args: unknown[]) => T): T | undefined {
         return this.features.find((f): f is T => f instanceof FeatureClass);
     }
 

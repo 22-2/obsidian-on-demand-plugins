@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PLUGIN_MODE } from "../../core/types";
-import { MaintenanceFeature } from "./maintenance-feature";
+import { PLUGIN_MODE } from "src/core/types";
+import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 
 describe("MaintenanceFeature", () => {
     let feature: MaintenanceFeature;

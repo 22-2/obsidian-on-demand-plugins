@@ -7,8 +7,8 @@
  */
 import type { App, EventRef, PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "obsidian-typings";
-import type OnDemandPlugin from "../main";
-import type { DeviceSettings, LazySettings, PluginMode } from "./types";
+import type OnDemandPlugin from "src/main";
+import type { DeviceSettings, LazySettings, PluginMode } from "src/core/types";
 
 /**
  * Minimal view of Obsidian's `Commands` object used by services.

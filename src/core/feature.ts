@@ -1,7 +1,7 @@
-import type { CoreContainer } from "../services/core-container";
-import type { EventBus } from "./event-bus";
-import type { FeatureManager } from "./feature-manager";
-import type { PluginContext } from "./plugin-context";
+import type { CoreContainer } from "src/services/core-container";
+import type { EventBus } from "src/core/event-bus";
+import type { FeatureManager } from "src/core/feature-manager";
+import type { PluginContext } from "src/core/plugin-context";
 
 /**
  * Interface that all Features must implement.

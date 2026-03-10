@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import { ExtraButtonComponent, Menu, Modal, Notice, Setting } from "obsidian";
-import { showConfirmModal } from "../../core/confirm-modal";
-import type { SettingsService } from "./settings-service";
+import { showConfirmModal } from "src/core/confirm-modal";
+import type { SettingsService } from "src/services/settings/settings-service";
 
 export class ProfileManagerModal extends Modal {
     constructor(

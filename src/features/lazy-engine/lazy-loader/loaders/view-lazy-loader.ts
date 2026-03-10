@@ -1,12 +1,12 @@
 import log from "loglevel";
 import type { WorkspaceLeaf } from "obsidian";
 import { debounce } from "obsidian";
-import type { CommandRegistry, PluginLoader } from "../../../../core/interfaces";
-import type { PluginContext } from "../../../../core/plugin-context";
-import { isLeafVisible } from "../../../../core/utils";
-import { BaseLazyLoader } from "./base-lazy-loader";
-import { resolvePluginForViewType } from "./internal/activation-rules";
-import type { LeafResource, LockStrategy } from "./internal/leaf-lock";
+import type { CommandRegistry, PluginLoader } from "src/core/interfaces";
+import type { PluginContext } from "src/core/plugin-context";
+import { isLeafVisible } from "src/core/utils";
+import { BaseLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/base-lazy-loader";
+import { resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
+import type { LeafResource, LockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 
 const logger = log.getLogger("OnDemandPlugin/ViewLazyLoader");
 

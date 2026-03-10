@@ -1,17 +1,17 @@
 import type { WorkspaceLeaf } from "obsidian";
-import type { EventBus } from "../../core/event-bus";
-import type { FeatureManager } from "../../core/feature-manager";
-import type { PluginContext } from "../../core/plugin-context";
-import { CommandCacheService } from "./command-cache/command-cache-service";
-import { FileLazyLoader } from "./lazy-loader/loaders/file-lazy-loader";
-import { LeafLockManager, LeafViewLockStrategy } from "./lazy-loader/loaders/internal/leaf-lock";
-import { ViewLazyLoader } from "./lazy-loader/loaders/view-lazy-loader";
-import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
+import type { EventBus } from "src/core/event-bus";
+import type { FeatureManager } from "src/core/feature-manager";
+import type { PluginContext } from "src/core/plugin-context";
+import { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
+import { FileLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/file-lazy-loader";
+import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
+import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
+import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
 import PQueue from "p-queue";
-import { PLUGIN_MODE } from "../../core/types";
-import { AppFeature } from "../../core/feature";
-import { patchSetViewState } from "../../patches/view-state";
-import { CoreContainer } from "../../services/core-container";
+import { PLUGIN_MODE } from "src/core/types";
+import type { AppFeature } from "src/core/feature";
+import { patchSetViewState } from "src/patches/view-state";
+import type { CoreContainer } from "src/services/core-container";
 
 export class LazyEngineFeature implements AppFeature {
     public commandCache!: CommandCacheService;

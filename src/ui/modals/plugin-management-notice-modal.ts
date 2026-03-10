@@ -1,6 +1,6 @@
 import type { App } from "obsidian";
 import { Modal, Setting } from "obsidian";
-import type { PluginContext } from "../../core/plugin-context";
+import type { PluginContext } from "src/core/plugin-context";
 
 export class PluginManagementNoticeModal extends Modal {
     constructor(
@@ -34,8 +34,8 @@ export class PluginManagementNoticeModal extends Modal {
                     .setButtonText("Go to On-Demand Plugins setting")
                     .setCta()
                     .onClick(() => {
-                        (this.app as any).setting.open();
-                        (this.app as any).setting.openTabById(this.ctx._plugin.manifest.id);
+                        this.app.setting.open();
+                        this.app.setting.openTabById(this.ctx._plugin.manifest.id);
                         this.close();
                     }),
             )

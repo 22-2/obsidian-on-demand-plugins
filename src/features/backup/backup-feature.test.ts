@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BackupFeature } from "./backup-feature";
+import { BackupFeature } from "src/features/backup/backup-feature";
 
 describe("BackupFeature", () => {
     let mockAdapter: any;

@@ -5,13 +5,11 @@
  * where the object graph is assembled, replacing the ad-hoc callback
  * wiring that was previously spread across main.ts.
  */
-import type { PluginManifest } from "obsidian";
-import PQueue from "p-queue";
-import type { PluginContext } from "../core/plugin-context";
-import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE } from "../core/types";
-import { patchSettingTabOpen } from "../patches/setting-tab";
-import { PluginRegistry } from "./registry/plugin-registry";
-import { SettingsService } from "./settings/settings-service";
+import type { PluginContext } from "src/core/plugin-context";
+import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE } from "src/core/types";
+import { patchSettingTabOpen } from "src/patches/setting-tab";
+import { PluginRegistry } from "src/services/registry/plugin-registry";
+import { SettingsService } from "src/services/settings/settings-service";
 
 export class CoreContainer {
     readonly registry: PluginRegistry;
@@ -72,12 +70,12 @@ export class CoreContainer {
         }
 
         // Version update backup check
-        const LAZY_VERSION_KEY = "lastLazyPluginVersion";
+
         const currentVersion = this.ctx._plugin.manifest.version;
-        const savedVersion = (this.settingsService.data as any)[LAZY_VERSION_KEY];
+        const savedVersion = this.settingsService.data.lastLazyPluginVersion;
 
         if (savedVersion !== currentVersion) {
-            (this.settingsService.data as any)[LAZY_VERSION_KEY] = currentVersion;
+            this.settingsService.data.lastLazyPluginVersion = currentVersion;
             await this.ctx.saveSettings();
         }
     }

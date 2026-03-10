@@ -1,7 +1,7 @@
-import type { CachedCommand } from "../../../core/interfaces";
-import type { PluginContext } from "../../../core/plugin-context";
-import { loadLocalStorage, saveLocalStorage } from "../../../core/storage";
-import type { CommandCache } from "../../../core/types";
+import type { CachedCommand } from "src/core/interfaces";
+import type { PluginContext } from "src/core/plugin-context";
+import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
+import type { CommandCache } from "src/core/types";
 
 export class CommandCacheStore {
     readonly commandCache = new Map<string, CachedCommand>();
