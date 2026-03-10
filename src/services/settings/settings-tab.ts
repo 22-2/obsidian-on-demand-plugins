@@ -355,7 +355,7 @@ export class SettingsTab extends PluginSettingTab {
         this.discardButton.setDisabled(!hasChanges);
 
         if (count > 0) {
-            this.applyButton.setButtonText(`Save & Apply (${count}) & restart Obsidian`);
+            this.applyButton.setButtonText(`Save & apply (${count}) & restart obsidian`);
             this.applyButton.setWarning();
         } else {
             this.applyButton.setButtonText("Save changes");
