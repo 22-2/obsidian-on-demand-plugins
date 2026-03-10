@@ -1,6 +1,6 @@
 import { around } from "monkey-around";
-import type { PluginContext } from "../core/plugin-context";
-import { PluginManagementNoticeModal } from "../ui/modals/plugin-management-notice-modal";
+import type { PluginContext } from "src/core/plugin-context";
+import { PluginManagementNoticeModal } from "src/ui/modals/plugin-management-notice-modal";
 
 export function patchSettingTabOpen(ctx: PluginContext): void {
     const settingApp = ctx.app.setting;

@@ -1,11 +1,11 @@
 import type { PluginManifest } from "obsidian";
-import type { CachedCommand, PluginLoader } from "../../core/interfaces";
-import type { PluginContext } from "../../core/plugin-context";
-import { isLazyMode, isPluginLoaded } from "../../core/utils";
-import { CommandCacheStore } from "./command-cache-store";
+import type { CachedCommand, PluginLoader } from "src/core/interfaces";
+import type { PluginContext } from "src/core/plugin-context";
+import { isLazyMode, isPluginLoaded } from "src/core/utils";
+import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
 
 // Re-export for consumers
-export type { CachedCommand } from "../../core/interfaces";
+export type { CachedCommand } from "src/core/interfaces";
 
 export class CommandCacheService {
     private store: CommandCacheStore;

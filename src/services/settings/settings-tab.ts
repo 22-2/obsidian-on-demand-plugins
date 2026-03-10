@@ -1,16 +1,16 @@
-import log from "loglevel";
 import type { App, ButtonComponent, DropdownComponent } from "obsidian";
 import { ExtraButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
-import { showConfirmModal } from "../../core/confirm-modal";
-import type { PluginMode, PluginSettings } from "../../core/types";
-import { PluginModes } from "../../core/types";
-import { isLazyMode } from "../../core/utils";
-import type OnDemandPlugin from "../../main";
-import { ToolsModal } from "../../ui/modals/tools-modal";
-import { LazyOptionsModal } from "./lazy-options-modal";
-import { ProfileManagerModal } from "./profile-manager-modal";
+import { showConfirmModal } from "src/core/confirm-modal";
+import type { PluginMode, PluginSettings } from "src/core/types";
+import { PluginModes } from "src/core/types";
+import { isLazyMode } from "src/core/utils";
+import type OnDemandPlugin from "src/main";
+import { ToolsModal } from "src/ui/modals/tools-modal";
+import { LazyOptionsModal } from "src/services/settings/lazy-options-modal";
+import { ProfileManagerModal } from "src/services/settings/profile-manager-modal";
+import { FeatureEvents } from "src/core/event-bus";
 
-const logger = log.getLogger("OnDemandPlugin/SettingsTab");
+
 
 export class SettingsTab extends PluginSettingTab {
     app: App;
@@ -18,7 +18,6 @@ export class SettingsTab extends PluginSettingTab {
     dropdowns: DropdownComponent[] = [];
     filterMethod: PluginMode | undefined;
     filterString: string | undefined;
-    containerEl: HTMLElement;
     pluginListContainer: HTMLElement;
     pluginSettings: { [pluginId: string]: PluginSettings } = {};
     pendingPluginIds = new Set<string>();
@@ -71,9 +70,9 @@ export class SettingsTab extends PluginSettingTab {
                 Object.values(profiles).forEach((p) => {
                     dropdown.addOption(p.id, p.name);
                 });
-                dropdown.setValue(this.plugin.container.settingsService.currentProfileId);
+                dropdown.setValue(this.plugin.core.settingsService.currentProfileId);
                 dropdown.onChange(async (newProfileId) => {
-                    const currentId = this.plugin.container.settingsService.currentProfileId;
+                    const currentId = this.plugin.core.settingsService.currentProfileId;
                     if (newProfileId === currentId) return;
 
                     // If dirty, ask for confirmation
@@ -101,7 +100,7 @@ export class SettingsTab extends PluginSettingTab {
                     .onClick(() => {
                         new ProfileManagerModal(
                             this.app,
-                            this.plugin.container.settingsService, // Access via container to get the instance
+                            this.plugin.core.settingsService, // Access via core to get the instance
                             // Callback on change
                             async () => {
                                 await this.plugin.saveSettings();
@@ -112,7 +111,7 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         // Show which profile is default for current device
-        const currentId = this.plugin.container.settingsService.currentProfileId;
+        const currentId = this.plugin.core.settingsService.currentProfileId;
         const isDesktopDefault = this.plugin.data.desktopProfileId === currentId;
         const isMobileDefault = this.plugin.data.mobileProfileId === currentId;
 
@@ -167,7 +166,7 @@ export class SettingsTab extends PluginSettingTab {
                     this.plugin.configureLogger(); // Apply log level immediately
 
                     if (count > 0) {
-                        await this.plugin.applyStartupPolicyAndRestart(Array.from(this.pendingPluginIds));
+                        await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds: Array.from(this.pendingPluginIds) });
                     } else {
                         new Notice("Settings saved");
                     }

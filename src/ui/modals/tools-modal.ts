@@ -1,9 +1,10 @@
 import type { App, DropdownComponent } from "obsidian";
 import { Modal, Notice, setIcon, Setting } from "obsidian";
-import type { PluginMode } from "../../core/types";
-import { PluginModes, PLUGIN_MODE } from "../../core/types";
-import type OnDemandPlugin from "../../main";
-import type { SyncDirection } from "../../services/maintenance/maintenance-service";
+import type { PluginMode } from "src/core/types";
+import { PluginModes, PLUGIN_MODE } from "src/core/types";
+import type OnDemandPlugin from "src/main";
+import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
+import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 
 export class ToolsModal extends Modal {
     private fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;
@@ -101,7 +102,8 @@ export class ToolsModal extends Modal {
         let syncDirection: SyncDirection = "lazyToCore";
 
         const refreshPreview = async () => {
-            const result = await this.plugin.container.maintenance.buildSyncPreview(syncDirection);
+            const feature = this.plugin.features.get(MaintenanceFeature);
+            const result = await feature!.buildSyncPreview(syncDirection);
             previewLabel.setText(result.label);
             previewSummary.setText(result.summary);
         };
@@ -128,7 +130,8 @@ export class ToolsModal extends Modal {
                 .setClass("sync-button")
                 .setCta()
                 .onClick(async () => {
-                    const result = await this.plugin.container.maintenance.executeSync(syncDirection);
+                    const feature = this.plugin.features.get(MaintenanceFeature);
+                    const result = await feature!.executeSync(syncDirection);
                     new Notice(result.message);
                     if (result.changed > 0) this.onComplete();
                     await refreshPreview();
@@ -148,7 +151,8 @@ export class ToolsModal extends Modal {
                     .onClick(async () => {
                         btn.setDisabled(true);
                         try {
-                            await this.plugin.rebuildAndApplyCommandCache({
+                            const feature = this.plugin.features.get(MaintenanceFeature);
+                            await (feature as MaintenanceFeature).rebuildAndApplyCommandCache({
                                 force: true,
                             });
                             new Notice("Command cache rebuilt successfully");
@@ -206,7 +210,8 @@ export class ToolsModal extends Modal {
                         this.confirmTimeout = null;
                     }
 
-                    const changed = this.plugin.container.maintenance.applyBatchModeReplace(this.fromMode, this.toMode);
+                    const feature = this.plugin.features.get(MaintenanceFeature);
+                    const changed = (feature as MaintenanceFeature).applyBatchModeReplace(this.fromMode, this.toMode);
                     if (changed > 0) {
                         new Notice(`Staged ${changed} plugin changes. Click "Save" in settings to apply.`);
                         this.onComplete();

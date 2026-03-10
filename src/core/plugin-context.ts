@@ -5,10 +5,10 @@
  * callbacks, they all receive a single PluginContext that provides unified
  * access to the Obsidian runtime and Lazy Plugin settings.
  */
-import type { App, PluginManifest } from "obsidian";
+import type { App, EventRef, PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "obsidian-typings";
-import type OnDemandPlugin from "../main";
-import type { DeviceSettings, LazySettings, PluginMode } from "./types";
+import type OnDemandPlugin from "src/main";
+import type { DeviceSettings, LazySettings, PluginMode } from "src/core/types";
 
 /**
  * Minimal view of Obsidian's `Commands` object used by services.
@@ -73,7 +73,7 @@ export interface PluginContext {
     register(unload: () => void): void;
 
     /** Register an event reference. */
-    registerEvent(eventRef: import("obsidian").EventRef): void;
+    registerEvent(eventRef: EventRef): void;
 
     /** Whether the plugin is enabled on disk (community-plugins.json). */
     isPluginEnabledOnDisk(pluginId: string): boolean;
@@ -98,7 +98,10 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         getManifests: () => plugin.manifests,
         getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
         getDefaultModeForPlugin: (pluginId) => plugin.getDefaultModeForPlugin(pluginId),
-        getCommandPluginId: (commandId) => plugin.getCommandPluginId(commandId),
+        getCommandPluginId: (commandId) => {
+            const [prefix] = commandId.split(":");
+            return plugin.manifests.some((p) => p.id === prefix) ? prefix : null;
+        },
         getData: () => plugin.data,
         getSettings: () => plugin.settings,
         saveSettings: () => plugin.saveSettings(),

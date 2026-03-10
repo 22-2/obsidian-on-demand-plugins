@@ -70,6 +70,7 @@ export interface Profile {
 // Global settings for the plugin
 export interface LazySettings {
     showConsoleLog: boolean;
+    lastLazyPluginVersion?: string;
 
     // Global settings for the plugin
     suppressPluginManagementNotice: boolean;

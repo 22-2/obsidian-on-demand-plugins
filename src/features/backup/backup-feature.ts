@@ -1,19 +1,34 @@
 import log from "loglevel";
+import type { CoreContainer } from "src/services/core-container";
+import type { AppFeature } from "src/core/feature";
+import type { EventBus } from "src/core/event-bus";
+import type { FeatureManager } from "src/core/feature-manager";
+import type { PluginContext } from "src/core/plugin-context";
+
+// Needed dynamic import from obsidian
 import { moment, normalizePath } from "obsidian";
-import type { PluginContext } from "../../core/plugin-context";
-import type { PluginRegistry } from "../registry/plugin-registry";
 
-const logger = log.getLogger("OnDemandPlugin/BackupService");
+const logger = log.getLogger("OnDemandPlugin/BackupFeature");
 
-export class BackupService {
-    private backupDir: string;
+export class BackupFeature implements AppFeature {
+    private backupDir!: string;
+    private ctx!: PluginContext;
 
-    constructor(
-        private ctx: PluginContext,
-        private registry: PluginRegistry,
-    ) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    onload(ctx: PluginContext, _core: CoreContainer, _features: FeatureManager, _events: EventBus) {
+        this.ctx = ctx;
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
+
+        // Whenever settings are saved, we create a backup
+        // @ts-expect-error - Custom workspace event
+        this.ctx.app.workspace.on("ondemand-plugins:settings-saved", async () => {
+            await this.createBackup();
+        });
+    }
+
+    onunload() {
+        // No teardown necessary
     }
 
     async ensureBackupFolder() {
@@ -25,15 +40,17 @@ export class BackupService {
     }
 
     async createBackup() {
+        if (!this.ctx) return;
+        
         await this.ensureBackupFolder();
         const adapter = this.ctx.app.vault.adapter;
 
         // 1. Read files
         const dataPath = normalizePath(`${this.ctx._plugin.manifest.dir}/data.json`);
-        const communityPath = this.registry.getCommunityPluginsConfigFilePath();
+        const communityPath = this.ctx.app.vault.getConfigFile("community-plugins");
 
-        let dataContent = "";
-        let communityContent = "";
+        let dataContent: string;
+        let communityContent: string;
 
         try {
             dataContent = await adapter.read(dataPath);
@@ -89,7 +106,7 @@ export class BackupService {
         let result;
         try {
             result = await adapter.list(this.backupDir);
-        } catch (e) {
+        } catch {
             return;
         }
 

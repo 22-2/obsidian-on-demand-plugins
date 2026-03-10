@@ -4,10 +4,10 @@ import type { ViewRegistry } from "obsidian-typings";
 import { pEvent } from "p-event";
 import pTimeout from "p-timeout";
 import pWaitFor from "p-wait-for";
-import type { CommandRegistry, PluginLoader } from "../../core/interfaces";
-import type { PluginContext } from "../../core/plugin-context";
-import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
-import { CommandExecutor } from "./command-executor";
+import type { CommandRegistry, PluginLoader } from "src/core/interfaces";
+import type { PluginContext } from "src/core/plugin-context";
+import { isPluginEnabled, isPluginLoaded } from "src/core/utils";
+import { CommandExecutor } from "src/features/lazy-engine/lazy-runner/command-executor";
 
 const logger = log.getLogger("OnDemandPlugin/LazyCommandRunner");
 

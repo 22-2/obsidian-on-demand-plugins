@@ -1,7 +1,7 @@
 import { Platform } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
-import { PluginRegistry } from "./plugin-registry";
+import { ON_DEMAND_PLUGIN_ID } from "src/core/constants";
+import { PluginRegistry } from "src/services/registry/plugin-registry";
 
 vi.mock("obsidian", () => ({
     normalizePath: (p: string) => p,
