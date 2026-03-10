@@ -155,6 +155,20 @@ export default class OnDemandPlugin extends Plugin {
         await lazyEngine!.applyPluginState(pluginId);
     }
 
+    async applyStartupPolicyAndRestart(pluginIds?: string[]) {
+        const policyFeature = this.features.get(StartupPolicyFeature);
+        if (policyFeature) {
+            await (policyFeature as StartupPolicyFeature).applyWithProgress(null, pluginIds);
+        }
+    }
+
+    async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
+        const maintenance = this.features.get(MaintenanceFeature);
+        if (maintenance) {
+            await (maintenance as MaintenanceFeature).rebuildAndApplyCommandCache(options);
+        }
+    }
+
     async switchProfile(profileId: string) {
         await this.core.settingsService.switchProfile(profileId);
         this.settings = this.core.settingsService.settings;
