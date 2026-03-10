@@ -1,6 +1,8 @@
 import log from "loglevel";
 import type { CoreContainer } from "../../services/core-container";
 import type { AppFeature } from "../../core/feature";
+import type { EventBus } from "../../core/event-bus";
+import type { FeatureManager } from "../../core/feature-manager";
 import type { PluginContext } from "../../core/plugin-context";
 
 // Needed dynamic import from obsidian
@@ -12,7 +14,7 @@ export class BackupFeature implements AppFeature {
     private backupDir!: string;
     private ctx!: PluginContext;
 
-    onload(ctx: PluginContext, core: CoreContainer) {
+    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
         this.ctx = ctx;
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);

@@ -6,6 +6,8 @@ import type { DeviceSettings, LazySettings, PluginMode } from "./core/types";
 import { PLUGIN_MODE } from "./core/types";
 import { toggleLoggerBy } from "./core/utils";
 import { FeatureManager } from "./core/feature-manager";
+import { EventBus, FeatureEvents } from "./core/event-bus";
+import { ProgressDialog } from "./core/progress";
 import { BackupFeature } from "./features/backup/backup-feature";
 import { MaintenanceFeature } from "./features/maintenance/maintenance-feature";
 import { StartupPolicyFeature } from "./features/startup-policy/startup-policy-feature";
@@ -23,12 +25,14 @@ export default class OnDemandPlugin extends Plugin {
 
     core!: CoreContainer;
     features!: FeatureManager;
+    events!: EventBus;
 
     async onload() {
         const ctx = createPluginContext(this);
         this.core = new CoreContainer(ctx);
+        this.events = new EventBus();
         
-        this.features = new FeatureManager(ctx, this.core);
+        this.features = new FeatureManager(ctx, this.core, this.events);
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
         this.features.register(new StartupPolicyFeature());
@@ -46,7 +50,50 @@ export default class OnDemandPlugin extends Plugin {
 
         await this.features.loadAll();
 
+        this.registerEventHandlers();
+
         this.addSettingTab(new SettingsTab(this.app, this));
+    }
+
+    private registerEventHandlers() {
+        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean }) => {
+            const force = options?.force ?? false;
+            const manifests = this.manifests;
+            const lazyCount = manifests.filter((p) => this.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_ENABLED && this.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_DISABLED).length;
+
+            const progress = new ProgressDialog(this.app, {
+                title: "Rebuilding command cache",
+                total: Math.max(1, lazyCount) + 2,
+                cancellable: true,
+                cancelText: "Cancel",
+                onCancel: () => {},
+            });
+            progress.open();
+
+            const lazyEngine = this.features.get(LazyEngineFeature);
+            if (lazyEngine) {
+                await lazyEngine.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
+                    progress.setStatus(`Rebuilding ${plugin.name}`);
+                    progress.setProgress(current, total);
+                });
+            }
+
+            const policyFeature = this.features.get(StartupPolicyFeature);
+            if (policyFeature) {
+                await (policyFeature as StartupPolicyFeature).applyWithProgress(progress);
+            }
+
+            if (lazyEngine) {
+                lazyEngine.commandCache.registerCachedCommands();
+            }
+        });
+
+        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[] }) => {
+            const policyFeature = this.features.get(StartupPolicyFeature);
+            if (policyFeature) {
+                await (policyFeature as StartupPolicyFeature).applyWithProgress(null, options?.pluginIds);
+            }
+        });
     }
 
     onunload() {

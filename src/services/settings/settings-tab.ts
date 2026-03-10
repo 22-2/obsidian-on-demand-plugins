@@ -9,7 +9,7 @@ import type OnDemandPlugin from "../../main";
 import { ToolsModal } from "../../ui/modals/tools-modal";
 import { LazyOptionsModal } from "./lazy-options-modal";
 import { ProfileManagerModal } from "./profile-manager-modal";
-import { StartupPolicyFeature } from "../../features/startup-policy/startup-policy-feature";
+import { FeatureEvents } from "../../core/event-bus";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsTab");
 
@@ -168,8 +168,7 @@ export class SettingsTab extends PluginSettingTab {
                     this.plugin.configureLogger(); // Apply log level immediately
 
                     if (count > 0) {
-                        const policyFeature = this.plugin.features.get(StartupPolicyFeature);
-                        await (policyFeature as StartupPolicyFeature).applyWithProgress(null, Array.from(this.pendingPluginIds));
+                        await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds: Array.from(this.pendingPluginIds) });
                     } else {
                         new Notice("Settings saved");
                     }

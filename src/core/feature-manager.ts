@@ -1,4 +1,5 @@
 import type { CoreContainer } from "../services/core-container";
+import type { EventBus } from "./event-bus";
 import type { AppFeature } from "./feature";
 import type { PluginContext } from "./plugin-context";
 
@@ -8,6 +9,7 @@ export class FeatureManager {
     constructor(
         private ctx: PluginContext,
         private core: CoreContainer,
+        private events: EventBus,
     ) {}
 
     register<T extends AppFeature>(feature: T): T {
@@ -21,7 +23,7 @@ export class FeatureManager {
 
     async loadAll() {
         for (const feature of this.features) {
-            await feature.onload(this.ctx, this.core, this);
+            await feature.onload(this.ctx, this.core, this, this.events);
         }
     }
 

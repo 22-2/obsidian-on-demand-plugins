@@ -32,7 +32,8 @@ describe("MaintenanceFeature", () => {
         };
 
         feature = new MaintenanceFeature();
-        feature.onload(mockCtx, { registry: mockRegistry } as any);
+        const mockEvents = { emit: vi.fn(), on: vi.fn() };
+        feature.onload(mockCtx, { registry: mockRegistry } as any, {} as any, mockEvents as any);
     });
 
     describe("applyBatchModeReplace", () => {

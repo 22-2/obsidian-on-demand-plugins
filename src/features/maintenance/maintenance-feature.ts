@@ -5,9 +5,7 @@ import { PLUGIN_MODE } from "../../core/types";
 import type { CoreContainer } from "../../services/core-container";
 import type { PluginRegistry } from "../../services/registry/plugin-registry";
 import { FeatureManager } from "../../core/feature-manager";
-import { ProgressDialog } from "../../core/progress";
-import { LazyEngineFeature } from "../lazy-engine/lazy-engine-feature";
-import { StartupPolicyFeature } from "../startup-policy/startup-policy-feature";
+import { EventBus, FeatureEvents } from "../../core/event-bus";
 
 export type SyncDirection = "coreToLazy" | "lazyToCore";
 
@@ -24,39 +22,18 @@ export interface SyncResult {
 export class MaintenanceFeature implements AppFeature {
     private ctx!: PluginContext;
     private registry!: PluginRegistry;
-    private features!: FeatureManager;
+    private events!: EventBus;
 
-    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager) {
+    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
         this.ctx = ctx;
         this.registry = core.registry;
-        this.features = features;
+        this.events = events;
     }
 
     onunload() {}
 
     async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
-        const force = options?.force ?? false;
-        const manifests = this.ctx.getManifests();
-        const lazyCount = manifests.filter((p) => this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_ENABLED && this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_DISABLED).length;
-
-        const progress = new ProgressDialog(this.ctx.app, {
-            title: "Rebuilding command cache",
-            total: Math.max(1, lazyCount) + 2,
-            cancellable: true,
-            cancelText: "Cancel",
-            onCancel: () => {},
-        });
-        progress.open();
-
-        const lazyEngine = this.features.get(LazyEngineFeature);
-        await lazyEngine!.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
-            progress.setStatus(`Rebuilding ${plugin.name}`);
-            progress.setProgress(current, total);
-        });
-
-        const policyFeature = this.features.get(StartupPolicyFeature);
-        await policyFeature!.applyWithProgress(progress);
-        lazyEngine!.commandCache.registerCachedCommands();
+        await this.events.emit(FeatureEvents.REBUILD_CACHE_REQUESTED, options);
     }
 
     async buildSyncPreview(direction: SyncDirection): Promise<SyncPreviewResult> {

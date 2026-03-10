@@ -11,6 +11,7 @@ import { PLUGIN_MODE } from "../../core/types";
 import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
 import type { CoreContainer } from "../../services/core-container";
 import type { PluginRegistry } from "../../services/registry/plugin-registry";
+import { EventBus } from "../../core/event-bus";
 import { FeatureManager } from "../../core/feature-manager";
 import { LazyEngineFeature } from "../lazy-engine/lazy-engine-feature";
 import type { CommandCacheService } from "../lazy-engine/command-cache/command-cache-service";
@@ -25,12 +26,14 @@ const logger = log.getLogger("OnDemandPlugin/StartupPolicyFeature");
 export class StartupPolicyFeature implements AppFeature {
     private mutex = new Mutex();
     private originalRegisterView: ((type: string, creator: unknown) => unknown) | null = null;
+    private events!: EventBus;
     private ctx!: PluginContext;
     private commandCacheService!: CommandCacheService;
     private registry!: PluginRegistry;
 
-    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager) {
+    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
         this.ctx = ctx;
+        this.events = events;
         const lazyEngine = features.get(LazyEngineFeature);
         this.commandCacheService = lazyEngine!.commandCache;
         this.registry = core.registry;

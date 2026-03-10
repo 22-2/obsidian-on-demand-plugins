@@ -1,4 +1,5 @@
 import type { WorkspaceLeaf } from "obsidian";
+import type { EventBus } from "../../core/event-bus";
 import type { FeatureManager } from "../../core/feature-manager";
 import type { PluginContext } from "../../core/plugin-context";
 import { CommandCacheService } from "./command-cache/command-cache-service";
@@ -20,9 +21,11 @@ export class LazyEngineFeature implements AppFeature {
     private fileLoader!: FileLazyLoader;
     private layoutReadyQueue!: PQueue;
     private ctx!: PluginContext;
+    private events!: EventBus;
 
-    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager) {
+    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
         this.ctx = ctx;
+        this.events = events;
 
         // 1. Core Engine parts
         this.lazyRunner = new LazyCommandRunner(ctx);
