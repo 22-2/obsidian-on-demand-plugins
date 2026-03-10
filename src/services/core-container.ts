@@ -7,7 +7,6 @@
  */
 import type { PluginContext } from "src/core/plugin-context";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE } from "src/core/types";
-import { patchSettingTabOpen } from "src/patches/setting-tab";
 import { patchPluginEnableDisable } from "src/patches/plugin-enable-disable";
 import { PluginRegistry } from "src/services/registry/plugin-registry";
 import { SettingsService } from "src/services/settings/settings-service";
@@ -39,7 +38,6 @@ export class CoreContainer {
         await this.handleInstallationAndBackups();
 
         // Apply monkey-patches
-        patchSettingTabOpen(this.ctx);
         patchPluginEnableDisable(this.ctx);
     }
 
