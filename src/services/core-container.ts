@@ -12,7 +12,6 @@ import { ProgressDialog } from "../core/progress";
 import { PLUGIN_MODE } from "../core/types";
 import { patchSettingTabOpen } from "../patches/setting-tab";
 import { patchSetViewState } from "../patches/view-state";
-import { BackupFeature } from "../features/backup/backup-feature";
 import { CommandCacheService } from "./command-cache/command-cache-service";
 import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
 import { LeafLockManager, LeafViewLockStrategy } from "./lazy-loader/internal/leaf-lock";
@@ -23,7 +22,7 @@ import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
 import { StartupPolicyService } from "./startup-policy/startup-policy-service";
 
-export class ServiceContainer {
+export class CoreContainer {
     readonly registry: PluginRegistry;
     readonly settingsService: SettingsService;
     readonly lazyRunner: LazyCommandRunner;
@@ -32,7 +31,6 @@ export class ServiceContainer {
     readonly viewLoader: ViewLazyLoader;
     readonly fileLoader: FileLazyLoader;
     readonly maintenance: MaintenanceService;
-    readonly backupFeature: BackupFeature;
     private layoutReadyQueue: PQueue;
 
     constructor(private ctx: PluginContext) {
@@ -77,10 +75,6 @@ export class ServiceContainer {
 
         // 9. MaintenanceService
         this.maintenance = new MaintenanceService(ctx, this.registry);
-
-        // 10. BackupFeature
-        this.backupFeature = new BackupFeature();
-        this.backupFeature.onload(ctx);
 
         // Queue used to limit concurrency when loading plugins on layout ready
         this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });

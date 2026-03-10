@@ -29,13 +29,16 @@ describe("BackupFeature", () => {
                         return "";
                     }),
                 },
+                workspace: {
+                    on: vi.fn(),
+                },
             },
         };
     });
 
     it("should initialize the backup directory correctly after onload", () => {
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx);
+        backupFeature.onload(mockCtx, {} as any);
         // Using any to access private property for testing
         expect((backupFeature as any).backupDir).toBe("mock/plugin/dir/backups");
     });
@@ -43,7 +46,7 @@ describe("BackupFeature", () => {
     it("should create backup folder if it doesn't exist", async () => {
         mockAdapter.exists.mockResolvedValue(false);
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx);
+        backupFeature.onload(mockCtx, {} as any);
 
         await backupFeature.ensureBackupFolder();
 
@@ -59,7 +62,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx);
+        backupFeature.onload(mockCtx, {} as any);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
@@ -73,7 +76,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx);
+        backupFeature.onload(mockCtx, {} as any);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
@@ -88,7 +91,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx);
+        backupFeature.onload(mockCtx, {} as any);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
@@ -109,7 +112,7 @@ describe("BackupFeature", () => {
         mockAdapter.list.mockResolvedValue({ folders: [], files: [] });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx);
+        backupFeature.onload(mockCtx, {} as any);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).toHaveBeenCalledTimes(2);
@@ -153,7 +156,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx);
+        backupFeature.onload(mockCtx, {} as any);
         // Using any to directly test the rotate logic
         await (backupFeature as any).rotateBackups();
 

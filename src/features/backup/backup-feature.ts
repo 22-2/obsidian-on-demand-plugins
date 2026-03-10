@@ -1,4 +1,5 @@
 import log from "loglevel";
+import type { CoreContainer } from "../../services/core-container";
 import type { AppFeature } from "../../core/feature";
 import type { PluginContext } from "../../core/plugin-context";
 
@@ -11,10 +12,16 @@ export class BackupFeature implements AppFeature {
     private backupDir!: string;
     private ctx!: PluginContext;
 
-    onload(ctx: PluginContext) {
+    onload(ctx: PluginContext, core: CoreContainer) {
         this.ctx = ctx;
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
+
+        // Whenever settings are saved, we create a backup
+        // @ts-expect-error - Custom workspace event
+        this.ctx.app.workspace.on("ondemand-plugins:settings-saved", async () => {
+            await this.createBackup();
+        });
     }
 
     onunload() {
