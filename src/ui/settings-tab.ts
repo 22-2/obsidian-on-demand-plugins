@@ -6,8 +6,8 @@ import { PluginModes } from "src/core/types";
 import { isLazyMode } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
 import { ToolsModal } from "src/ui/modals/tools-modal";
-import { LazyOptionsModal } from "src/services/settings/lazy-options-modal";
-import { ProfileManagerModal } from "src/services/settings/profile-manager-modal";
+import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
+import { ProfileManagerModal } from "src/ui/modals/profile-manager-modal";
 import { FeatureEvents } from "src/core/event-bus";
 
 

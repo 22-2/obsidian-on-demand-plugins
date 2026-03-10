@@ -13,7 +13,7 @@ import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { CoreContainer } from "src/services/core-container";
-import { SettingsTab } from "src/services/settings/settings-tab";
+import { SettingsTab } from "src/ui/settings-tab";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
 
