@@ -34,11 +34,14 @@ importers:
         version: 2.14.4
     devDependencies:
       '@22-2/esbuild-plugin-obsidian-copy':
-        specifier: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git
-        version: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916
+        specifier: git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916
+        version: https://codeload.github.com/22-2/esbuild-plugin-obsidian-copy/tar.gz/3677bb62f4af684968629eb8fc508260240fb916
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.3(jiti@2.6.1))
+      '@mkizka/eslint-plugin-relative-import':
+        specifier: ^0.0.9
+        version: 0.0.9
       '@playwright/test':
         specifier: ^1.58.2
         version: 1.58.2
@@ -66,9 +69,6 @@ importers:
       eslint-config-prettier:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.0.3(jiti@2.6.1))
-      eslint-plugin-path:
-        specifier: ^2.0.3
-        version: 2.0.3(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3)
       globals:
         specifier: ^17.4.0
         version: 17.4.0
@@ -76,7 +76,7 @@ importers:
         specifier: ^2.6.1
         version: 2.6.1
       obsidian-e2e-toolkit:
-        specifier: github:22-2/obsidian-e2e-toolkit#0.1.71
+        specifier: github:22-2/obsidian-e2e-toolkit#d370e91687da22fce5ddadca9e64cca95761a211
         version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/d370e91687da22fce5ddadca9e64cca95761a211(@playwright/test@1.58.2)(playwright@1.58.2)
       obsidian-typings:
         specifier: ^4.110.0
@@ -102,8 +102,8 @@ importers:
 
 packages:
 
-  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916':
-    resolution: {commit: 3677bb62f4af684968629eb8fc508260240fb916, repo: https://github.com/22-2/esbuild-plugin-obsidian-copy.git, type: git}
+  '@22-2/esbuild-plugin-obsidian-copy@https://codeload.github.com/22-2/esbuild-plugin-obsidian-copy/tar.gz/3677bb62f4af684968629eb8fc508260240fb916':
+    resolution: {tarball: https://codeload.github.com/22-2/esbuild-plugin-obsidian-copy/tar.gz/3677bb62f4af684968629eb8fc508260240fb916}
     version: 0.1.0
 
   '@antfu/install-pkg@1.1.0':
@@ -430,6 +430,9 @@ packages:
 
   '@mermaid-js/parser@0.3.0':
     resolution: {integrity: sha512-HsvL6zgE5sUPGgkIDlmAWR1HTNHz2Iy11BAWPTa4Jjabkpguy4Ze2gzfLrg6pdRuBvFwgUYyxiaNqZwrEEXepA==}
+
+  '@mkizka/eslint-plugin-relative-import@0.0.9':
+    resolution: {integrity: sha512-iUUt3lOW2ez4MrwS2Urw/ddwD9ifde+TlcXXBeAPlRR/7uGH/rREj07TFWW7G70NsyFtV1NpBvi8bjDZOM+RsQ==}
 
   '@napi-rs/canvas-android-arm64@0.1.96':
     resolution: {integrity: sha512-ew1sPrN3dGdZ3L4FoohPfnjq0f9/Jk7o+wP7HkQZokcXgIUD6FIyICEWGhMYzv53j63wUcPvZeAwgewX58/egg==}
@@ -1535,12 +1538,6 @@ packages:
     peerDependencies:
       eslint: '>=7.0.0'
 
-  eslint-plugin-path@2.0.3:
-    resolution: {integrity: sha512-VmVvqufPiviIViXK05Eg2OvCUh5RpXTmVdb5xQ1symoICf11d3LnFiEbdV/HGqM3BVJyQnNkyK/aduL+A1O3JA==}
-    engines: {node: '>= 12.22.0'}
-    peerDependencies:
-      eslint: '>=9.0.0'
-
   eslint-scope@9.1.2:
     resolution: {integrity: sha512-xS90H51cKw0jltxmvmHy2Iai1LIqrfbw57b79w/J7MfvDfkIkFZ+kj6zC3BjtUwh150HsSSdxXZcsuv72miDFQ==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
@@ -1844,10 +1841,6 @@ packages:
   levn@0.4.1:
     resolution: {integrity: sha512-+bT2uH4E5LGE7h/n3evcS/sQlJXCpIp6ym8OWJ5eV6+67Dsql/LaaT7qJBAt2rzfoa/5QBGBhxDix1dMt2kQKQ==}
     engines: {node: '>= 0.8.0'}
-
-  load-tsconfig@0.2.5:
-    resolution: {integrity: sha512-IXO6OCs9yg8tMKzfPZ1YmheJbZCiEsnBdcB03l0OcfK9prKnJb96siuHCr5Fl37/yo9DnKU+TLpxzTUspw9shg==}
-    engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
   local-pkg@1.1.2:
     resolution: {integrity: sha512-arhlxbFRmoQHl33a0Zkle/YWlmNwoyt6QNZEIJcqNbdrsix5Lvc4HyyI3EnwxTYlZYc32EbYrQ8SzEZ7dqgg9A==}
@@ -2477,7 +2470,7 @@ packages:
 
 snapshots:
 
-  '@22-2/esbuild-plugin-obsidian-copy@git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916': {}
+  '@22-2/esbuild-plugin-obsidian-copy@https://codeload.github.com/22-2/esbuild-plugin-obsidian-copy/tar.gz/3677bb62f4af684968629eb8fc508260240fb916': {}
 
   '@antfu/install-pkg@1.1.0':
     dependencies:
@@ -2743,6 +2736,8 @@ snapshots:
   '@mermaid-js/parser@0.3.0':
     dependencies:
       langium: 3.0.0
+
+  '@mkizka/eslint-plugin-relative-import@0.0.9': {}
 
   '@napi-rs/canvas-android-arm64@0.1.96':
     optional: true
@@ -3868,16 +3863,6 @@ snapshots:
     dependencies:
       eslint: 10.0.3(jiti@2.6.1)
 
-  eslint-plugin-path@2.0.3(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3):
-    dependencies:
-      '@typescript-eslint/types': 8.56.1
-      '@typescript-eslint/utils': 8.56.1(eslint@10.0.3(jiti@2.6.1))(typescript@5.9.3)
-      eslint: 10.0.3(jiti@2.6.1)
-      load-tsconfig: 0.2.5
-    transitivePeerDependencies:
-      - supports-color
-      - typescript
-
   eslint-scope@9.1.2:
     dependencies:
       '@types/esrecurse': 4.3.1
@@ -4199,8 +4184,6 @@ snapshots:
     dependencies:
       prelude-ls: 1.2.1
       type-check: 0.4.0
-
-  load-tsconfig@0.2.5: {}
 
   local-pkg@1.1.2:
     dependencies:

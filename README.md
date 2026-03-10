@@ -49,11 +49,11 @@ This plugin modifies `community-plugins.json` directly to enable bulk plugin swi
 This plugin relies on monkey-patching Obsidian's internal functions to achieve its features. As a result, future Obsidian updates may cause instability or break the plugin's functionality. Please use this plugin with understanding of these risks.
 
 ### Periodic Execution & Hooks
-Plugins that rely on the following should **not** be lazy-loaded:
+Plugins that rely on the following are recommended to use **Lazy on layout ready**:
 - **Periodic tasks**: Plugins using `setInterval` or `setTimeout` for background sync, backups, or timers.
 - **Global Event Hooks**: Plugins that register events like `this.app.vault.on('modify', ...)` or `this.app.workspace.on('layout-change', ...)` right at startup.
 
-Since these plugins are only enabled when triggered, their background tasks or hooks will not be active until the plugin is loaded.
+If these plugins are set to **Lazy on demand**, they are only enabled when triggered, so their background tasks or hooks will not be active until the plugin is loaded.
 
 Note: This plugin does not support embedded or inline views (for example, Dataview embeds). Embedded views may not trigger lazy-loading as expected.
 

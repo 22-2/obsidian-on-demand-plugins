@@ -1,8 +1,8 @@
 import log from "loglevel";
 import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
-import type { LazyOptions } from "../../core/types";
-import type OnDemandPlugin from "../../main";
+import type { LazyOptions } from "src/core/types";
+import type OnDemandPlugin from "src/main";
 
 const logger = log.getLogger("OnDemandPlugin/LazyOptionsModal");
 
