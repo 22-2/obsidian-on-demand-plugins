@@ -8,7 +8,6 @@
 import type { PluginManifest, WorkspaceLeaf } from "obsidian";
 import PQueue from "p-queue";
 import type { PluginContext } from "../core/plugin-context";
-import { ProgressDialog } from "../core/progress";
 import { PLUGIN_MODE } from "../core/types";
 import { patchSettingTabOpen } from "../patches/setting-tab";
 import { patchSetViewState } from "../patches/view-state";
@@ -19,14 +18,12 @@ import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
 import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
-import { StartupPolicyService } from "./startup-policy/startup-policy-service";
 
 export class CoreContainer {
     readonly registry: PluginRegistry;
     readonly settingsService: SettingsService;
     readonly lazyRunner: LazyCommandRunner;
     readonly commandCache: CommandCacheService;
-    readonly startupPolicy: StartupPolicyService;
     readonly viewLoader: ViewLazyLoader;
     readonly fileLoader: FileLazyLoader;
     private layoutReadyQueue: PQueue;
@@ -50,8 +47,7 @@ export class CoreContainer {
         // 5. Wire LazyCommandRunner → CommandRegistry (setter injection to break cycle)
         this.lazyRunner.setCommandRegistry(this.commandCache);
 
-        // 6. StartupPolicyService (needs ctx + commandCache + registry)
-        this.startupPolicy = new StartupPolicyService(ctx, this.commandCache, this.registry);
+        // 6. [Moved to FeatureManager: StartupPolicyFeature]
 
         // --- View & File Loading Support ---
 
@@ -160,58 +156,7 @@ export class CoreContainer {
         const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
 
         await Promise.all(tasks);
-    }
-
-    /**
-     * Rebuild the command cache for all lazy plugins and apply startup policy.
-     */
-    async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
-        const force = options?.force ?? false;
-        // Show a progress dialog early to cover the command cache rebuild and the
-        // subsequent startup policy apply steps.
-        const manifests = this.ctx.getManifests();
-        const lazyCount = manifests.filter((p) => this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_ENABLED && this.ctx.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_DISABLED).length;
-
-        const progress = new ProgressDialog(this.ctx.app, {
-            title: "Rebuilding command cache",
-            total: Math.max(1, lazyCount) + 2,
-            cancellable: true,
-            cancelText: "Cancel",
-            onCancel: () => {},
-        });
-        progress.open();
-
-        await this.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
-            progress.setStatus(`Rebuilding ${plugin.name}`);
-            progress.setProgress(current, total);
-        });
-
-        // Reuse the same progress dialog for the startup policy apply step so
-        // the user sees a continuous progress experience.
-        await this.startupPolicy.applyWithProgress(progress);
         this.commandCache.registerCachedCommands();
-    }
-
-    /**
-     * Rebuild command cache for specific plugins.
-     */
-    async rebuildCommandCache(
-        pluginIds: string[],
-        options?: {
-            force?: boolean;
-            onProgress?: (current: number, total: number, plugin: PluginManifest) => void;
-        },
-    ) {
-        const force = options?.force ?? false;
-        await this.commandCache.refreshCommandCache(pluginIds, force, options?.onProgress);
-        this.commandCache.registerCachedCommands();
-    }
-
-    /**
-     * Apply startup policy to specified plugins or all plugins.
-     */
-    async applyStartupPolicy(pluginIds?: string[]) {
-        await this.startupPolicy.applyWithProgress(null, pluginIds);
     }
 
     /**

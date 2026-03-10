@@ -3,35 +3,46 @@ import log from "loglevel";
 import type { PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "obsidian-typings";
 import { ON_DEMAND_PLUGIN_ID } from "../../core/constants";
+import type { AppFeature } from "../../core/feature";
 import type { PluginContext } from "../../core/plugin-context";
 import { ProgressDialog } from "../../core/progress";
 import { saveLocalStorage } from "../../core/storage";
 import { PLUGIN_MODE } from "../../core/types";
 import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
-import type { CommandCacheService } from "../command-cache/command-cache-service";
-import type { PluginRegistry } from "../registry/plugin-registry";
+import type { CommandCacheService } from "../../services/command-cache/command-cache-service";
+import type { CoreContainer } from "../../services/core-container";
+import type { PluginRegistry } from "../../services/registry/plugin-registry";
 
-const logger = log.getLogger("OnDemandPlugin/StartupPolicyService");
+const logger = log.getLogger("OnDemandPlugin/StartupPolicyFeature");
 
 /**
  * Manages plugin startup policies and lifecycle.
  * Handles lazy loading, view-based loading, and persistent plugin states
  * with progress UI and cancellation support.
  */
-export class StartupPolicyService {
+export class StartupPolicyFeature implements AppFeature {
     private mutex = new Mutex();
     private originalRegisterView: ((type: string, creator: unknown) => unknown) | null = null;
+    private ctx!: PluginContext;
+    private commandCacheService!: CommandCacheService;
+    private registry!: PluginRegistry;
 
-    constructor(
-        private ctx: PluginContext,
-        private commandCacheService: CommandCacheService,
-        private registry: PluginRegistry,
-    ) {}
+    onload(ctx: PluginContext, core: CoreContainer) {
+        this.ctx = ctx;
+        this.commandCacheService = core.commandCache;
+        this.registry = core.registry;
+    }
 
-    /** Apply startup policy (debounced + serialized via mutex). */
-    // public apply = debounce(async (pluginIds?: string[]) => {
-    //     await this.mutex.runExclusive(() => this.executeStartupPolicy(pluginIds));
-    // }, 100);
+    onunload() {
+        if (this.originalRegisterView) {
+            const { viewRegistry } = this.ctx.app as unknown as {
+                viewRegistry?: { registerView?: (type: string, creator: unknown) => unknown };
+            };
+            if (viewRegistry) {
+                viewRegistry.registerView = this.originalRegisterView;
+            }
+        }
+    }
 
     /** Apply startup policy reusing an externally created ProgressDialog. */
     public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[]) {

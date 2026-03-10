@@ -6,8 +6,10 @@ import type { DeviceSettings, LazySettings, PluginMode } from "./core/types";
 import { PLUGIN_MODE } from "./core/types";
 import { toggleLoggerBy } from "./core/utils";
 import { FeatureManager } from "./core/feature-manager";
+import { ProgressDialog } from "./core/progress";
 import { BackupFeature } from "./features/backup/backup-feature";
 import { MaintenanceFeature } from "./features/maintenance/maintenance-feature";
+import { StartupPolicyFeature } from "./features/startup-policy/startup-policy-feature";
 import { CoreContainer } from "./services/core-container";
 import { SettingsTab } from "./services/settings/settings-tab";
 
@@ -29,6 +31,7 @@ export default class OnDemandPlugin extends Plugin {
         this.features = new FeatureManager(ctx, this.core);
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
+        this.features.register(new StartupPolicyFeature());
 
         await this.loadSettings();
         this.configureLogger();
@@ -62,7 +65,6 @@ export default class OnDemandPlugin extends Plugin {
 
     async saveSettings() {
         await this.core.settingsService.save();
-        // @ts-expect-error - custom event
         this.app.workspace.trigger("ondemand-plugins:settings-saved");
     }
 
@@ -134,7 +136,31 @@ export default class OnDemandPlugin extends Plugin {
     // ─── Delegated operations ──────────────────────────────────
 
     async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
-        await this.core.rebuildAndApplyCommandCache(options);
+        const force = options?.force ?? false;
+        // Show a progress dialog early to cover the command cache rebuild and the
+        // subsequent startup policy apply steps.
+        const manifests = this.manifests;
+        const lazyCount = manifests.filter((p) => this.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_ENABLED && this.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_DISABLED).length;
+
+        const progress = new ProgressDialog(this.app, {
+            title: "Rebuilding command cache",
+            total: Math.max(1, lazyCount) + 2,
+            cancellable: true,
+            cancelText: "Cancel",
+            onCancel: () => {},
+        });
+        progress.open();
+
+        await this.core.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
+            progress.setStatus(`Rebuilding ${plugin.name}`);
+            progress.setProgress(current, total);
+        });
+
+        // Reuse the same progress dialog for the startup policy apply step so
+        // the user sees a continuous progress experience.
+        const policyFeature = this.features.get(StartupPolicyFeature);
+        await policyFeature!.applyWithProgress(progress);
+        this.core.commandCache.registerCachedCommands();
     }
 
     async rebuildCommandCache(
@@ -144,7 +170,9 @@ export default class OnDemandPlugin extends Plugin {
             onProgress?: (current: number, total: number, plugin: PluginManifest) => void;
         },
     ) {
-        await this.core.rebuildCommandCache(pluginIds, options);
+        const force = options?.force ?? false;
+        await this.core.commandCache.refreshCommandCache(pluginIds, force, options?.onProgress);
+        this.core.commandCache.registerCachedCommands();
     }
 
     getCommandPluginId(commandId: string): string | null {
@@ -153,7 +181,8 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     async applyStartupPolicyAndRestart(pluginIds?: string[]) {
-        await this.core.applyStartupPolicy(pluginIds);
+        const policyFeature = this.features.get(StartupPolicyFeature);
+        await policyFeature!.applyWithProgress(null, pluginIds);
     }
 
     configureLogger(): void {
