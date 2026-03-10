@@ -7,6 +7,7 @@ import { PLUGIN_MODE } from "./core/types";
 import { toggleLoggerBy } from "./core/utils";
 import { FeatureManager } from "./core/feature-manager";
 import { BackupFeature } from "./features/backup/backup-feature";
+import { MaintenanceFeature } from "./features/maintenance/maintenance-feature";
 import { CoreContainer } from "./services/core-container";
 import { SettingsTab } from "./services/settings/settings-tab";
 
@@ -27,6 +28,7 @@ export default class OnDemandPlugin extends Plugin {
         
         this.features = new FeatureManager(ctx, this.core);
         this.features.register(new BackupFeature());
+        this.features.register(new MaintenanceFeature());
 
         await this.loadSettings();
         this.configureLogger();

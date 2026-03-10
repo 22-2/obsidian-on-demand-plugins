@@ -1,7 +1,9 @@
+import type { AppFeature } from "../../core/feature";
 import type { PluginContext } from "../../core/plugin-context";
 import type { PluginMode } from "../../core/types";
 import { PLUGIN_MODE } from "../../core/types";
-import type { PluginRegistry } from "../registry/plugin-registry";
+import type { CoreContainer } from "../../services/core-container";
+import type { PluginRegistry } from "../../services/registry/plugin-registry";
 
 export type SyncDirection = "coreToLazy" | "lazyToCore";
 
@@ -15,11 +17,16 @@ export interface SyncResult {
     message: string;
 }
 
-export class MaintenanceService {
-    constructor(
-        private ctx: PluginContext,
-        private registry: PluginRegistry,
-    ) {}
+export class MaintenanceFeature implements AppFeature {
+    private ctx!: PluginContext;
+    private registry!: PluginRegistry;
+
+    onload(ctx: PluginContext, core: CoreContainer) {
+        this.ctx = ctx;
+        this.registry = core.registry;
+    }
+
+    onunload() {}
 
     async buildSyncPreview(direction: SyncDirection): Promise<SyncPreviewResult> {
         await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);

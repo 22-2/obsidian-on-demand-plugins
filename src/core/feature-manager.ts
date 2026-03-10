@@ -10,8 +10,13 @@ export class FeatureManager {
         private core: CoreContainer,
     ) {}
 
-    register(feature: AppFeature) {
+    register<T extends AppFeature>(feature: T): T {
         this.features.push(feature);
+        return feature;
+    }
+
+    get<T extends AppFeature>(FeatureClass: new (...args: any[]) => T): T | undefined {
+        return this.features.find((f): f is T => f instanceof FeatureClass);
     }
 
     async loadAll() {

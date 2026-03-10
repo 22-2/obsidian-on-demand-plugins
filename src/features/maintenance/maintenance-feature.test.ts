@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PLUGIN_MODE } from "../../core/types";
-import { MaintenanceService } from "./maintenance-service";
+import { MaintenanceFeature } from "./maintenance-feature";
 
-describe("MaintenanceService", () => {
-    let service: MaintenanceService;
+describe("MaintenanceFeature", () => {
+    let feature: MaintenanceFeature;
     let mockCtx: any;
     let mockRegistry: any;
 
@@ -31,12 +31,13 @@ describe("MaintenanceService", () => {
             enabledPluginsFromDisk: new Set(["plugin-1", "on-demand-plugins"]),
         };
 
-        service = new MaintenanceService(mockCtx, mockRegistry);
+        feature = new MaintenanceFeature();
+        feature.onload(mockCtx, { registry: mockRegistry } as any);
     });
 
     describe("applyBatchModeReplace", () => {
         it("should replace modes for matching plugins", () => {
-            const changed = service.applyBatchModeReplace(PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.LAZY);
+            const changed = feature.applyBatchModeReplace(PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.LAZY);
 
             expect(changed).toBe(1);
             expect(mockCtx.getSettings().plugins["plugin-1"].mode).toBe(PLUGIN_MODE.LAZY);
@@ -44,7 +45,7 @@ describe("MaintenanceService", () => {
         });
 
         it("should return 0 if no plugins match", () => {
-            const changed = service.applyBatchModeReplace(PLUGIN_MODE.LAZY, PLUGIN_MODE.ALWAYS_ENABLED);
+            const changed = feature.applyBatchModeReplace(PLUGIN_MODE.LAZY, PLUGIN_MODE.ALWAYS_ENABLED);
             expect(changed).toBe(0);
         });
     });
@@ -55,7 +56,7 @@ describe("MaintenanceService", () => {
             // plugin-2 is NOT on disk but ALWAYS_ENABLED -> should become ALWAYS_DISABLED
             mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "on-demand-plugins"]);
 
-            const result = await service.executeSync("coreToLazy");
+            const result = await feature.executeSync("coreToLazy");
 
             expect(result.changed).toBe(2);
             expect(mockCtx.getSettings().plugins["plugin-1"].mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
@@ -68,7 +69,7 @@ describe("MaintenanceService", () => {
             // plugin-2 is ALWAYS_ENABLED, but not in enabledPluginsFromDisk
             mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "on-demand-plugins"]);
 
-            const result = await service.executeSync("lazyToCore");
+            const result = await feature.executeSync("lazyToCore");
 
             expect(result.changed).toBe(1);
             expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(expect.arrayContaining(["plugin-2", "on-demand-plugins"]), false);
@@ -81,7 +82,7 @@ describe("MaintenanceService", () => {
             });
             mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "on-demand-plugins"]);
 
-            const result = await service.executeSync("lazyToCore");
+            const result = await feature.executeSync("lazyToCore");
 
             expect(result.changed).toBe(0);
             expect(mockRegistry.writeCommunityPluginsFile).not.toHaveBeenCalled();
@@ -91,7 +92,7 @@ describe("MaintenanceService", () => {
     describe("buildSyncPreview", () => {
         it("should build coreToLazy preview", async () => {
             mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "on-demand-plugins"]);
-            const preview = await service.buildSyncPreview("coreToLazy");
+            const preview = await feature.buildSyncPreview("coreToLazy");
 
             expect(preview.label).toContain("community-plugins.json");
             expect(preview.summary).toContain("Will enable: 1");
@@ -100,7 +101,7 @@ describe("MaintenanceService", () => {
 
         it("should build lazyToCore preview", async () => {
             mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "on-demand-plugins"]);
-            const preview = await service.buildSyncPreview("lazyToCore");
+            const preview = await feature.buildSyncPreview("lazyToCore");
 
             expect(preview.label).toContain("On-Demand Plugins");
             expect(preview.summary).toContain("Will enable: 1"); // plugin-2
