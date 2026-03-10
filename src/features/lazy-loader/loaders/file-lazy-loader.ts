@@ -1,8 +1,8 @@
 import log from "loglevel";
 import type { View, WorkspaceLeaf } from "obsidian";
 import { TFile } from "obsidian";
-import type { PluginLoader } from "../../core/interfaces";
-import type { PluginContext } from "../../core/plugin-context";
+import type { PluginLoader } from "../../../core/interfaces";
+import type { PluginContext } from "../../../core/plugin-context";
 import { BaseLazyLoader } from "./base-lazy-loader";
 import { resolvePluginForFile } from "./internal/activation-rules";
 import type { LockStrategy } from "./internal/leaf-lock";
