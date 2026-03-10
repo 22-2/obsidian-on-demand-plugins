@@ -3,18 +3,19 @@ import log from "loglevel";
 import type { PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "obsidian-typings";
 import { ON_DEMAND_PLUGIN_ID } from "src/core/constants";
+import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";
+import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
 import { ProgressDialog } from "src/core/progress";
 import { saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginEnabled, isPluginLoaded } from "src/core/utils";
+import type { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
+import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
+import { patchViewRegistry } from "src/patches/view-registry";
 import type { CoreContainer } from "src/services/core-container";
 import type { PluginRegistry } from "src/services/registry/plugin-registry";
-import type { EventBus } from "src/core/event-bus";
-import type { FeatureManager } from "src/core/feature-manager";
-import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
-import type { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
 
 const logger = log.getLogger("OnDemandPlugin/StartupPolicyFeature");
 
@@ -25,7 +26,6 @@ const logger = log.getLogger("OnDemandPlugin/StartupPolicyFeature");
  */
 export class StartupPolicyFeature implements AppFeature {
     private mutex = new Mutex();
-    private originalRegisterView: ((type: string, creator: unknown) => unknown) | null = null;
     private events!: EventBus;
     private ctx!: PluginContext;
     private commandCacheService!: CommandCacheService;
@@ -40,14 +40,6 @@ export class StartupPolicyFeature implements AppFeature {
     }
 
     onunload() {
-        if (this.originalRegisterView) {
-            const { viewRegistry } = this.ctx.app as unknown as {
-                viewRegistry?: { registerView?: (type: string, creator: unknown) => unknown };
-            };
-            if (viewRegistry) {
-                viewRegistry.registerView = this.originalRegisterView;
-            }
-        }
     }
 
     /** Apply startup policy reusing an externally created ProgressDialog. */
@@ -79,7 +71,7 @@ export class StartupPolicyFeature implements AppFeature {
         const lazyOnViews: Record<string, string[]> = {
             ...(this.ctx.getSettings().lazyOnViews ?? {}),
         };
-        const stopIntercepting = this.interceptViewRegistry(lazyOnViews);
+        const stopIntercepting = patchViewRegistry(this.ctx, lazyOnViews);
 
         try {
             await this.loadLazyPluginsWithProgress(lazyManifests, targetIds, progress, () => cancelled);
@@ -88,56 +80,6 @@ export class StartupPolicyFeature implements AppFeature {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // View registry interception
-    // -------------------------------------------------------------------------
-
-    /**
-     * Monkey-patches ViewRegistry.registerView to capture which view types
-     * each lazy plugin registers. Returns a cleanup function.
-     */
-    private interceptViewRegistry(lazyOnViews: Record<string, string[]>): () => void {
-        const { viewRegistry } = this.ctx.app as unknown as {
-            viewRegistry?: { registerView?: (type: string, creator: unknown) => unknown };
-        };
-
-        this.originalRegisterView = viewRegistry?.registerView ?? null;
-        if (!viewRegistry || typeof this.originalRegisterView !== "function") {
-            return () => {};
-        }
-
-        const settings = this.ctx.getSettings();
-
-        viewRegistry.registerView = (type: string, creator: unknown) => {
-            const loadingId = (this.ctx.app as unknown as { plugins: Plugins }).plugins.loadingPluginId as string | undefined;
-
-            if (loadingId && type) {
-                const mode = this.ctx.getPluginMode(loadingId);
-                const pluginSettings = settings.plugins[loadingId];
-                const isLazyWithUseView = mode === PLUGIN_MODE.LAZY && pluginSettings?.lazyOptions?.useView === true;
-
-                if (isLazyWithUseView) {
-                    lazyOnViews[loadingId] ??= [];
-                    if (!lazyOnViews[loadingId].includes(type)) {
-                        lazyOnViews[loadingId].push(type);
-                    }
-
-                    if (isLazyWithUseView && pluginSettings?.lazyOptions) {
-                        pluginSettings.lazyOptions.viewTypes ??= [];
-                        if (!pluginSettings.lazyOptions.viewTypes.includes(type)) {
-                            pluginSettings.lazyOptions.viewTypes.push(type);
-                        }
-                    }
-                }
-            }
-
-            return this.originalRegisterView!.apply(viewRegistry, [type, creator]);
-        };
-
-        return () => {
-            viewRegistry.registerView = this.originalRegisterView!;
-        };
-    }
 
     // -------------------------------------------------------------------------
     // Plugin loading
