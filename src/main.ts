@@ -10,7 +10,7 @@ import { ProgressDialog } from "./core/progress";
 import { BackupFeature } from "./features/backup/backup-feature";
 import { MaintenanceFeature } from "./features/maintenance/maintenance-feature";
 import { StartupPolicyFeature } from "./features/startup-policy/startup-policy-feature";
-import { LazyLoaderFeature } from "./features/lazy-loader/lazy-loader-feature";
+import { LazyEngineFeature } from "./features/lazy-engine/lazy-engine-feature";
 import { CoreContainer } from "./services/core-container";
 import { SettingsTab } from "./services/settings/settings-tab";
 
@@ -33,7 +33,7 @@ export default class OnDemandPlugin extends Plugin {
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
         this.features.register(new StartupPolicyFeature());
-        this.features.register(new LazyLoaderFeature());
+        this.features.register(new LazyEngineFeature());
 
         await this.loadSettings();
         this.configureLogger();
@@ -105,7 +105,8 @@ export default class OnDemandPlugin extends Plugin {
     async updatePluginSettings(pluginId: string, mode: PluginMode) {
         this.settings.plugins[pluginId] = { mode, userConfigured: true };
         await this.saveSettings();
-        await this.core.applyPluginState(pluginId);
+        const lazyEngine = this.features.get(LazyEngineFeature);
+        await lazyEngine!.applyPluginState(pluginId);
     }
 
     async switchProfile(profileId: string) {
@@ -153,7 +154,8 @@ export default class OnDemandPlugin extends Plugin {
         });
         progress.open();
 
-        await this.core.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
+        const lazyEngine = this.features.get(LazyEngineFeature);
+        await lazyEngine!.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
             progress.setStatus(`Rebuilding ${plugin.name}`);
             progress.setProgress(current, total);
         });
@@ -162,7 +164,7 @@ export default class OnDemandPlugin extends Plugin {
         // the user sees a continuous progress experience.
         const policyFeature = this.features.get(StartupPolicyFeature);
         await policyFeature!.applyWithProgress(progress);
-        this.core.commandCache.registerCachedCommands();
+        lazyEngine!.commandCache.registerCachedCommands();
     }
 
     async rebuildCommandCache(
@@ -173,8 +175,9 @@ export default class OnDemandPlugin extends Plugin {
         },
     ) {
         const force = options?.force ?? false;
-        await this.core.commandCache.refreshCommandCache(pluginIds, force, options?.onProgress);
-        this.core.commandCache.registerCachedCommands();
+        const lazyEngine = this.features.get(LazyEngineFeature);
+        await lazyEngine!.commandCache.refreshCommandCache(pluginIds, force, options?.onProgress);
+        lazyEngine!.commandCache.registerCachedCommands();
     }
 
     getCommandPluginId(commandId: string): string | null {

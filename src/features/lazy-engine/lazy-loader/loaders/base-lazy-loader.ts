@@ -1,6 +1,6 @@
 import log from "loglevel";
 import type { WorkspaceLeaf } from "obsidian";
-import type { PluginLoader } from "../../../core/interfaces";
+import type { PluginLoader } from "../../../../../../../../core/interfaces";
 import type { PluginContext } from "../../../core/plugin-context";
 import { isPluginLoaded, rebuildLeafView } from "../../../core/utils";
 import type { LockStrategy } from "./internal/leaf-lock";

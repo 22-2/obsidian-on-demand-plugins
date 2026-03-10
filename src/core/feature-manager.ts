@@ -21,7 +21,7 @@ export class FeatureManager {
 
     async loadAll() {
         for (const feature of this.features) {
-            await feature.onload(this.ctx, this.core);
+            await feature.onload(this.ctx, this.core, this);
         }
     }
 

@@ -1,7 +1,7 @@
 import log from "loglevel";
 import type { Command, MarkdownFileInfo } from "obsidian";
 import { MarkdownView } from "obsidian";
-import type { CommandRegistry } from "../../core/interfaces";
+import type { CommandRegistry } from "../../../core/interfaces";
 import type { PluginContext } from "../../core/plugin-context";
 
 const logger = log.getLogger("OnDemandPlugin/CommandExecutor");

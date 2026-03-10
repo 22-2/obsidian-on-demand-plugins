@@ -1,4 +1,5 @@
 import type { CoreContainer } from "../services/core-container";
+import type { FeatureManager } from "./feature-manager";
 import type { PluginContext } from "./plugin-context";
 
 /**
@@ -10,7 +11,7 @@ export interface AppFeature {
     /**
      * Called when the feature is loaded.
      */
-    onload(ctx: PluginContext, core: CoreContainer): void | Promise<void>;
+    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager): void | Promise<void>;
 
     /**
      * Called when the feature is unloaded (e.g., plugin reload/disable).

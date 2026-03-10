@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PluginContext } from "../../core/plugin-context";
-import * as storageMs from "../../core/storage";
+import type { PluginContext } from "../../../core/plugin-context";
+import * as storageMs from "../../../core/storage";
 import { CommandCacheStore } from "./command-cache-store";
 
-vi.mock("../../core/storage");
+vi.mock("../../../core/storage");
 
 describe("CommandCacheStore", () => {
     let store: CommandCacheStore;

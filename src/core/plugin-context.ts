@@ -5,7 +5,7 @@
  * callbacks, they all receive a single PluginContext that provides unified
  * access to the Obsidian runtime and Lazy Plugin settings.
  */
-import type { App, PluginManifest } from "obsidian";
+import type { App, EventRef, PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "obsidian-typings";
 import type OnDemandPlugin from "../main";
 import type { DeviceSettings, LazySettings, PluginMode } from "./types";
@@ -73,7 +73,7 @@ export interface PluginContext {
     register(unload: () => void): void;
 
     /** Register an event reference. */
-    registerEvent(eventRef: import("obsidian").EventRef): void;
+    registerEvent(eventRef: EventRef): void;
 
     /** Whether the plugin is enabled on disk (community-plugins.json). */
     isPluginEnabledOnDisk(pluginId: string): boolean;

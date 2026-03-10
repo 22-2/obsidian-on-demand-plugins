@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
-import type { PluginLoader } from "../../core/interfaces";
-import type { PluginContext } from "../../core/plugin-context";
-import * as storageMs from "../../core/storage";
-import * as utilsMs from "../../core/utils";
+import type { PluginLoader } from "../../../core/interfaces";
+import type { PluginContext } from "../../../core/plugin-context";
+import * as storageMs from "../../../core/storage";
+import * as utilsMs from "../../../core/utils";
 import { CommandCacheService } from "./command-cache-service";
 
-vi.mock("../../core/utils", () => ({
+vi.mock("../../../core/utils", () => ({
     isPluginLoaded: vi.fn(),
     isLazyMode: vi.fn(),
 }));
-vi.mock("../../core/storage");
+vi.mock("../../../core/storage");
 
 describe("CommandCacheService", () => {
     let service: CommandCacheService;

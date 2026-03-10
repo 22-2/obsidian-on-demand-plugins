@@ -8,19 +8,14 @@
 import type { PluginManifest } from "obsidian";
 import PQueue from "p-queue";
 import type { PluginContext } from "../core/plugin-context";
-import { PLUGIN_MODE } from "../core/types";
+import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE } from "../core/types";
 import { patchSettingTabOpen } from "../patches/setting-tab";
-import { CommandCacheService } from "./command-cache/command-cache-service";
-import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
 
 export class CoreContainer {
     readonly registry: PluginRegistry;
     readonly settingsService: SettingsService;
-    readonly lazyRunner: LazyCommandRunner;
-    readonly commandCache: CommandCacheService;
-    private layoutReadyQueue: PQueue;
 
     constructor(private ctx: PluginContext) {
         // 1. Registry (no service deps)
@@ -31,18 +26,6 @@ export class CoreContainer {
             // SettingsService expects a Plugin, we pass it through the context adapter
             ctx._plugin,
         );
-
-        // 3. LazyCommandRunner (needs PluginContext only at construction)
-        this.lazyRunner = new LazyCommandRunner(ctx);
-
-        // 4. CommandCacheService (needs PluginContext + PluginLoader interface)
-        this.commandCache = new CommandCacheService(ctx, this.lazyRunner);
-
-        // 5. Wire LazyCommandRunner → CommandRegistry (setter injection to break cycle)
-        this.lazyRunner.setCommandRegistry(this.commandCache);
-
-        // Queue used to limit concurrency when loading plugins on layout ready
-        this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });
     }
 
     /**
@@ -56,14 +39,8 @@ export class CoreContainer {
         // Handle initial load profile creation & backups
         await this.handleInstallationAndBackups();
 
-        // Load command cache from persisted data
-        this.commandCache.loadFromData();
-        this.commandCache.registerCachedCommands();
-
         // Apply monkey-patches
         patchSettingTabOpen(this.ctx);
-
-        this.registerLayoutReadyLoader();
     }
 
     private async handleInstallationAndBackups() {
@@ -73,7 +50,6 @@ export class CoreContainer {
             const currentPlugins = Array.from(this.registry.enabledPluginsFromDisk);
 
             // Generate a safe copy of default settings
-            const { DEFAULT_DEVICE_SETTINGS } = await import("../core/types");
             const backupSettings = JSON.parse(JSON.stringify(DEFAULT_DEVICE_SETTINGS));
 
             // Set all currently enabled plugins to ALWAYS_ENABLED in this profile
@@ -106,65 +82,7 @@ export class CoreContainer {
         }
     }
 
-    private registerLayoutReadyLoader() {
-        this.ctx.app.workspace.onLayoutReady(this.onLayoutReady.bind(this));
-    }
-
-    private async onLayoutReady() {
-        const manifests = this.ctx.getManifests();
-
-        const toLoad = manifests.filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
-
-        if (toLoad.length === 0) return;
-
-        const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
-
-        await Promise.all(tasks);
-        this.commandCache.registerCachedCommands();
-    }
-
-    /**
-     * Apply the state for a single plugin based on its mode.
-     */
-    async applyPluginState(pluginId: string) {
-        const mode = this.ctx.getPluginMode(pluginId);
-        if (mode === PLUGIN_MODE.ALWAYS_ENABLED) {
-            if (!this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
-                await this.ctx.obsidianPlugins.enablePlugin(pluginId);
-                await this.lazyRunner.waitForPluginLoaded(pluginId);
-            }
-            this.commandCache.removeCachedCommandsForPlugin(pluginId);
-            return;
-        }
-
-        if (mode === PLUGIN_MODE.LAZY) {
-            await this.commandCache.ensureCommandsCached(pluginId);
-            if (this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
-                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
-            }
-            this.commandCache.registerCachedCommandsForPlugin(pluginId);
-            return;
-        }
-
-        if (mode === PLUGIN_MODE.LAZY_ON_LAYOUT_READY) {
-            this.commandCache.removeCachedCommandsForPlugin(pluginId);
-            // If layout is already ready, load it immediately. Otherwise it will be handled by the layoutReadyLoader.
-            if (this.ctx.app.workspace.layoutReady) {
-                await this.lazyRunner.ensurePluginLoaded(pluginId);
-            }
-            return;
-        }
-
-        if (this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
-            await this.ctx.obsidianPlugins.disablePlugin(pluginId);
-        }
-        this.commandCache.removeCachedCommandsForPlugin(pluginId);
-    }
-
     destroy() {
-        this.commandCache?.clear();
-        this.lazyRunner?.clear();
         this.registry?.clear();
-        this.layoutReadyQueue?.clear();
     }
 }
