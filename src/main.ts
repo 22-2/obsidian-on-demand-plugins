@@ -10,6 +10,7 @@ import { ProgressDialog } from "./core/progress";
 import { BackupFeature } from "./features/backup/backup-feature";
 import { MaintenanceFeature } from "./features/maintenance/maintenance-feature";
 import { StartupPolicyFeature } from "./features/startup-policy/startup-policy-feature";
+import { LazyLoaderFeature } from "./features/lazy-loader/lazy-loader-feature";
 import { CoreContainer } from "./services/core-container";
 import { SettingsTab } from "./services/settings/settings-tab";
 
@@ -32,6 +33,7 @@ export default class OnDemandPlugin extends Plugin {
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
         this.features.register(new StartupPolicyFeature());
+        this.features.register(new LazyLoaderFeature());
 
         await this.loadSettings();
         this.configureLogger();

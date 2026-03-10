@@ -5,16 +5,12 @@
  * where the object graph is assembled, replacing the ad-hoc callback
  * wiring that was previously spread across main.ts.
  */
-import type { PluginManifest, WorkspaceLeaf } from "obsidian";
+import type { PluginManifest } from "obsidian";
 import PQueue from "p-queue";
 import type { PluginContext } from "../core/plugin-context";
 import { PLUGIN_MODE } from "../core/types";
 import { patchSettingTabOpen } from "../patches/setting-tab";
-import { patchSetViewState } from "../patches/view-state";
 import { CommandCacheService } from "./command-cache/command-cache-service";
-import { FileLazyLoader } from "./lazy-loader/file-lazy-loader";
-import { LeafLockManager, LeafViewLockStrategy } from "./lazy-loader/internal/leaf-lock";
-import { ViewLazyLoader } from "./lazy-loader/view-lazy-loader";
 import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import { PluginRegistry } from "./registry/plugin-registry";
 import { SettingsService } from "./settings/settings-service";
@@ -24,8 +20,6 @@ export class CoreContainer {
     readonly settingsService: SettingsService;
     readonly lazyRunner: LazyCommandRunner;
     readonly commandCache: CommandCacheService;
-    readonly viewLoader: ViewLazyLoader;
-    readonly fileLoader: FileLazyLoader;
     private layoutReadyQueue: PQueue;
 
     constructor(private ctx: PluginContext) {
@@ -46,26 +40,6 @@ export class CoreContainer {
 
         // 5. Wire LazyCommandRunner → CommandRegistry (setter injection to break cycle)
         this.lazyRunner.setCommandRegistry(this.commandCache);
-
-        // 6. [Moved to FeatureManager: StartupPolicyFeature]
-
-        // --- View & File Loading Support ---
-
-        // Unified lock manager for memory-safe leaf locking
-        const lockManager = new LeafLockManager();
-
-        // 7. ViewLazyLoader (needs ctx + pluginLoader + commandRegistry)
-        this.viewLoader = new ViewLazyLoader(ctx, this.lazyRunner, this.commandCache, new LeafViewLockStrategy(lockManager));
-
-        // 8. FileLazyLoader (needs ctx + pluginLoader)
-        this.fileLoader = new FileLazyLoader(
-            ctx,
-            this.lazyRunner,
-            // Delegate to the shared manager with the "leaf-generic" subKey
-            {
-                lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic"),
-            },
-        );
 
         // Queue used to limit concurrency when loading plugins on layout ready
         this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });
@@ -88,16 +62,6 @@ export class CoreContainer {
 
         // Apply monkey-patches
         patchSettingTabOpen(this.ctx);
-
-        patchSetViewState({
-            register: this.ctx.register.bind(this.ctx),
-            onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
-        });
-
-        this.viewLoader.registerActiveLeafReload();
-
-        // Register standardized FileLazyLoader (handles Excalidraw and others via lazyOnFiles)
-        this.fileLoader.register();
 
         this.registerLayoutReadyLoader();
     }
