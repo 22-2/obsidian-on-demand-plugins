@@ -9,6 +9,7 @@ import type OnDemandPlugin from "../../main";
 import { ToolsModal } from "../../ui/modals/tools-modal";
 import { LazyOptionsModal } from "./lazy-options-modal";
 import { ProfileManagerModal } from "./profile-manager-modal";
+import { StartupPolicyFeature } from "../../features/startup-policy/startup-policy-feature";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsTab");
 
@@ -71,9 +72,9 @@ export class SettingsTab extends PluginSettingTab {
                 Object.values(profiles).forEach((p) => {
                     dropdown.addOption(p.id, p.name);
                 });
-                dropdown.setValue(this.plugin.container.settingsService.currentProfileId);
+                dropdown.setValue(this.plugin.core.settingsService.currentProfileId);
                 dropdown.onChange(async (newProfileId) => {
-                    const currentId = this.plugin.container.settingsService.currentProfileId;
+                    const currentId = this.plugin.core.settingsService.currentProfileId;
                     if (newProfileId === currentId) return;
 
                     // If dirty, ask for confirmation
@@ -101,7 +102,7 @@ export class SettingsTab extends PluginSettingTab {
                     .onClick(() => {
                         new ProfileManagerModal(
                             this.app,
-                            this.plugin.container.settingsService, // Access via container to get the instance
+                            this.plugin.core.settingsService, // Access via core to get the instance
                             // Callback on change
                             async () => {
                                 await this.plugin.saveSettings();
@@ -112,7 +113,7 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         // Show which profile is default for current device
-        const currentId = this.plugin.container.settingsService.currentProfileId;
+        const currentId = this.plugin.core.settingsService.currentProfileId;
         const isDesktopDefault = this.plugin.data.desktopProfileId === currentId;
         const isMobileDefault = this.plugin.data.mobileProfileId === currentId;
 
@@ -167,7 +168,8 @@ export class SettingsTab extends PluginSettingTab {
                     this.plugin.configureLogger(); // Apply log level immediately
 
                     if (count > 0) {
-                        await this.plugin.applyStartupPolicyAndRestart(Array.from(this.pendingPluginIds));
+                        const policyFeature = this.plugin.features.get(StartupPolicyFeature);
+                        await (policyFeature as StartupPolicyFeature).applyWithProgress(null, Array.from(this.pendingPluginIds));
                     } else {
                         new Notice("Settings saved");
                     }

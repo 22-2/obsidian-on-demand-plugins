@@ -9,9 +9,11 @@ import { ProgressDialog } from "../../core/progress";
 import { saveLocalStorage } from "../../core/storage";
 import { PLUGIN_MODE } from "../../core/types";
 import { isPluginEnabled, isPluginLoaded } from "../../core/utils";
-import type { CommandCacheService } from "../../services/command-cache/command-cache-service";
 import type { CoreContainer } from "../../services/core-container";
 import type { PluginRegistry } from "../../services/registry/plugin-registry";
+import { FeatureManager } from "../../core/feature-manager";
+import { LazyEngineFeature } from "../lazy-engine/lazy-engine-feature";
+import type { CommandCacheService } from "../lazy-engine/command-cache/command-cache-service";
 
 const logger = log.getLogger("OnDemandPlugin/StartupPolicyFeature");
 
@@ -27,9 +29,10 @@ export class StartupPolicyFeature implements AppFeature {
     private commandCacheService!: CommandCacheService;
     private registry!: PluginRegistry;
 
-    onload(ctx: PluginContext, core: CoreContainer) {
+    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager) {
         this.ctx = ctx;
-        this.commandCacheService = core.commandCache;
+        const lazyEngine = features.get(LazyEngineFeature);
+        this.commandCacheService = lazyEngine!.commandCache;
         this.registry = core.registry;
     }
 

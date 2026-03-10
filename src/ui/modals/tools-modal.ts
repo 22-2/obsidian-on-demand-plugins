@@ -151,7 +151,8 @@ export class ToolsModal extends Modal {
                     .onClick(async () => {
                         btn.setDisabled(true);
                         try {
-                            await this.plugin.rebuildAndApplyCommandCache({
+                            const feature = this.plugin.features.get(MaintenanceFeature);
+                            await (feature as MaintenanceFeature).rebuildAndApplyCommandCache({
                                 force: true,
                             });
                             new Notice("Command cache rebuilt successfully");
@@ -210,7 +211,7 @@ export class ToolsModal extends Modal {
                     }
 
                     const feature = this.plugin.features.get(MaintenanceFeature);
-                    const changed = feature!.applyBatchModeReplace(this.fromMode, this.toMode);
+                    const changed = (feature as MaintenanceFeature).applyBatchModeReplace(this.fromMode, this.toMode);
                     if (changed > 0) {
                         new Notice(`Staged ${changed} plugin changes. Click "Save" in settings to apply.`);
                         this.onComplete();

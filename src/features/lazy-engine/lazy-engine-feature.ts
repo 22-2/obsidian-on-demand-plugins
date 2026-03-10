@@ -8,9 +8,9 @@ import { ViewLazyLoader } from "./lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "./lazy-runner/lazy-command-runner";
 import PQueue from "p-queue";
 import { PLUGIN_MODE } from "../../core/types";
-import { AppFeature } from "src/core/feature";
-import { patchSetViewState } from "src/patches/view-state";
-import { CoreContainer } from "src/services/core-container";
+import { AppFeature } from "../../core/feature";
+import { patchSetViewState } from "../../patches/view-state";
+import { CoreContainer } from "../../services/core-container";
 
 export class LazyEngineFeature implements AppFeature {
     public commandCache!: CommandCacheService;

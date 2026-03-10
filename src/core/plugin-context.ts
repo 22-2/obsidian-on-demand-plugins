@@ -98,7 +98,10 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         getManifests: () => plugin.manifests,
         getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
         getDefaultModeForPlugin: (pluginId) => plugin.getDefaultModeForPlugin(pluginId),
-        getCommandPluginId: (commandId) => plugin.getCommandPluginId(commandId),
+        getCommandPluginId: (commandId) => {
+            const [prefix] = commandId.split(":");
+            return plugin.manifests.some((p) => p.id === prefix) ? prefix : null;
+        },
         getData: () => plugin.data,
         getSettings: () => plugin.settings,
         saveSettings: () => plugin.saveSettings(),
