@@ -10,6 +10,7 @@ import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-com
 import PQueue from "p-queue";
 import { PLUGIN_MODE } from "src/core/types";
 import type { AppFeature } from "src/core/feature";
+import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchSetViewState } from "src/patches/view-state";
 import type { CoreContainer } from "src/services/core-container";
 
@@ -54,6 +55,7 @@ export class LazyEngineFeature implements AppFeature {
             register: this.ctx.register.bind(this.ctx),
             onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
         });
+        patchRibbonReorder(ctx);
 
         this.viewLoader.registerActiveLeafReload();
         this.fileLoader.register();
