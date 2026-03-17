@@ -198,13 +198,6 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     // ─── Delegated operations ──────────────────────────────────
-
-
-
-
-
-
-
     configureLogger(): void {
         const level = this.data.showConsoleLog ? "debug" : "error";
         toggleLoggerBy(level, (name) => name.startsWith("OnDemandPlugin/"));
