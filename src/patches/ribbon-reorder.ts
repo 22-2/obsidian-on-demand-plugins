@@ -11,13 +11,13 @@ export function patchRibbonReorder(ctx: PluginContext): void {
     let warned = false;
 
     ctx.register(
-        around(Plugin.prototype as any, {
-            addRibbonIcon: (next: any) =>
-                function (this: any, ...args: any[]) {
+        around(Plugin.prototype, {
+            addRibbonIcon: (next) =>
+                function (this: Plugin, ...args: Parameters<Plugin["addRibbonIcon"]>) {
                     const result = next.call(this, ...args);
                     try {
-                        if (typeof (ctx.app as any).updateRibbonDisplay === "function") {
-                            (ctx.app as any).updateRibbonDisplay();
+                        if (typeof ctx.app.updateRibbonDisplay === "function") {
+                            ctx.app.updateRibbonDisplay();
                         }
                     } catch (e) {
                         if (!warned) {
