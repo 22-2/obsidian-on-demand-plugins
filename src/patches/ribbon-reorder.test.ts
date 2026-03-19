@@ -2,9 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Plugin } from "obsidian";
 import log from "loglevel";
 import { patchRibbonReorder } from "./ribbon-reorder";
+import type { PluginContext } from "../core/plugin-context";
 
 describe("patchRibbonReorder", () => {
-    let originalAddRibbonIcon: any;
+    let originalAddRibbonIcon: Plugin["addRibbonIcon"] | undefined;
     let unregister: () => void;
 
     beforeEach(() => {
@@ -15,22 +16,22 @@ describe("patchRibbonReorder", () => {
     afterEach(() => {
         // Restore prototype if we modified it
         if (originalAddRibbonIcon !== undefined) {
-            (Plugin.prototype as any).addRibbonIcon = originalAddRibbonIcon;
+            (Plugin.prototype as unknown as Record<string, unknown>).addRibbonIcon = originalAddRibbonIcon;
         } else {
-            delete (Plugin.prototype as any).addRibbonIcon;
+            Reflect.deleteProperty(Plugin.prototype, "addRibbonIcon");
         }
     });
 
     function setupPrototype() {
-        originalAddRibbonIcon = (Plugin.prototype as any).addRibbonIcon;
-        (Plugin.prototype as any).addRibbonIcon = vi.fn().mockReturnValue({ tagName: "DIV" });
+        originalAddRibbonIcon = (Plugin.prototype as unknown as { addRibbonIcon?: Plugin["addRibbonIcon"] }).addRibbonIcon;
+        (Plugin.prototype as unknown as Record<string, unknown>).addRibbonIcon = vi.fn().mockReturnValue({ tagName: "DIV" });
     }
 
-    function createMockCtx(appOverrides: Record<string, any> = {}) {
+    function createMockCtx(appOverrides: Record<string, unknown> = {}) {
         return {
             app: { updateRibbonDisplay: vi.fn(), ...appOverrides },
             register: (fn: () => void) => { unregister = fn; },
-        } as any;
+        } as unknown as PluginContext;
     }
 
     function createPluginInstance() {
@@ -53,7 +54,7 @@ describe("patchRibbonReorder", () => {
     it("preserves original addRibbonIcon return value", () => {
         setupPrototype();
         const expectedEl = { tagName: "SPAN" };
-        (Plugin.prototype as any).addRibbonIcon = vi.fn().mockReturnValue(expectedEl);
+        (Plugin.prototype as unknown as Record<string, unknown>).addRibbonIcon = vi.fn().mockReturnValue(expectedEl);
 
         const ctx = createMockCtx();
         patchRibbonReorder(ctx);
@@ -67,7 +68,7 @@ describe("patchRibbonReorder", () => {
     it("no-ops when updateRibbonDisplay is missing", () => {
         setupPrototype();
         const ctx = createMockCtx({ updateRibbonDisplay: undefined });
-        delete ctx.app.updateRibbonDisplay;
+        delete (ctx.app as unknown as Record<string, unknown>).updateRibbonDisplay;
         patchRibbonReorder(ctx);
 
         const plugin = createPluginInstance();
@@ -76,7 +77,7 @@ describe("patchRibbonReorder", () => {
 
     it("no-ops when addRibbonIcon is missing on prototype", () => {
         // Don't add addRibbonIcon to prototype
-        originalAddRibbonIcon = (Plugin.prototype as any).addRibbonIcon;
+        originalAddRibbonIcon = (Plugin.prototype as unknown as { addRibbonIcon?: Plugin["addRibbonIcon"] }).addRibbonIcon;
         const ctx = createMockCtx();
         expect(() => patchRibbonReorder(ctx)).not.toThrow();
     });
@@ -84,7 +85,7 @@ describe("patchRibbonReorder", () => {
     it("isolates updateRibbonDisplay exceptions and logs a warning once", () => {
         setupPrototype();
         const expectedEl = { tagName: "DIV" };
-        (Plugin.prototype as any).addRibbonIcon = vi.fn().mockReturnValue(expectedEl);
+        (Plugin.prototype as unknown as Record<string, unknown>).addRibbonIcon = vi.fn().mockReturnValue(expectedEl);
 
         const error = new Error("ribbon exploded");
         const ctx = createMockCtx({
@@ -98,7 +99,7 @@ describe("patchRibbonReorder", () => {
         const warnSpy = vi.spyOn(logger, "warn").mockImplementation(() => {});
         const plugin = createPluginInstance();
 
-        let result: any;
+        let result!: ReturnType<Plugin["addRibbonIcon"]>;
         expect(() => { result = plugin.addRibbonIcon("dice", "Test", vi.fn()); }).not.toThrow();
         expect(result).toBe(expectedEl);
         expect(warnSpy).toHaveBeenCalledWith("updateRibbonDisplay failed:", error);
