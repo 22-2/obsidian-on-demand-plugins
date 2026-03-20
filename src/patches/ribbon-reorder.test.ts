@@ -114,16 +114,16 @@ describe("patchRibbonReorder", () => {
 
     it("cleanup restores original method", () => {
         setupPrototype();
-        const original = (Plugin.prototype as any).addRibbonIcon;
+        const original = (Plugin.prototype as unknown as { addRibbonIcon?: Plugin["addRibbonIcon"] }).addRibbonIcon;
         const ctx = createMockCtx();
         patchRibbonReorder(ctx);
 
         // Method should be patched (different from original)
-        expect((Plugin.prototype as any).addRibbonIcon).not.toBe(original);
+        expect((Plugin.prototype as unknown as { addRibbonIcon?: Plugin["addRibbonIcon"] }).addRibbonIcon).not.toBe(original);
 
         // Call unregister to restore
         unregister();
 
-        expect((Plugin.prototype as any).addRibbonIcon).toBe(original);
+        expect((Plugin.prototype as unknown as { addRibbonIcon?: Plugin["addRibbonIcon"] }).addRibbonIcon).toBe(original);
     });
 });

@@ -80,7 +80,7 @@ export default class OnDemandPlugin extends Plugin {
 
             const policyFeature = this.features.get(StartupPolicyFeature);
             if (policyFeature) {
-                await (policyFeature as StartupPolicyFeature).applyWithProgress(progress);
+                await policyFeature.applyWithProgress(progress);
             }
 
             if (lazyEngine) {
@@ -91,7 +91,7 @@ export default class OnDemandPlugin extends Plugin {
         this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[] }) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
             if (policyFeature) {
-                await (policyFeature as StartupPolicyFeature).applyWithProgress(null, options?.pluginIds);
+                await policyFeature.applyWithProgress(null, options?.pluginIds);
             }
         });
     }
@@ -158,23 +158,23 @@ export default class OnDemandPlugin extends Plugin {
     async applyStartupPolicyAndRestart(pluginIds?: string[]) {
         const policyFeature = this.features.get(StartupPolicyFeature);
         if (policyFeature) {
-            await (policyFeature as StartupPolicyFeature).applyWithProgress(null, pluginIds);
+            await policyFeature.applyWithProgress(null, pluginIds);
         }
     }
 
     async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
         const maintenance = this.features.get(MaintenanceFeature);
         if (maintenance) {
-            await (maintenance as MaintenanceFeature).rebuildAndApplyCommandCache(options);
+            await maintenance.rebuildAndApplyCommandCache(options);
         }
     }
 
     async switchProfile(profileId: string) {
-        await this.core.settingsService.switchProfile(profileId);
+        this.core.settingsService.switchProfile(profileId);
         this.settings = this.core.settingsService.settings;
         await this.saveSettings();
         const policyFeature = this.features.get(StartupPolicyFeature);
-        await (policyFeature as StartupPolicyFeature).applyWithProgress(null);
+        await policyFeature?.applyWithProgress(null);
     }
 
     updateManifests() {

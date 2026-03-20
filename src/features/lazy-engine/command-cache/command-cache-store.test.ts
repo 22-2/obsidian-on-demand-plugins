@@ -7,7 +7,10 @@ vi.mock("../../../core/storage");
 
 describe("CommandCacheStore", () => {
     let store: CommandCacheStore;
-    let mockCtx: any;
+    let mockCtx: {
+        app: object;
+        getManifests: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         vi.resetAllMocks();

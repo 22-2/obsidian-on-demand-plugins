@@ -43,7 +43,7 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
         const { app } = this.ctx;
 
         this.ctx.registerEvent(
-            app.workspace.on("file-open", async (file: TFile | null) => {
+            app.workspace.on("file-open", (file: TFile | null) => {
                 if (!file) return;
 
                 app.workspace.iterateAllLeaves((leaf) => {
@@ -91,22 +91,22 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
             leaf,
             async () => resolvePluginForFile(this.ctx, file),
             { leafId, description: file.path },
-            async (wasNewlyLoaded) => {
+            (wasNewlyLoaded) => {
                 // Only rebuild if the plugin was newly loaded
                 if (!wasNewlyLoaded) {
                     logger.debug(`skipping rebuildLeafView for ${file.path} - plugin was not newly loaded`);
-                    return;
+                    return Promise.resolve();
                 }
 
                 // Check if the view has already been transformed by the plugin
                 const viewTypeAfterLoad = leaf.view.getViewType();
                 if (viewTypeAfterLoad !== "markdown") {
                     logger.debug(`skipping rebuildLeafView for ${file.path} - view already transformed to ${viewTypeAfterLoad}`);
-                    return;
+                    return Promise.resolve();
                 }
 
                 // After loading the plugin, rebuild the view if still needed
-                await this.rebuildLeafViewWithLogging(leaf, leafId);
+                return this.rebuildLeafViewWithLogging(leaf, leafId);
             },
         );
     }

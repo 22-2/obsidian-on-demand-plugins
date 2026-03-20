@@ -1,8 +1,11 @@
+import log from "loglevel";
 import { Platform } from "obsidian";
 import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, LazySettings, Profile } from "src/core/types";
 import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS } from "src/core/types";
 import type OnDemandPlugin from "src/main";
+
+const logger = log.getLogger("OnDemandPlugin/SettingsService");
 
 export class SettingsService {
     data: LazySettings;
@@ -81,7 +84,7 @@ export class SettingsService {
             return;
         }
 
-        console.log("[Lazy Plugin] Migrating legacy settings to profiles...");
+        logger.debug("[Lazy Plugin] Migrating legacy settings to profiles...");
 
         const profiles: Record<string, Profile> = {};
 
@@ -130,7 +133,7 @@ export class SettingsService {
      * Does NOT change the default profile for the device (desktopProfileId/mobileProfileId)
      * unless explicitly requested.
      */
-    async switchProfile(profileId: string) {
+    switchProfile(profileId: string) {
         if (!this.data.profiles[profileId]) {
             throw new Error(`Profile ${profileId} not found`);
         }

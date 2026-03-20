@@ -1,5 +1,5 @@
 import log from "loglevel";
-import type { Command, MarkdownFileInfo } from "obsidian";
+import type { MarkdownFileInfo } from "obsidian";
 import { MarkdownView } from "obsidian";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
@@ -19,7 +19,7 @@ export class CommandExecutor {
      * @returns True if the command was executed successfully, false otherwise
      */
     executeCommandDirect(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as Command;
+        const command = this.ctx.obsidianCommands.commands[commandId];
 
         if (!command) return false;
 
@@ -88,7 +88,7 @@ export class CommandExecutor {
     }
 
     isCommandExecutable(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as Command | undefined;
+        const command = this.ctx.obsidianCommands.commands[commandId];
 
         if (!command) return false;
 

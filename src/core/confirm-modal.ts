@@ -17,7 +17,7 @@ import { Modal } from "obsidian";
  * ```
  */
 export async function showConfirmModal(app: App, args: { message: string }): Promise<boolean | null> {
-    return new ConfirmModal(app, args.message).open();
+    return new ConfirmModal(app, args.message).openAndWait();
 }
 
 export class ConfirmModal extends Modal {
@@ -83,7 +83,7 @@ export class ConfirmModal extends Modal {
     /**
      * Open the dialog and return a Promise that resolves with the user's choice.
      */
-    open(): Promise<boolean | null> {
+    openAndWait(): Promise<boolean | null> {
         super.open();
         return new Promise<boolean | null>((resolve) => {
             this.resolve = resolve;

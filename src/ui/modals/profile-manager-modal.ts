@@ -80,27 +80,31 @@ export class ProfileManagerModal extends Modal {
 
                 menu.addItem((item) =>
                     item
-                        .setTitle("Set as Desktop default")
+                        .setTitle("Set as desktop default")
                         .setIcon("monitor")
                         .setChecked(isDesktopDefault)
                         .setDisabled(isDesktopDefault)
-                        .onClick(async () => {
+                        .onClick(() => {
+                            void (async () => {
                             this.settingsService.setDeviceDefault(id, "desktop");
                             await this.settingsService.save();
                             this.onOpen();
+                            })();
                         }),
                 );
 
                 menu.addItem((item) =>
                     item
-                        .setTitle("Set as Mobile default")
+                        .setTitle("Set as mobile default")
                         .setIcon("smartphone")
                         .setChecked(isMobileDefault)
                         .setDisabled(isMobileDefault)
-                        .onClick(async () => {
+                        .onClick(() => {
+                            void (async () => {
                             this.settingsService.setDeviceDefault(id, "mobile");
                             await this.settingsService.save();
                             this.onOpen();
+                            })();
                         }),
                 );
 

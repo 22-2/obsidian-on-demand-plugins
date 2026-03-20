@@ -84,7 +84,7 @@ export class LazyOptionsModal extends Modal {
 
         if (this.options.useFile) {
             new Setting(contentEl)
-                .setName("File Suffixes")
+                .setName("File suffixes")
                 .setDesc("Matches the end of the filename (basename). e.g., '.excalidraw' for 'file.excalidraw.md'")
                 .addTextArea((text) =>
                     text
@@ -130,9 +130,9 @@ export class LazyOptionsModal extends Modal {
             .addButton((btn) => btn.setButtonText("Cancel").onClick(() => this.close()))
             .addButton((btn) =>
                 btn
-                    .setButtonText("Save Options")
+                    .setButtonText("Save options")
                     .setCta()
-                    .onClick(async () => {
+                    .onClick(() => {
                         const pluginSettings = this.plugin.settings.plugins[this.pluginId];
                         if (pluginSettings) {
                             pluginSettings.lazyOptions = this.options;

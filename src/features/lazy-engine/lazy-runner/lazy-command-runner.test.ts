@@ -13,7 +13,14 @@ vi.mock("p-wait-for");
 
 describe("LazyCommandRunner", () => {
     let runner: LazyCommandRunner;
-    let mockCtx: any;
+    let mockCtx: {
+        app: { workspace: { on: ReturnType<typeof vi.fn>; off: ReturnType<typeof vi.fn> } };
+        obsidianPlugins: {
+            enabledPlugins: Set<string>;
+            enablePlugin: ReturnType<typeof vi.fn>;
+        };
+        getData: ReturnType<typeof vi.fn>;
+    };
     let mockRegistry: Mocked<CommandRegistry>;
 
     beforeEach(() => {
@@ -37,7 +44,7 @@ describe("LazyCommandRunner", () => {
             getCachedCommand: vi.fn(),
             syncCommandWrappersForPlugin: vi.fn(),
             isWrapperCommand: vi.fn(),
-        } as any;
+        } as unknown as Mocked<CommandRegistry>;
 
         runner = new LazyCommandRunner(mockCtx as unknown as PluginContext);
         runner.setCommandRegistry(mockRegistry);
@@ -58,7 +65,7 @@ describe("LazyCommandRunner", () => {
         it("should enable and wait for plugin if not loaded/enabled", async () => {
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
             vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(false);
-            vi.mocked(pWaitFor).mockResolvedValue(undefined as any);
+            vi.mocked(pWaitFor).mockResolvedValue(undefined);
 
             // After enablePlugin, next check should be true
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValueOnce(false).mockReturnValue(true);
@@ -81,7 +88,7 @@ describe("LazyCommandRunner", () => {
 
         it("should use mutex to serialize multiple calls for same plugin", async () => {
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
-            vi.mocked(pWaitFor).mockResolvedValue(undefined as any);
+            vi.mocked(pWaitFor).mockResolvedValue(undefined);
 
             // First call will trigger enablePlugin.
             // Second call (serialized by mutex) should see it's already loaded and skip enablePlugin.
@@ -122,7 +129,7 @@ describe("LazyCommandRunner", () => {
             vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);
 
             // Mock executor functionality inside runner (relying on internal property access)
-            const executor = (runner as any).commandExecutor;
+            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean; executeCommandDirect: (id: string) => boolean } }).commandExecutor;
             vi.spyOn(executor, "isCommandExecutable").mockReturnValue(true);
             const executeSpy = vi.spyOn(executor, "executeCommandDirect").mockReturnValue(true);
 
@@ -134,7 +141,7 @@ describe("LazyCommandRunner", () => {
 
     describe("waitForCommand", () => {
         it("should return true immediately if command is executable", async () => {
-            const executor = (runner as any).commandExecutor;
+            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean } }).commandExecutor;
             vi.spyOn(executor, "isCommandExecutable").mockReturnValue(true);
 
             const result = await runner.waitForCommand("cmd1");
