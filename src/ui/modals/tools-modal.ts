@@ -9,7 +9,7 @@ import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature
 export class ToolsModal extends Modal {
     private fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;
     private toMode: PluginMode = PLUGIN_MODE.LAZY;
-    private confirmTimeout: number | null = null;
+    private confirmTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
     private activeTabId: string = "sync";
     private tabContentEl!: HTMLElement;
 
@@ -115,8 +115,8 @@ export class ToolsModal extends Modal {
             .setDesc("Choose which source should update the other.")
             .addDropdown((dropdown) => {
                 dropdown
-                .addOption("lazyToCore", "Plugin data ➔ Obsidian config")
-                .addOption("coreToLazy", "Obsidian config ➔ Plugin data")
+                .addOption("lazyToCore", "Plugin data -> Obsidian config")
+                .addOption("coreToLazy", "Obsidian config -> plugin data")
                     .setValue(syncDirection)
                     .onChange((val: SyncDirection) => {
                         syncDirection = val;
@@ -201,8 +201,8 @@ export class ToolsModal extends Modal {
 
                     if (btn.buttonEl.innerText === "Replace all") {
                         btn.setButtonText("Click to confirm").setWarning();
-                        if (this.confirmTimeout) window.clearTimeout(this.confirmTimeout);
-                        this.confirmTimeout = window.setTimeout(() => {
+                        if (this.confirmTimeout) globalThis.clearTimeout(this.confirmTimeout);
+                        this.confirmTimeout = globalThis.setTimeout(() => {
                             btn.setButtonText("Replace all");
                             btn.buttonEl.removeClass("mod-warning");
                         }, 3000);
@@ -210,7 +210,7 @@ export class ToolsModal extends Modal {
                     }
 
                     if (this.confirmTimeout) {
-                        window.clearTimeout(this.confirmTimeout);
+                        globalThis.clearTimeout(this.confirmTimeout);
                         this.confirmTimeout = null;
                     }
 
@@ -232,7 +232,9 @@ export class ToolsModal extends Modal {
     private addModeOptions(dropdown: DropdownComponent): DropdownComponent {
         Object.keys(PluginModes)
             .filter((key) => key !== "lazyOnView")
-            .forEach((key) => dropdown.addOption(key, PluginModes[key as PluginMode]));
+            .forEach((key) => {
+                dropdown.addOption(key, PluginModes[key as PluginMode]);
+            });
         return dropdown;
     }
 

@@ -23,21 +23,21 @@ export class CommandExecutor {
 
         if (!command) return false;
 
-        const activeEditor = this.ctx.app.workspace.activeEditor as MarkdownFileInfo | null;
+        const activeEditor: MarkdownFileInfo | null = this.ctx.app.workspace.activeEditor;
 
         if (activeEditor && activeEditor.editor) {
             const editor = activeEditor.editor;
+            const activeElement = document.activeElement;
 
             // Follow conditions from obsidian's source
             if (activeEditor instanceof MarkdownView) {
                 const view = activeEditor;
-                const activeEl = activeDocument.activeElement;
-                if (view.inlineTitleEl?.contains(activeEl) || view.titleEl?.contains(activeEl)) {
+                if (view.inlineTitleEl?.contains(activeElement) || view.titleEl?.contains(activeElement)) {
                     return false;
                 }
             }
 
-            if (!command.allowProperties && activeDocument.activeElement?.closest(".metadata-container")) {
+            if (!command.allowProperties && activeElement?.closest(".metadata-container")) {
                 return false;
             }
 

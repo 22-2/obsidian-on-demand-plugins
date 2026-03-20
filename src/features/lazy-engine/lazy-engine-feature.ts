@@ -52,7 +52,7 @@ export class LazyEngineFeature implements AppFeature {
 
         // 3. Patches and Subscriptions
         patchSetViewState({
-            register: this.ctx.register.bind(this.ctx),
+            register: (unload) => this.ctx.register(unload),
             onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
         });
         patchRibbonReorder(ctx);

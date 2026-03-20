@@ -16,13 +16,12 @@ describe("CommandExecutor", () => {
     beforeEach(() => {
         vi.resetAllMocks();
 
-        // Mock global activeDocument
-        (global as unknown as { activeDocument: unknown }).activeDocument = {
+        globalThis.document = {
             activeElement: {
                 closest: vi.fn().mockReturnValue(null),
                 contains: vi.fn().mockReturnValue(false),
             },
-        };
+        } as unknown as Document;
 
         mockCtx = {
             app: {
@@ -152,7 +151,7 @@ describe("CommandExecutor", () => {
 
         it("should return false if in metadata-container and allowProperties is false", () => {
             mockCtx.app.workspace.activeEditor = { editor: {} };
-            (activeDocument.activeElement?.closest as ReturnType<typeof vi.fn>).mockReturnValue({}); // in a container
+            (document.activeElement?.closest as ReturnType<typeof vi.fn>).mockReturnValue({}); // in a container
 
             const cmd = {
                 callback: vi.fn(),

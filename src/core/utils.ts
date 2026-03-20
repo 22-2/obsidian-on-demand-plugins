@@ -10,8 +10,10 @@ export function sleep(ms: number) {
 
 export function toggleLoggerBy(level: LogLevelDesc, filter: (name: string) => boolean = () => true): void {
     Object.values(log.getLoggers())
-        // @ts-expect-error - loglevel types don't expose name property
-        .filter((logger) => filter(logger.name))
+        .filter((logger) => {
+            const loggerName = (logger as { name?: unknown }).name;
+            return typeof loggerName === "string" && filter(loggerName);
+        })
         .forEach((logger) => {
             logger.setLevel(level);
         });

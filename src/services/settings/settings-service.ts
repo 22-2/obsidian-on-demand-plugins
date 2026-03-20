@@ -7,6 +7,10 @@ import type OnDemandPlugin from "src/main";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsService");
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
+
 export class SettingsService {
     data: LazySettings;
     /** Currently active device settings (points to the active profile's settings) */
@@ -20,7 +24,8 @@ export class SettingsService {
 
     async load() {
         // 1. Load raw data
-        const loaded = (await this.plugin.loadData()) || {};
+        const rawLoaded: unknown = await this.plugin.loadData();
+        const loaded = isRecord(rawLoaded) ? (rawLoaded as Partial<LazySettings>) : {};
         this.isFirstLoad = Object.keys(loaded).length === 0;
 
         // 2. Merge with defaults (shallow merge at top level)
@@ -149,11 +154,11 @@ export class SettingsService {
     }
 
     createProfile(name: string, sourceProfileId?: string): string {
-        const newId = crypto.randomUUID();
+        const newId = globalThis.crypto.randomUUID();
         const sourceSettings = sourceProfileId && this.data.profiles[sourceProfileId] ? this.data.profiles[sourceProfileId].settings : DEFAULT_DEVICE_SETTINGS;
 
         // Deep copy settings to avoid reference issues
-        const newSettings = JSON.parse(JSON.stringify(sourceSettings));
+        const newSettings = structuredClone(sourceSettings);
 
         this.data.profiles[newId] = {
             id: newId,

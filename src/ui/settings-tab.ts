@@ -111,7 +111,7 @@ export class SettingsTab extends PluginSettingTab {
 
         // --- Standard Settings ---
 
-        new Setting(this.containerEl).setName("General behavior").setHeading();
+        new Setting(this.containerEl).setName("Plugin behavior").setHeading();
 
         new Setting(this.containerEl)
             .setName("Default mode")
@@ -181,7 +181,9 @@ export class SettingsTab extends PluginSettingTab {
                 dropdown.addOption("", "All");
                 Object.keys(PluginModes)
                     .filter((key) => key !== "lazyOnView")
-                    .forEach((key) => dropdown.addOption(key, PluginModes[key as PluginMode]));
+                    .forEach((key) => {
+                        dropdown.addOption(key, PluginModes[key as PluginMode]);
+                    });
                 dropdown.setValue(this.filterMethod ?? "");
                 dropdown.onChange((value: string) => {
                     this.filterMethod = value === "" ? undefined : (value as PluginMode);

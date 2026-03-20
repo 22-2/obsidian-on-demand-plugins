@@ -84,16 +84,21 @@ export interface PluginContext {
  * to the PluginContext interface used by all services.
  */
 export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
+    const appWithInternals = plugin.app as App & {
+        plugins: Plugins;
+        commands: Commands;
+    };
+
     return {
         _plugin: plugin,
         get app() {
             return plugin.app;
         },
         get obsidianPlugins() {
-            return (plugin.app as unknown as { plugins: Plugins }).plugins;
+            return appWithInternals.plugins;
         },
         get obsidianCommands() {
-            return (plugin.app as unknown as { commands: Commands }).commands;
+            return appWithInternals.commands;
         },
         getManifests: () => plugin.manifests,
         getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
@@ -105,8 +110,8 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         getData: () => plugin.data,
         getSettings: () => plugin.settings,
         saveSettings: () => plugin.saveSettings(),
-        register: plugin.register.bind(plugin),
-        registerEvent: plugin.registerEvent.bind(plugin),
+        register: (unload) => plugin.register(unload),
+        registerEvent: (eventRef) => plugin.registerEvent(eventRef),
         isPluginEnabledOnDisk: (pluginId) => plugin.isPluginEnabledOnDisk(pluginId),
     };
 }

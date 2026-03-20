@@ -97,7 +97,7 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     onunload() {
-        this.features?.unloadAll();
+        void this.features?.unloadAll();
         this.core?.destroy();
     }
 

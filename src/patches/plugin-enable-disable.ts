@@ -11,13 +11,14 @@ import { LazyEngineFeature } from "../features/lazy-engine/lazy-engine-feature";
  * without losing their lazy-loading configuration.
  */
 export function patchPluginEnableDisable(ctx: PluginContext): void {
-    const obsidianPlugins = ctx.obsidianPlugins as unknown as Plugins;
+    const obsidianPlugins = ctx.obsidianPlugins;
 
     ctx.register(
         around(obsidianPlugins, {
-            enablePlugin: (next) =>
+            enablePlugin: (next: Plugins["enablePlugin"]) =>
                 async function (this: Plugins, pluginId: string) {
-                    const result = await next.call(this, pluginId);
+                    const callNext = next as (this: Plugins, pluginId: string) => ReturnType<Plugins["enablePlugin"]>;
+                    await callNext.call(this, pluginId);
 
                     // Only sync if the mode was ALWAYS_DISABLED. If it's a LAZY mode, 
                     // we want to preserve that setting for the next start.
@@ -32,11 +33,12 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
                         lazyEngine.commandCache.syncCommandWrappersForPlugin(pluginId);
                     }
 
-                    return result;
+                    return;
                 },
-            disablePlugin: (next) =>
+            disablePlugin: (next: Plugins["disablePlugin"]) =>
                 async function (this: Plugins, pluginId: string) {
-                    const result = await next.call(this, pluginId);
+                    const callNext = next as (this: Plugins, pluginId: string) => ReturnType<Plugins["disablePlugin"]>;
+                    await callNext.call(this, pluginId);
 
                     // Only sync if the mode was ALWAYS_ENABLED. If it's a LAZY mode, 
                     // we preserve it. It will be successfully initialized with wrappers on the next start.
@@ -51,7 +53,7 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
                         lazyEngine.commandCache.syncCommandWrappersForPlugin(pluginId);
                     }
 
-                    return result;
+                    return;
                 },
         }),
     );

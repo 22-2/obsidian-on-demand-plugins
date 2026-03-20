@@ -20,10 +20,11 @@ export function patchViewRegistry(
     }
 
     const settings = ctx.getSettings();
+    type RegisterView = NonNullable<NonNullable<typeof viewRegistry>["registerView"]>;
 
     return around(viewRegistry as Required<typeof viewRegistry>, {
-        registerView: (next) =>
-            function (this: unknown, type: string, creator: unknown) {
+        registerView: (next: RegisterView) =>
+            function (this: unknown, type: string, creator: unknown): unknown {
                 const loadingId = (ctx.app as unknown as { plugins: Plugins }).plugins.loadingPluginId as string | undefined;
 
                 if (loadingId && type) {
@@ -46,7 +47,8 @@ export function patchViewRegistry(
                     }
                 }
 
-                return next.apply(this, [type, creator]);
+                const result: ReturnType<RegisterView> = next.call(this, type, creator);
+                return result;
             },
     });
 }
