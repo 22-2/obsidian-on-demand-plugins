@@ -1,8 +1,15 @@
+import log from "loglevel";
 import { Platform } from "obsidian";
 import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, LazySettings, Profile } from "src/core/types";
 import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS } from "src/core/types";
 import type OnDemandPlugin from "src/main";
+
+const logger = log.getLogger("OnDemandPlugin/SettingsService");
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null;
+}
 
 export class SettingsService {
     data: LazySettings;
@@ -17,7 +24,8 @@ export class SettingsService {
 
     async load() {
         // 1. Load raw data
-        const loaded = (await this.plugin.loadData()) || {};
+        const rawLoaded: unknown = await this.plugin.loadData();
+        const loaded = isRecord(rawLoaded) ? (rawLoaded as Partial<LazySettings>) : {};
         this.isFirstLoad = Object.keys(loaded).length === 0;
 
         // 2. Merge with defaults (shallow merge at top level)
@@ -81,7 +89,7 @@ export class SettingsService {
             return;
         }
 
-        console.log("[Lazy Plugin] Migrating legacy settings to profiles...");
+        logger.debug("[Lazy Plugin] Migrating legacy settings to profiles...");
 
         const profiles: Record<string, Profile> = {};
 
@@ -130,7 +138,7 @@ export class SettingsService {
      * Does NOT change the default profile for the device (desktopProfileId/mobileProfileId)
      * unless explicitly requested.
      */
-    async switchProfile(profileId: string) {
+    switchProfile(profileId: string) {
         if (!this.data.profiles[profileId]) {
             throw new Error(`Profile ${profileId} not found`);
         }
@@ -146,11 +154,11 @@ export class SettingsService {
     }
 
     createProfile(name: string, sourceProfileId?: string): string {
-        const newId = crypto.randomUUID();
+        const newId = globalThis.crypto.randomUUID();
         const sourceSettings = sourceProfileId && this.data.profiles[sourceProfileId] ? this.data.profiles[sourceProfileId].settings : DEFAULT_DEVICE_SETTINGS;
 
         // Deep copy settings to avoid reference issues
-        const newSettings = JSON.parse(JSON.stringify(sourceSettings));
+        const newSettings = structuredClone(sourceSettings);
 
         this.data.profiles[newId] = {
             id: newId,

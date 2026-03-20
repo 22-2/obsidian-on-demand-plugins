@@ -1,8 +1,5 @@
 import log from "loglevel";
-import type { CoreContainer } from "src/services/core-container";
 import type { AppFeature } from "src/core/feature";
-import type { EventBus } from "src/core/event-bus";
-import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
 
 // Needed dynamic import from obsidian
@@ -10,20 +7,23 @@ import { moment, normalizePath } from "obsidian";
 
 const logger = log.getLogger("OnDemandPlugin/BackupFeature");
 
+function hasProfilesRecord(value: unknown): value is { profiles: Record<string, unknown> } {
+    return typeof value === "object" && value !== null && "profiles" in value && typeof value.profiles === "object" && value.profiles !== null;
+}
+
 export class BackupFeature implements AppFeature {
     private backupDir!: string;
     private ctx!: PluginContext;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    onload(ctx: PluginContext, _core: CoreContainer, _features: FeatureManager, _events: EventBus) {
+    onload(ctx: PluginContext) {
         this.ctx = ctx;
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
 
         // Whenever settings are saved, we create a backup
         // @ts-expect-error - Custom workspace event
-        this.ctx.app.workspace.on("ondemand-plugins:settings-saved", async () => {
-            await this.createBackup();
+        this.ctx.app.workspace.on("ondemand-plugins:settings-saved", () => {
+            void this.createBackup();
         });
     }
 
@@ -41,7 +41,7 @@ export class BackupFeature implements AppFeature {
 
     async createBackup() {
         if (!this.ctx) return;
-        
+
         await this.ensureBackupFolder();
         const adapter = this.ctx.app.vault.adapter;
 
@@ -62,8 +62,8 @@ export class BackupFeature implements AppFeature {
 
         // 2. Validate json
         try {
-            const dataParsed = JSON.parse(dataContent);
-            if (!dataParsed || !dataParsed.profiles) {
+            const dataParsed: unknown = JSON.parse(dataContent);
+            if (!hasProfilesRecord(dataParsed)) {
                 logger.warn("Invalid data.json for backup, skipping validation failed.");
                 return;
             }
@@ -73,7 +73,7 @@ export class BackupFeature implements AppFeature {
         }
 
         try {
-            const communityParsed = JSON.parse(communityContent);
+            const communityParsed: unknown = JSON.parse(communityContent);
             if (!Array.isArray(communityParsed)) {
                 logger.warn("Invalid community-plugins.json for backup, skipping");
                 return;

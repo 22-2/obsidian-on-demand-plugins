@@ -16,7 +16,9 @@ const logger = log.getLogger("OnDemandPlugin/ViewLazyLoader");
  * plugin is loaded and commands are synchronized.
  */
 export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
-    private debouncedInitializeLazyViewForLeaf = debounce(this.initializeLazyViewForLeaf.bind(this), 100, true);
+    private debouncedInitializeLazyViewForLeaf = debounce((leaf: WorkspaceLeaf) => {
+        void this.initializeLazyViewForLeaf(leaf);
+    }, 100, true);
 
     constructor(
         ctx: PluginContext,

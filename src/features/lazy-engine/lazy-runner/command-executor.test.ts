@@ -6,19 +6,22 @@ import { CommandExecutor } from "src/features/lazy-engine/lazy-runner/command-ex
 
 describe("CommandExecutor", () => {
     let executor: CommandExecutor;
-    let mockCtx: any;
+    let mockCtx: {
+        app: { workspace: { activeEditor: unknown } };
+        obsidianCommands: { commands: Record<string, unknown> };
+        getData: ReturnType<typeof vi.fn>;
+    };
     let mockRegistry: Mocked<CommandRegistry>;
 
     beforeEach(() => {
         vi.resetAllMocks();
 
-        // Mock global activeDocument
-        (global as any).activeDocument = {
+        globalThis.document = {
             activeElement: {
                 closest: vi.fn().mockReturnValue(null),
                 contains: vi.fn().mockReturnValue(false),
             },
-        };
+        } as unknown as Document;
 
         mockCtx = {
             app: {
@@ -36,7 +39,7 @@ describe("CommandExecutor", () => {
             isWrapperCommand: vi.fn().mockReturnValue(false),
             getCachedCommand: vi.fn(),
             syncCommandWrappersForPlugin: vi.fn(),
-        } as any;
+        } as unknown as Mocked<CommandRegistry>;
 
         executor = new CommandExecutor(mockCtx as unknown as PluginContext, mockRegistry);
     });
@@ -133,11 +136,11 @@ describe("CommandExecutor", () => {
         });
 
         it("should return false if active element is title element", () => {
-            // @ts-expect-error
+            // @ts-expect-error - Create minimal MarkdownView instance for title-focus branch coverage
             const view = new MarkdownView();
-            (view as any).inlineTitleEl = { contains: vi.fn().mockReturnValue(true) };
+            (view as unknown as { inlineTitleEl: unknown }).inlineTitleEl = { contains: vi.fn().mockReturnValue(true) };
             mockCtx.app.workspace.activeEditor = view;
-            (view as any).editor = {};
+            (view as unknown as { editor: unknown }).editor = {};
 
             const cmd = { callback: vi.fn() };
             mockCtx.obsidianCommands.commands["cmd1"] = cmd;
@@ -148,7 +151,7 @@ describe("CommandExecutor", () => {
 
         it("should return false if in metadata-container and allowProperties is false", () => {
             mockCtx.app.workspace.activeEditor = { editor: {} };
-            (activeDocument.activeElement?.closest as any).mockReturnValue({}); // in a container
+            (document.activeElement?.closest as ReturnType<typeof vi.fn>).mockReturnValue({}); // in a container
 
             const cmd = {
                 callback: vi.fn(),

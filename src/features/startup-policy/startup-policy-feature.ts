@@ -1,7 +1,7 @@
 import { Mutex } from "async-mutex";
 import log from "loglevel";
 import type { PluginManifest } from "obsidian";
-import type { Commands, Plugins } from "obsidian-typings";
+import type { Commands } from "obsidian-typings";
 import { ON_DEMAND_PLUGIN_ID } from "src/core/constants";
 import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";

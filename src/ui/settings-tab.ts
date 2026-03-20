@@ -33,7 +33,11 @@ export class SettingsTab extends PluginSettingTab {
         this.pluginSettings = this.plugin.settings.plugins;
     }
 
-    async display() {
+    display(): void {
+        void this.displayAsync();
+    }
+
+    private async displayAsync(): Promise<void> {
         const { containerEl } = this;
         this.containerEl = containerEl;
 
@@ -71,28 +75,9 @@ export class SettingsTab extends PluginSettingTab {
                     dropdown.addOption(p.id, p.name);
                 });
                 dropdown.setValue(this.plugin.core.settingsService.currentProfileId);
-                dropdown.onChange(async (newProfileId) => {
-                    const currentId = this.plugin.core.settingsService.currentProfileId;
-                    if (newProfileId === currentId) return;
-
-                    // If dirty, ask for confirmation
-                    if (this.isDirty || this.pendingPluginIds.size > 0) {
-                        const confirm = await showConfirmModal(this.app, {
-                            message: "You have unsaved changes in the current profile. If you switch now, these changes will be lost. Switch anyway?",
-                        });
-                        if (confirm !== true) {
-                            dropdown.setValue(currentId);
-                            return;
-                        }
-                    }
-
-                    // Use the managed switchProfile method which updates references and saves
-                    this.isDirty = false;
-                    this.pendingPluginIds.clear();
-                    new Notice(`Switched to profile: ${profiles[newProfileId].name}`);
-                    await this.plugin.switchProfile(newProfileId);
-                    this.display(); // Rebuild everything for the new profile
-                });
+                    dropdown.onChange((newProfileId) => {
+                        void this.handleProfileChange(newProfileId, dropdown);
+                    });
             })
             .addExtraButton((btn) => {
                 btn.setIcon("settings")
@@ -102,8 +87,8 @@ export class SettingsTab extends PluginSettingTab {
                             this.app,
                             this.plugin.core.settingsService, // Access via core to get the instance
                             // Callback on change
-                            async () => {
-                                await this.plugin.saveSettings();
+                            () => {
+                                void this.plugin.saveSettings();
                                 this.buildDom(); // Refresh dropdown
                             },
                         ).open();
@@ -126,7 +111,7 @@ export class SettingsTab extends PluginSettingTab {
 
         // --- Standard Settings ---
 
-        new Setting(this.containerEl).setName("General behavior").setHeading();
+        new Setting(this.containerEl).setName("Plugin behavior").setHeading();
 
         new Setting(this.containerEl)
             .setName("Default mode")
@@ -141,10 +126,10 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         new Setting(this.containerEl)
-            .setName("Maintenance & batch operations")
+            .setName("Maintenance and batch operations")
             .setDesc("Rebuild command cache, sync with Obsidian settings, or batch-update plugin modes.")
             .addButton((button) => {
-                button.setButtonText("Open Tools");
+                button.setButtonText("Open tools");
                 button.onClick(() => {
                     new ToolsModal(this.app, this.plugin, () => {
                         this.buildDom();
@@ -159,35 +144,16 @@ export class SettingsTab extends PluginSettingTab {
                 this.applyButton = button;
                 button.setButtonText("Save changes");
                 button.setCta();
-                button.onClick(async () => {
-                    const count = this.pendingPluginIds.size;
-                    this.normalizelazyOnViews();
-                    await this.plugin.saveSettings();
-                    this.plugin.configureLogger(); // Apply log level immediately
-
-                    if (count > 0) {
-                        await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds: Array.from(this.pendingPluginIds) });
-                    } else {
-                        new Notice("Settings saved");
-                    }
-
-                    this.isDirty = false;
-                    this.pendingPluginIds.clear();
-                    this.updateApplyButton();
+                button.onClick(() => {
+                    void this.handleSaveChanges();
                 });
             })
             .addButton((button) => {
                 this.discardButton = button;
                 button.setButtonText("Discard");
                 button.setTooltip("Discard unsaved changes");
-                button.onClick(async () => {
-                    if (await showConfirmModal(this.app, { message: "Are you sure you want to discard all unsaved changes?" })) {
-                        await this.plugin.loadSettings();
-                        this.isDirty = false;
-                        this.pendingPluginIds.clear();
-                        this.display();
-                        new Notice("Changes discarded");
-                    }
+                button.onClick(() => {
+                    void this.handleDiscardChanges();
                 });
             });
 
@@ -215,7 +181,9 @@ export class SettingsTab extends PluginSettingTab {
                 dropdown.addOption("", "All");
                 Object.keys(PluginModes)
                     .filter((key) => key !== "lazyOnView")
-                    .forEach((key) => dropdown.addOption(key, PluginModes[key as PluginMode]));
+                    .forEach((key) => {
+                        dropdown.addOption(key, PluginModes[key as PluginMode]);
+                    });
                 dropdown.setValue(this.filterMethod ?? "");
                 dropdown.onChange((value: string) => {
                     this.filterMethod = value === "" ? undefined : (value as PluginMode);
@@ -226,6 +194,57 @@ export class SettingsTab extends PluginSettingTab {
         // Add an element to contain the plugin list
         this.pluginListContainer = this.containerEl.createEl("div");
         this.buildPluginList();
+    }
+
+    private async handleProfileChange(newProfileId: string, dropdown: DropdownComponent): Promise<void> {
+        const profiles = this.plugin.data.profiles;
+        const currentId = this.plugin.core.settingsService.currentProfileId;
+        if (newProfileId === currentId) return;
+
+        // If dirty, ask for confirmation
+        if (this.isDirty || this.pendingPluginIds.size > 0) {
+            const confirm = await showConfirmModal(this.app, {
+                message: "You have unsaved changes in the current profile. If you switch now, these changes will be lost. Switch anyway?",
+            });
+            if (confirm !== true) {
+                dropdown.setValue(currentId);
+                return;
+            }
+        }
+
+        // Use the managed switchProfile method which updates references and saves
+        this.isDirty = false;
+        this.pendingPluginIds.clear();
+        new Notice(`Switched to profile: ${profiles[newProfileId].name}`);
+        await this.plugin.switchProfile(newProfileId);
+        this.display(); // Rebuild everything for the new profile
+    }
+
+    private async handleSaveChanges(): Promise<void> {
+        const count = this.pendingPluginIds.size;
+        this.normalizelazyOnViews();
+        await this.plugin.saveSettings();
+        this.plugin.configureLogger(); // Apply log level immediately
+
+        if (count > 0) {
+            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds: Array.from(this.pendingPluginIds) });
+        } else {
+            new Notice("Settings saved");
+        }
+
+        this.isDirty = false;
+        this.pendingPluginIds.clear();
+        this.updateApplyButton();
+    }
+
+    private async handleDiscardChanges(): Promise<void> {
+        if (await showConfirmModal(this.app, { message: "Are you sure you want to discard all unsaved changes?" })) {
+            await this.plugin.loadSettings();
+            this.isDirty = false;
+            this.pendingPluginIds.clear();
+            this.display();
+            new Notice("Changes discarded");
+        }
     }
 
     buildPluginList() {

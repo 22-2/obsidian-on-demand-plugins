@@ -31,7 +31,7 @@ export class EventBus {
         const set = this.handlers.get(event);
         if (!set) return;
 
-        const promises: Promise<void | unknown>[] = [];
+        const promises: Promise<void>[] = [];
         for (const handler of set) {
             try {
                 const result = handler(payload);

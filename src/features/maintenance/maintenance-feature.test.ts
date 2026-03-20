@@ -4,23 +4,39 @@ import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature
 
 describe("MaintenanceFeature", () => {
     let feature: MaintenanceFeature;
-    let mockCtx: any;
-    let mockRegistry: any;
+    let settingsState: {
+        plugins: Record<string, { mode: string }>;
+    };
+    let mockCtx: {
+        getData: () => { showConsoleLog: boolean };
+        getManifests: ReturnType<typeof vi.fn>;
+        getSettings: () => typeof settingsState;
+        getPluginMode: (id: string) => string | undefined;
+        saveSettings: ReturnType<typeof vi.fn>;
+        _plugin: { manifest: { id: string } };
+    };
+    let mockRegistry: {
+        loadEnabledPluginsFromDisk: ReturnType<typeof vi.fn>;
+        writeCommunityPluginsFile: ReturnType<typeof vi.fn>;
+        enabledPluginsFromDisk: Set<string>;
+    };
 
     beforeEach(() => {
+        settingsState = {
+            plugins: {
+                "plugin-1": { mode: PLUGIN_MODE.ALWAYS_DISABLED },
+                "plugin-2": { mode: PLUGIN_MODE.ALWAYS_ENABLED },
+            },
+        };
+
         mockCtx = {
-            getData: vi.fn().mockReturnValue({ showConsoleLog: false }),
+            getData: () => ({ showConsoleLog: false }),
             getManifests: vi.fn().mockReturnValue([
                 { id: "plugin-1", name: "Plugin 1" },
                 { id: "plugin-2", name: "Plugin 2" },
             ]),
-            getSettings: vi.fn().mockReturnValue({
-                plugins: {
-                    "plugin-1": { mode: PLUGIN_MODE.ALWAYS_DISABLED },
-                    "plugin-2": { mode: PLUGIN_MODE.ALWAYS_ENABLED },
-                },
-            }),
-            getPluginMode: vi.fn((id) => mockCtx.getSettings().plugins[id]?.mode),
+            getSettings: () => settingsState,
+            getPluginMode: (id) => mockCtx.getSettings().plugins[id]?.mode,
             saveSettings: vi.fn().mockResolvedValue(undefined),
             _plugin: { manifest: { id: "on-demand-plugins" } },
         };
@@ -33,7 +49,7 @@ describe("MaintenanceFeature", () => {
 
         feature = new MaintenanceFeature();
         const mockEvents = { emit: vi.fn(), on: vi.fn() };
-        feature.onload(mockCtx, { registry: mockRegistry } as any, {} as any, mockEvents as any);
+        feature.onload(mockCtx as never, { registry: mockRegistry } as never, {} as never, mockEvents as never);
     });
 
     describe("applyBatchModeReplace", () => {
@@ -78,9 +94,9 @@ describe("MaintenanceFeature", () => {
 
         it("should do nothing if already in sync", async () => {
             mockCtx.getManifests.mockReturnValue([{ id: "plugin-1", name: "Plugin 1" }]);
-            mockCtx.getSettings.mockReturnValue({
+            settingsState = {
                 plugins: { "plugin-1": { mode: PLUGIN_MODE.ALWAYS_ENABLED } },
-            });
+            };
             mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "on-demand-plugins"]);
 
             const result = await feature.executeSync("lazyToCore");

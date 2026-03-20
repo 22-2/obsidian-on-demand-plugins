@@ -53,7 +53,7 @@ export class CommandCacheStore {
         });
     }
 
-    async persist(): Promise<void> {
+    persist(): void {
         const cache: CommandCache = {};
         const versions: Record<string, string> = {};
 

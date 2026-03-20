@@ -20,7 +20,7 @@ export class LazyOptionsModal extends Modal {
 
         // Initialize options from existing settings or defaults
         this.options = settings?.lazyOptions
-            ? JSON.parse(JSON.stringify(settings.lazyOptions))
+            ? structuredClone(settings.lazyOptions)
             : {
                   useView: settings?.mode === "lazyOnView",
                   viewTypes: this.plugin.settings.lazyOnViews?.[pluginId] || [],
@@ -41,9 +41,9 @@ export class LazyOptionsModal extends Modal {
     onOpen() {
         const { contentEl } = this;
         contentEl.empty();
-        new Setting(contentEl).setName(`Lazy options: ${this.pluginId}`).setHeading();
+        new Setting(contentEl).setName(`Lazy options for ${this.pluginId}`).setHeading();
         contentEl.createEl("p", {
-            text: "Configure advanced activation rules for this plugin. Note: Plugins are also automatically loaded when their commands are executed.",
+            text: "Configure advanced activation rules for this plugin. Plugins also load automatically when their commands run.",
             cls: "setting-item-description",
         });
 
@@ -84,11 +84,10 @@ export class LazyOptionsModal extends Modal {
 
         if (this.options.useFile) {
             new Setting(contentEl)
-                .setName("File Suffixes")
-                .setDesc("Matches the end of the filename (basename). e.g., '.excalidraw' for 'file.excalidraw.md'")
+                .setName("File suffixes")
+                .setDesc("Match the end of the file name, one suffix per line.")
                 .addTextArea((text) =>
                     text
-                        .setPlaceholder(".excalidraw")
                         .setValue(this.options.fileCriteria.suffixes?.join("\n") || "")
                         .onChange((value) => {
                             this.options.fileCriteria.suffixes = value
@@ -130,9 +129,9 @@ export class LazyOptionsModal extends Modal {
             .addButton((btn) => btn.setButtonText("Cancel").onClick(() => this.close()))
             .addButton((btn) =>
                 btn
-                    .setButtonText("Save Options")
+                    .setButtonText("Save")
                     .setCta()
-                    .onClick(async () => {
+                    .onClick(() => {
                         const pluginSettings = this.plugin.settings.plugins[this.pluginId];
                         if (pluginSettings) {
                             pluginSettings.lazyOptions = this.options;

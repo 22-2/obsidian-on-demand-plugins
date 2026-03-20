@@ -76,7 +76,7 @@ export class MaintenanceFeature implements AppFeature {
         }
     }
 
-    private async syncCoreToLazy(): Promise<SyncResult> {
+    private syncCoreToLazy(): SyncResult {
         const onDisk = this.registry.enabledPluginsFromDisk;
         let changed = 0;
         const manifests = this.ctx.getManifests();

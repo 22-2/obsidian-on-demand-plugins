@@ -48,7 +48,7 @@ export class CoreContainer {
             const currentPlugins = Array.from(this.registry.enabledPluginsFromDisk);
 
             // Generate a safe copy of default settings
-            const backupSettings = JSON.parse(JSON.stringify(DEFAULT_DEVICE_SETTINGS));
+            const backupSettings = structuredClone(DEFAULT_DEVICE_SETTINGS);
 
             // Set all currently enabled plugins to ALWAYS_ENABLED in this profile
             currentPlugins.forEach((id) => {

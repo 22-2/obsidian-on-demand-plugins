@@ -1,5 +1,5 @@
 import log from "loglevel";
-import type { Command, MarkdownFileInfo } from "obsidian";
+import type { MarkdownFileInfo } from "obsidian";
 import { MarkdownView } from "obsidian";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
@@ -19,25 +19,25 @@ export class CommandExecutor {
      * @returns True if the command was executed successfully, false otherwise
      */
     executeCommandDirect(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as Command;
+        const command = this.ctx.obsidianCommands.commands[commandId];
 
         if (!command) return false;
 
-        const activeEditor = this.ctx.app.workspace.activeEditor as MarkdownFileInfo | null;
+        const activeEditor: MarkdownFileInfo | null = this.ctx.app.workspace.activeEditor;
 
         if (activeEditor && activeEditor.editor) {
             const editor = activeEditor.editor;
+            const activeElement = document.activeElement;
 
             // Follow conditions from obsidian's source
             if (activeEditor instanceof MarkdownView) {
                 const view = activeEditor;
-                const activeEl = activeDocument.activeElement;
-                if (view.inlineTitleEl?.contains(activeEl) || view.titleEl?.contains(activeEl)) {
+                if (view.inlineTitleEl?.contains(activeElement) || view.titleEl?.contains(activeElement)) {
                     return false;
                 }
             }
 
-            if (!command.allowProperties && activeDocument.activeElement?.closest(".metadata-container")) {
+            if (!command.allowProperties && activeElement?.closest(".metadata-container")) {
                 return false;
             }
 
@@ -88,7 +88,7 @@ export class CommandExecutor {
     }
 
     isCommandExecutable(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId] as Command | undefined;
+        const command = this.ctx.obsidianCommands.commands[commandId];
 
         if (!command) return false;
 

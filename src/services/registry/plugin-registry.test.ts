@@ -1,4 +1,5 @@
 import { Platform } from "obsidian";
+import type { App } from "obsidian";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ON_DEMAND_PLUGIN_ID } from "src/core/constants";
 import { PluginRegistry } from "src/services/registry/plugin-registry";
@@ -10,15 +11,24 @@ vi.mock("obsidian", () => ({
 
 describe("PluginRegistry", () => {
     let registry: PluginRegistry;
-    let mockApp: any;
-    let mockObsidianPlugins: any;
+    let mockApp: {
+        vault: {
+            configDir: string;
+            readConfigJson: ReturnType<typeof vi.fn>;
+            writeConfigJson: ReturnType<typeof vi.fn>;
+        };
+    };
+    let mockObsidianPlugins: {
+        manifests: Record<string, { id: string; name: string; isDesktopOnly?: boolean }>;
+        enabledPlugins: Set<string>;
+    };
 
     beforeEach(() => {
         vi.resetAllMocks();
 
         mockApp = {
             vault: {
-                configDir: ".obsidian",
+                configDir: "config",
                 readConfigJson: vi.fn(),
                 writeConfigJson: vi.fn(),
             },
@@ -33,7 +43,13 @@ describe("PluginRegistry", () => {
             enabledPlugins: new Set(["plugin-a"]),
         };
 
-        registry = new PluginRegistry(mockApp, mockObsidianPlugins);
+        registry = new PluginRegistry(
+            mockApp as unknown as App,
+            mockObsidianPlugins as unknown as {
+                manifests: Record<string, import("obsidian").PluginManifest>;
+                enabledPlugins: Set<string>;
+            },
+        );
     });
 
     describe("updateManifests", () => {

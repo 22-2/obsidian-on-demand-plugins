@@ -67,14 +67,14 @@ jobs:
             # - name: Setup Electron
             #   run: node node_modules/electron/install.js
 
-            - name: Install Playwright browsers (Unix)
+            - name: Install Playwright chromium (Unix)
               if: matrix.os != 'windows-latest'
-              run: pnpm exec playwright install
+              run: pnpm exec playwright install chromium
               shell: bash
 
-            - name: Install Playwright browsers (Windows)
+            - name: Install Playwright chromium (Windows)
               if: matrix.os == 'windows-latest'
-              run: pnpm exec playwright install
+              run: pnpm exec playwright install chromium
               shell: pwsh
 
             - name: Build plugin under test

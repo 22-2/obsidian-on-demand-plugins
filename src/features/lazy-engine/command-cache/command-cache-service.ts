@@ -56,7 +56,7 @@ export class CommandCacheService {
         }
 
         if (hasChanges) {
-            await this.store.persist();
+            this.store.persist();
         }
     }
 
@@ -91,7 +91,7 @@ export class CommandCacheService {
     async ensureCommandsCached(pluginId: string): Promise<void> {
         if (this.store.isValid(pluginId)) return;
         await this.refreshCommandsForPlugin(pluginId);
-        await this.store.persist();
+        this.store.persist();
     }
 
     // ---------------------------------------------------------------------------
@@ -129,8 +129,8 @@ export class CommandCacheService {
                 id: commandId,
                 name: cached.name,
                 icon: cached.icon,
-                callback: async () => {
-                    await this.pluginLoader.runLazyCommand(commandId);
+                callback: () => {
+                    void this.pluginLoader.runLazyCommand(commandId);
                 },
             };
 

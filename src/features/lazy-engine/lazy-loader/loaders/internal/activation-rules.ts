@@ -34,7 +34,6 @@ const DEFAULT_FILE_RULES: Record<string, FileActivationCriteria> = {
  * This function checks both the modern per-plugin lazyOptions and the legacy
  * global lazyOnViews map. It returns `null` when:
  * - No plugin claims this view type
- * - The matching plugin also has file-based rules (to prevent infinite rebuild loops)
  * - The plugin is not in a lazy mode
  *
  * @param ctx - The plugin context containing settings and app instance
@@ -49,12 +48,6 @@ export function resolvePluginForViewType(ctx: PluginContext, viewType: string): 
         const opts = pluginSettings.lazyOptions;
         if (!opts?.useView || !opts.viewTypes.includes(viewType)) continue;
 
-        // Defer to FileLazyLoader when file rules are also present
-        if (hasFileRules(ctx, pluginId)) {
-            logger.debug(`[LazyPlugins] resolvePluginForViewType: ${pluginId} has view rule for ${viewType} but also has file rules. Skipping.`);
-            continue;
-        }
-
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
         logger.debug(`[LazyPlugins] resolvePluginForViewType: resolved ${pluginId} for ${viewType}`);
         return pluginId;
@@ -64,7 +57,6 @@ export function resolvePluginForViewType(ctx: PluginContext, viewType: string): 
     const lazyOnViews = settings.lazyOnViews || {};
     for (const [pluginId, viewTypes] of Object.entries(lazyOnViews)) {
         if (!viewTypes.includes(viewType)) continue;
-        if (hasFileRules(ctx, pluginId)) continue;
         if (!isLazyMode(ctx.getPluginMode(pluginId))) continue;
         logger.debug(`[LazyPlugins] resolvePluginForViewType (legacy): resolved ${pluginId} for ${viewType}`);
         return pluginId;
@@ -172,23 +164,3 @@ export async function matchesCriteria(ctx: PluginContext, file: TFile, criteria:
     return false;
 }
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Returns `true` when the plugin has any kind of file-based activation rule—
- * either via lazyOptions.useFile, legacy lazyOnFiles, or the built-in defaults.
- */
-function hasFileRules(ctx: PluginContext, pluginId: string): boolean {
-    const settings = ctx.getSettings();
-
-    if (settings.plugins[pluginId]?.lazyOptions?.useFile) return true;
-
-    const lazyOnFiles = settings.lazyOnFiles || {};
-    if (lazyOnFiles[pluginId] && Object.keys(lazyOnFiles[pluginId]).length > 0) return true;
-
-    if (pluginId in DEFAULT_FILE_RULES) return true;
-
-    return false;
-}
