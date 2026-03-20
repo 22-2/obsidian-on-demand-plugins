@@ -48,7 +48,7 @@ export class FileLazyLoader extends BaseLazyLoader<WorkspaceLeaf> {
 
                 app.workspace.iterateAllLeaves((leaf) => {
                     const viewFile = (leaf.view as ViewWithFile).file;
-                    if (viewFile === file) {
+                    if (viewFile?.path === file.path) {
                         void this.checkFileForLazyLoading(file, leaf);
                     }
                 });

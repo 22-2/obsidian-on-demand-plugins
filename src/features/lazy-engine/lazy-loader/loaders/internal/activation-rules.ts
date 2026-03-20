@@ -132,8 +132,15 @@ export async function matchesCriteria(ctx: PluginContext, file: TFile, criteria:
 
     // 1. Suffix check (e.g. "foo.excalidraw" for "foo.excalidraw.md")
     if (criteria.suffixes?.length) {
-        for (const suffix of criteria.suffixes) {
-            if (file.basename.endsWith(suffix)) return true;
+        for (const rawSuffix of criteria.suffixes) {
+            const suffix = rawSuffix.trim();
+            if (!suffix) continue;
+
+            // Support both extension-less basename rules (e.g. ".excalidraw")
+            // and full file-name/path rules (e.g. "mfdi.md", ".mfdi.md").
+            if (file.basename.endsWith(suffix) || file.name.endsWith(suffix) || file.path.endsWith(suffix)) {
+                return true;
+            }
         }
     }
 
