@@ -17,5 +17,5 @@
         "lib": ["DOM", "ESNext"]
     },
     "include": ["**/*.ts",],
-    "exclude": ["node_modules", "playwright.config.ts"]
+    "exclude": ["node_modules"]
 }
