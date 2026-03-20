@@ -1,5 +1,5 @@
 import pWaitFor from "p-wait-for";
-import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as utilsMs from "src/core/utils";
@@ -21,7 +21,11 @@ describe("LazyCommandRunner", () => {
         };
         getData: ReturnType<typeof vi.fn>;
     };
-    let mockRegistry: Mocked<CommandRegistry>;
+    let mockRegistry: {
+        getCachedCommand: ReturnType<typeof vi.fn>;
+        syncCommandWrappersForPlugin: ReturnType<typeof vi.fn>;
+        isWrapperCommand: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         vi.resetAllMocks();
@@ -44,10 +48,10 @@ describe("LazyCommandRunner", () => {
             getCachedCommand: vi.fn(),
             syncCommandWrappersForPlugin: vi.fn(),
             isWrapperCommand: vi.fn(),
-        } as unknown as Mocked<CommandRegistry>;
+        };
 
         runner = new LazyCommandRunner(mockCtx as unknown as PluginContext);
-        runner.setCommandRegistry(mockRegistry);
+        runner.setCommandRegistry(mockRegistry as unknown as CommandRegistry);
     });
 
     describe("ensurePluginLoaded", () => {
@@ -92,11 +96,15 @@ describe("LazyCommandRunner", () => {
 
             // First call will trigger enablePlugin.
             // Second call (serialized by mutex) should see it's already loaded and skip enablePlugin.
-            mockCtx.obsidianPlugins.enablePlugin.mockImplementation(async () => {
-                await new Promise((r) => setTimeout(r, 50));
-                vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
-                vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);
-            });
+            mockCtx.obsidianPlugins.enablePlugin.mockReturnValue(
+                new Promise<void>((resolve) =>
+                    setTimeout(() => {
+                        vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+                        vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);
+                        resolve();
+                    }, 50),
+                ),
+            );
 
             // Start both concurrently
             const p1 = runner.ensurePluginLoaded("test-plugin");

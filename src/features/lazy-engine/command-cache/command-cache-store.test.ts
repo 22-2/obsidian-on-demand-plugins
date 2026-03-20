@@ -75,10 +75,10 @@ describe("CommandCacheStore", () => {
     });
 
     describe("persist", () => {
-        it("should save current cache to storage", async () => {
+        it("should save current cache to storage", () => {
             store.set("test-plugin", [{ id: "cmd1", name: "Cmd 1", icon: "icon1", pluginId: "test-plugin" }]);
 
-            await store.persist();
+            store.persist();
 
             expect(storageMs.saveLocalStorage).toHaveBeenCalledTimes(2);
             expect(storageMs.saveLocalStorage).toHaveBeenNthCalledWith(1, mockCtx.app, "commandCache", {

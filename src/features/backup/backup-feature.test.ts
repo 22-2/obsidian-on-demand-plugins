@@ -73,9 +73,9 @@ describe("BackupFeature", () => {
 
     it("should skip backup if data.json is invalid JSON", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        mockAdapter.read.mockImplementation((path: string) => {
-            if (path.includes("data.json")) return Promise.resolve("{ invalid json ");
-            return Promise.resolve("[]");
+        mockAdapter.read.mockImplementation(async (path: string) => {
+            if (path.includes("data.json")) return "{ invalid json ";
+            return "[]";
         });
 
         const backupFeature = new BackupFeature();
@@ -87,9 +87,9 @@ describe("BackupFeature", () => {
 
     it("should skip backup if data.json does not contain profiles", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        mockAdapter.read.mockImplementation((path: string) => {
-            if (path.includes("data.json")) return Promise.resolve('{"some_key": "value"}');
-            return Promise.resolve("[]");
+        mockAdapter.read.mockImplementation(async (path: string) => {
+            if (path.includes("data.json")) return '{"some_key": "value"}';
+            return "[]";
         });
 
         const backupFeature = new BackupFeature();
@@ -101,10 +101,10 @@ describe("BackupFeature", () => {
 
     it("should skip backup if community-plugins.json is not an array", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        mockAdapter.read.mockImplementation((path: string) => {
-            if (path.includes("data.json")) return Promise.resolve('{"profiles": {}}');
-            if (path.includes("community-plugins.json")) return Promise.resolve('{"not_array": true}');
-            return Promise.resolve("");
+        mockAdapter.read.mockImplementation(async (path: string) => {
+            if (path.includes("data.json")) return '{"profiles": {}}';
+            if (path.includes("community-plugins.json")) return '{"not_array": true}';
+            return "";
         });
 
         const backupFeature = new BackupFeature();
@@ -119,10 +119,10 @@ describe("BackupFeature", () => {
         const validData = '{"profiles": {}}';
         const validCommunity = '["plugin1", "plugin2"]';
 
-        mockAdapter.read.mockImplementation((path: string) => {
-            if (path.includes("data.json")) return Promise.resolve(validData);
-            if (path.includes("community-plugins.json")) return Promise.resolve(validCommunity);
-            return Promise.resolve("");
+        mockAdapter.read.mockImplementation(async (path: string) => {
+            if (path.includes("data.json")) return validData;
+            if (path.includes("community-plugins.json")) return validCommunity;
+            return "";
         });
 
         // Mock list returning empty array so rotation doesn't fail
@@ -149,10 +149,10 @@ describe("BackupFeature", () => {
         const validData = '{"profiles": {}}';
         const validCommunity = "[]";
 
-        mockAdapter.read.mockImplementation((path: string) => {
-            if (path.includes("data.json")) return Promise.resolve(validData);
-            if (path.includes("community-plugins.json")) return Promise.resolve(validCommunity);
-            return Promise.resolve("");
+        mockAdapter.read.mockImplementation(async (path: string) => {
+            if (path.includes("data.json")) return validData;
+            if (path.includes("community-plugins.json")) return validCommunity;
+            return "";
         });
 
         mockAdapter.list.mockResolvedValue({

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as storageMs from "src/core/storage";
@@ -30,7 +30,10 @@ type MockCtx = {
 describe("CommandCacheService", () => {
     let service: CommandCacheService;
     let mockCtx: MockCtx;
-    let mockPluginLoader: Mocked<PluginLoader>;
+    let mockPluginLoader: {
+        waitForPluginLoaded: ReturnType<typeof vi.fn>;
+        runLazyCommand: ReturnType<typeof vi.fn>;
+    };
 
     beforeEach(() => {
         vi.resetAllMocks();
@@ -56,9 +59,9 @@ describe("CommandCacheService", () => {
         mockPluginLoader = {
             waitForPluginLoaded: vi.fn().mockResolvedValue(true),
             runLazyCommand: vi.fn().mockResolvedValue(undefined),
-        } as unknown as Mocked<PluginLoader>;
+        };
 
-        service = new CommandCacheService(mockCtx as unknown as PluginContext, mockPluginLoader);
+        service = new CommandCacheService(mockCtx as unknown as PluginContext, mockPluginLoader as unknown as PluginLoader);
     });
 
     describe("getCommandsForPlugin", () => {
@@ -73,8 +76,7 @@ describe("CommandCacheService", () => {
 
             const result = await service.getCommandsForPlugin("test-plugin");
 
-            const enablePlugin = mockCtx.obsidianPlugins.enablePlugin;
-            expect(enablePlugin).toHaveBeenCalledWith("test-plugin");
+            expect(mockCtx.obsidianPlugins.enablePlugin).toHaveBeenCalledWith("test-plugin");
             expect(mockPluginLoader.waitForPluginLoaded).toHaveBeenCalledWith("test-plugin");
 
             expect(result).toHaveLength(1);
@@ -88,8 +90,7 @@ describe("CommandCacheService", () => {
 
             await service.getCommandsForPlugin("test-plugin");
 
-            const enablePlugin = mockCtx.obsidianPlugins.enablePlugin;
-            expect(enablePlugin).not.toHaveBeenCalled();
+            expect(mockCtx.obsidianPlugins.enablePlugin).not.toHaveBeenCalled();
             expect(mockPluginLoader.waitForPluginLoaded).not.toHaveBeenCalled();
         });
     });
@@ -166,8 +167,7 @@ describe("CommandCacheService", () => {
 
             await service.ensureCommandsCached("test-plugin");
 
-            const enablePlugin = mockCtx.obsidianPlugins.enablePlugin;
-            expect(enablePlugin).not.toHaveBeenCalled();
+            expect(mockCtx.obsidianPlugins.enablePlugin).not.toHaveBeenCalled();
         });
     });
 

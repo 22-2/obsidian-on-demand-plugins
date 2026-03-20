@@ -16,11 +16,7 @@ export function patchRibbonReorder(ctx: PluginContext): void {
         around(Plugin.prototype, {
             addRibbonIcon: (next: AddRibbonIcon) =>
                 function (this: Plugin, ...args: Parameters<AddRibbonIcon>): ReturnType<AddRibbonIcon> {
-                    const callNext = next as (this: Plugin, ...innerArgs: Parameters<AddRibbonIcon>) => ReturnType<AddRibbonIcon>;
-                    // `monkey-around` erases the original method signature to `any`.
-                    // The explicit cast above narrows it back to the concrete runtime contract.
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-                    const result = callNext.call(this, ...args);
+                    const result = next.call(this, ...args) as HTMLElement;
                     try {
                         if (typeof ctx.app.updateRibbonDisplay === "function") {
                             ctx.app.updateRibbonDisplay();
@@ -31,7 +27,6 @@ export function patchRibbonReorder(ctx: PluginContext): void {
                             warned = true;
                         }
                     }
-                    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
                     return result;
                 },
         }),
