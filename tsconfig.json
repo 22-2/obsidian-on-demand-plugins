@@ -6,6 +6,7 @@
         "module": "ESNext",
         "target": "esnext",
         "allowJs": true,
+        "noEmit": true,
         "noImplicitAny": true,
         "moduleResolution": "bundler",
         "importHelpers": true,
@@ -15,6 +16,6 @@
         "types": ["obsidian-typings"],
         "lib": ["DOM", "ESNext"]
     },
-    "include": ["**/*.ts"],
+    "include": ["**/*.ts",],
     "exclude": ["node_modules", "playwright.config.ts"]
 }

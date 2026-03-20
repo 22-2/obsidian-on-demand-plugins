@@ -1,30 +1,20 @@
-// eslint.config.mjs
-import tsparser from "@typescript-eslint/parser";
-import { defineConfig } from "eslint/config";
+// @ts-check
 import obsidianmd from "eslint-plugin-obsidianmd";
+import { defineConfig } from "eslint/config"
 
 export default defineConfig([
+    // @ts-expect-error
     ...obsidianmd.configs.recommended,
-    // Or include English locale files (JSON and TS/JS modules)
-    // ...obsidianmd.configs.recommendedWithLocalesEn,
-
     {
-        files: ["**/*.ts"],
+        files: ["**/*.{ts,tsx,mts,cts}"],
         languageOptions: {
-            parser: tsparser,
-            parserOptions: { project: "./tsconfig.json" },
+            parserOptions: {
+                project: true,
+                tsconfigRootDir: import.meta.dirname,
+            },
         },
-
-        // Optional project overrides
-        rules: {
-            "obsidianmd/ui/sentence-case": [
-                "warn",
-                {
-                    brands: ["YourBrand"],
-                    acronyms: ["OK"],
-                    enforceCamelCaseLower: true,
-                },
-            ],
-        },
+    },
+    {
+        ignores: ["**/*.{js,json}", "myfiles/**/*"]
     },
 ]);
