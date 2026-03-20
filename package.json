@@ -1,7 +1,7 @@
 {
 	"name": "on-demand-plugins",
 	"type": "module",
-	"version": "3.1.7",
+	"version": "3.1.8",
 	"description": "Lazy load plugins by caching their commands. Plugins are enabled on-demand when you trigger their commands (or open specific views), keeping startup fast.",
 	"main": "main.js",
 	"scripts": {
