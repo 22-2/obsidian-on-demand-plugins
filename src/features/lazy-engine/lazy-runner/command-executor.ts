@@ -46,21 +46,23 @@ export class CommandExecutor {
             }
 
             if (typeof command.editorCheckCallback === "function") {
-                if (command.editorCheckCallback(true, editor, activeEditor)) {
+                const editorCheckCallback = command.editorCheckCallback as unknown as (checking: boolean, editor: unknown, info: MarkdownFileInfo) => boolean;
+                if (editorCheckCallback(true, editor, activeEditor)) {
                     if (this.ctx.getData().showConsoleLog) {
                         logger.debug(`Executing editorCheckCallback for: ${commandId}`);
                     }
-                    command.editorCheckCallback(false, editor, activeEditor);
+                    editorCheckCallback(false, editor, activeEditor);
                     return true;
                 }
                 return false;
             }
 
             if (typeof command.editorCallback === "function") {
+                const editorCallback = command.editorCallback as unknown as (editor: unknown, info: MarkdownFileInfo) => void;
                 if (this.ctx.getData().showConsoleLog) {
                     logger.debug(`Executing editorCallback for: ${commandId}`);
                 }
-                command.editorCallback(editor, activeEditor);
+                editorCallback(editor, activeEditor);
                 return true;
             }
         }
