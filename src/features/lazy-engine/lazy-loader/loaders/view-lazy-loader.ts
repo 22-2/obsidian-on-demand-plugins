@@ -57,7 +57,7 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
             return;
         }
 
-        await this.loadPluginWithLock({ leaf, viewType }, async () => resolvePluginForViewType(this.ctx, viewType), { leafId, description: `viewType: ${viewType}` });
+        await this.loadPluginWithLock({ leaf, viewType }, () => Promise.resolve(resolvePluginForViewType(this.ctx, viewType)), { leafId, description: `viewType: ${viewType}` });
 
         // Sync commands and update re-entry guard
         const pluginId = resolvePluginForViewType(this.ctx, viewType);

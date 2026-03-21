@@ -73,7 +73,7 @@ describe("BackupFeature", () => {
 
     it("should skip backup if data.json is invalid JSON", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        mockAdapter.read.mockImplementation(async (path: string) => {
+        mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return "{ invalid json ";
             return "[]";
         });
@@ -87,7 +87,7 @@ describe("BackupFeature", () => {
 
     it("should skip backup if data.json does not contain profiles", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        mockAdapter.read.mockImplementation(async (path: string) => {
+        mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return '{"some_key": "value"}';
             return "[]";
         });
@@ -101,7 +101,7 @@ describe("BackupFeature", () => {
 
     it("should skip backup if community-plugins.json is not an array", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        mockAdapter.read.mockImplementation(async (path: string) => {
+        mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return '{"profiles": {}}';
             if (path.includes("community-plugins.json")) return '{"not_array": true}';
             return "";
@@ -119,7 +119,7 @@ describe("BackupFeature", () => {
         const validData = '{"profiles": {}}';
         const validCommunity = '["plugin1", "plugin2"]';
 
-        mockAdapter.read.mockImplementation(async (path: string) => {
+        mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return validData;
             if (path.includes("community-plugins.json")) return validCommunity;
             return "";
@@ -149,7 +149,7 @@ describe("BackupFeature", () => {
         const validData = '{"profiles": {}}';
         const validCommunity = "[]";
 
-        mockAdapter.read.mockImplementation(async (path: string) => {
+        mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return validData;
             if (path.includes("community-plugins.json")) return validCommunity;
             return "";
