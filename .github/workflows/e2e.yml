@@ -3,130 +3,130 @@ name: E2E Tests
 on:
   push: {}
   pull_request: {}
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      obsidian_version:
+        description: "Obsidian release version (e.g. 1.12.4). Use latest for latest release."
+        required: false
+        default: "latest"
 
 jobs:
-    e2e:
-        runs-on: ${{ matrix.os }}
-        strategy:
-            matrix:
-                os: [macos-latest, windows-latest]
+  e2e:
+    runs-on: ${{ matrix.os }}
+    env:
+      OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.obsidian_version || 'latest' }}"
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
 
-            - name: Setup pnpm (action)
-              uses: pnpm/action-setup@v4
-              with:
-                  version: "10"
+      - name: Setup pnpm (action)
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
 
-            - name: Setup Node
-              uses: actions/setup-node@v5
-              with:
-                  node-version: "23.x"
-                  cache: "pnpm"
-                  cache-dependency-path: pnpm-lock.yaml
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24.x"
+          cache: "pnpm"
+          cache-dependency-path: pnpm-lock.yaml
 
-            - name: Cache plugin downloads
-              uses: actions/cache@v4
-              with:
-                  path: myfiles
-                  key: ${{ runner.os }}-myfiles-${{ hashFiles('tests/plugin-sources.json') }}
-                  restore-keys: |
-                      ${{ runner.os }}-myfiles-
+      - name: Cache plugin downloads
+        uses: actions/cache@v4
+        with:
+          path: myfiles
+          key: ${{ runner.os }}-myfiles-${{ hashFiles('tests/plugin-sources.json') }}
+          restore-keys: |
+            ${{ runner.os }}-myfiles-
 
-            - name: Cache toolkit assets
-              uses: actions/cache@v4
-              with:
-                  path: obsidian-e2e-toolkit-assets
-                  key: ${{ runner.os }}-obsidians-e2e-toolkit-v2
-                  restore-keys: |
-                      ${{ runner.os }}-obsidians-e2e-toolkit-
+      - name: Cache toolkit assets
+        uses: actions/cache@v4
+        with:
+          path: obsidian-e2e-toolkit-assets
+          key: "${{ runner.os }}-obsidians-e2e-toolkit-v4-${{ env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION }}"
+          restore-keys: |
+            ${{ runner.os }}-obsidians-e2e-toolkit-v4-
 
-            - name: Cache Playwright browsers
-              id: playwright-cache
-              uses: actions/cache@v4
-              with:
-                  path: .cache/ms-playwright
-                  key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
-                  restore-keys: |
-                      ${{ runner.os }}-playwright-chromium-
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/ms-playwright
+          key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chromium-
 
-            - name: Ensure pnpm (Unix)
-              if: matrix.os != 'windows-latest'
-              run: |
-                  npm install -g pnpm@10 || corepack prepare pnpm@10 --activate
-                  pnpm -v
-              shell: bash
+      - name: Ensure pnpm (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          npm install -g pnpm@10 || corepack prepare pnpm@10 --activate
+          pnpm -v
+        shell: bash
 
-            - name: Ensure pnpm (Windows)
-              if: matrix.os == 'windows-latest'
-              run: |
-                  npm install -g pnpm@10 -s
-                  pnpm -v
-              shell: pwsh
+      - name: Ensure pnpm (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          npm install -g pnpm@10 -s
+          pnpm -v
+        shell: pwsh
 
-            - name: Install dependencies
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-              run: |
-                  git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-                  pnpm install --no-frozen-lockfile
+      - name: Install dependencies
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+          pnpm install --no-frozen-lockfile
 
-            # - name: Setup Electron
-            #   run: node node_modules/electron/install.js
+      - name: Install Playwright chromium (Unix)
+        if: matrix.os != 'windows-latest' && steps.playwright-cache.outputs.cache-hit != 'true'
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
+        run: pnpm exec playwright install chromium
+        shell: bash
 
-            - name: Install Playwright chromium (Unix, cache miss only)
-              if: matrix.os != 'windows-latest' && steps.playwright-cache.outputs.cache-hit != 'true'
-              env:
-                  PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
-              run: pnpm exec playwright install chromium
-              shell: bash
+      - name: Install Playwright chromium (Windows)
+        if: matrix.os == 'windows-latest' && steps.playwright-cache.outputs.cache-hit != 'true'
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
+        run: pnpm exec playwright install chromium
+        shell: pwsh
 
-            - name: Install Playwright chromium (Windows)
-              if: matrix.os == 'windows-latest' && steps.playwright-cache.outputs.cache-hit != 'true'
-              env:
-                  PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
-              run: pnpm exec playwright install chromium
-              shell: pwsh
+      - name: Build plugin under test
+        run: pnpm run build
 
-            - name: Build plugin under test
-              run: pnpm run build:nocheck
+      - name: Ensure toolkit Obsidian is installed (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          node "${{ github.workspace }}/node_modules/obsidian-e2e-toolkit/scripts/setup.mjs"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
+          OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: ${{ env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION }}
+        shell: bash
 
-            - name: Ensure toolkit Obsidian is installed (Unix)
-              if: matrix.os != 'windows-latest'
-              run: |
-                if [ -d "${{ github.workspace }}/obsidian-e2e-toolkit-assets/obsidian-unpacked" ]; then
-                  echo "Toolkit cache found, skipping setup"
-                else
-                  node "${{ github.workspace }}/node_modules/obsidian-e2e-toolkit/scripts/setup.mjs"
-                fi
-              env:
-                OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
-              shell: bash
+      - name: Ensure toolkit Obsidian is installed (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          node "$env:GITHUB_WORKSPACE\node_modules\obsidian-e2e-toolkit\scripts\setup.mjs"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
+          OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: ${{ env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION }}
+        shell: pwsh
 
-            - name: Ensure toolkit Obsidian is installed (Windows)
-              if: matrix.os == 'windows-latest'
-              run: |
-                if (Test-Path "$env:GITHUB_WORKSPACE\obsidian-e2e-toolkit-assets\obsidian-unpacked") {
-                  Write-Host "Toolkit cache found, skipping setup"
-                } else {
-                  node "$env:GITHUB_WORKSPACE\node_modules\obsidian-e2e-toolkit\scripts\setup.mjs"
-                }
-              env:
-                OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
-              shell: pwsh
+      - name: Run E2E tests
+        env:
+          CI: true
+          PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
+        run: pnpm run test:e2e
 
-            - name: Run E2E tests
-              env:
-                  CI: true
-                  PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
-              run: pnpm run test:e2e
-
-            - name: Upload Playwright report
-              if: always()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: playwright-report-${{ matrix.os }}
-                  path: playwright-report
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: playwright-report
