@@ -138,7 +138,9 @@ export class BackupFeature implements AppFeature {
 
             // Same handling as above: ignore ENOENT if the file was already removed, and log other errors.
             try {
-                await adapter.remove(oldest);
+                if (await adapter.exists(oldest)) {
+                    await adapter.remove(oldest);
+                }
             } catch (e) {
                 const err = e as { code?: string } | undefined;
                 if (err?.code === "ENOENT") {
