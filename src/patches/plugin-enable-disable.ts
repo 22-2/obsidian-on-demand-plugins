@@ -18,7 +18,7 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
             enablePlugin: (next: Plugins["enablePlugin"]) =>
                 async function (this: Plugins, pluginId: string) {
                     const callNext = next as (this: Plugins, pluginId: string) => ReturnType<Plugins["enablePlugin"]>;
-                    await callNext.call(this, pluginId);
+                    const result = await callNext.call(this, pluginId);
 
                     // Only sync if the mode was ALWAYS_DISABLED. If it's a LAZY mode, 
                     // we want to preserve that setting for the next start.
@@ -33,7 +33,7 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
                         lazyEngine.commandCache.syncCommandWrappersForPlugin(pluginId);
                     }
 
-                    return;
+                    return result;
                 },
             disablePlugin: (next: Plugins["disablePlugin"]) =>
                 async function (this: Plugins, pluginId: string) {
