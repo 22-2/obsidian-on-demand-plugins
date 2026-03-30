@@ -115,12 +115,38 @@ export class BackupFeature implements AppFeature {
 
         while (dataBackups.length > 3) {
             const oldest = dataBackups.shift();
-            if (oldest) await adapter.remove(oldest);
+            if (!oldest) continue;
+
+            // Reason: Another process or a previous operation may have already removed the file,
+            // and `adapter.remove` may throw ENOENT which would lead to an unhandled Promise rejection.
+            // Therefore, ignore ENOENT but log any other errors.
+            try {
+                await adapter.remove(oldest);
+            } catch (e) {
+                const err = e as { code?: string } | undefined;
+                if (err?.code === "ENOENT") {
+                    logger.warn(`Backup already removed, skipping: ${oldest}`);
+                } else {
+                    logger.error(`Failed to remove backup ${oldest}`, e);
+                }
+            }
         }
 
         while (communityBackups.length > 3) {
             const oldest = communityBackups.shift();
-            if (oldest) await adapter.remove(oldest);
+            if (!oldest) continue;
+
+            // Same handling as above: ignore ENOENT if the file was already removed, and log other errors.
+            try {
+                await adapter.remove(oldest);
+            } catch (e) {
+                const err = e as { code?: string } | undefined;
+                if (err?.code === "ENOENT") {
+                    logger.warn(`Backup already removed, skipping: ${oldest}`);
+                } else {
+                    logger.error(`Failed to remove backup ${oldest}`, e);
+                }
+            }
         }
     }
 }
