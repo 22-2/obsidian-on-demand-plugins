@@ -1,5 +1,14 @@
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import {
+    ensureBuilt,
+    findCommandByPrefix,
+    pluginUnderTestId,
+    targetPluginId,
+    triggerActiveLeafChange,
+    useOnDemandPlugins,
+    waitForPluginDisabled,
+    waitForPluginEnabled,
+} from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -22,34 +31,15 @@ test("manual enable/disable is stable for lazy (command)", async ({ obsidian }) 
     }, targetPluginId);
 
     // Find wrapper command if present
-    const commandId = await obsidian.page.evaluate(
-        (id) => Object.keys(app.commands.commands).find((cmd) => cmd.startsWith(`${id}:`)),
-        targetPluginId,
-    );
+    const commandId = await findCommandByPrefix(obsidian, `${targetPluginId}:`);
 
     // Try to manually enable plugin (do not fail test immediately if it doesn't become enabled)
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    const deadline = Date.now() + 15000;
-    let enabled = false;
-    while (Date.now() < deadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) {
-            enabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    const enabled = await waitForPluginEnabled(obsidian, targetPluginId, 15_000);
 
     // Attempt to disable (ensure call completes)
     await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
-    const deadline2 = Date.now() + 8000;
-    let disabled = false;
-    while (Date.now() < deadline2) {
-        if (!(await obsidian.isPluginEnabled(targetPluginId))) {
-            disabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    await waitForPluginDisabled(obsidian, targetPluginId);
 
     // Ensure the test environment is still responsive
     expect(await obsidian.vaultName()).toBeTruthy();
@@ -57,15 +47,7 @@ test("manual enable/disable is stable for lazy (command)", async ({ obsidian }) 
     // If wrapper command exists, invoking it should re-enable the plugin
     if (commandId) {
         await obsidian.page.evaluate((cmd) => app.commands.executeCommandById(cmd), commandId as string);
-        const deadline3 = Date.now() + 15000;
-        let reenabled = false;
-        while (Date.now() < deadline3) {
-            if (await obsidian.isPluginEnabled(targetPluginId)) {
-                reenabled = true;
-                break;
-            }
-            await new Promise((r) => setTimeout(r, 200));
-        }
+        const reenabled = await waitForPluginEnabled(obsidian, targetPluginId, 15_000);
         if (reenabled) {
             expect(reenabled).toBe(true);
         }
@@ -94,45 +76,17 @@ test("manual enable/disable is stable for lazyOnView", async ({ obsidian }) => {
 
     // Manually enable plugin
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    const deadline = Date.now() + 8000;
-    let enabled = false;
-    while (Date.now() < deadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) {
-            enabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
     expect(enabled).toBe(true);
 
     // Manually disable plugin
     await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
-    const deadline2 = Date.now() + 8000;
-    let disabled = false;
-    while (Date.now() < deadline2) {
-        if (!(await obsidian.isPluginEnabled(targetPluginId))) {
-            disabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    await waitForPluginDisabled(obsidian, targetPluginId);
     // If disable didn't complete in this environment, continue — we'll verify load via view trigger below.
 
     // Trigger view change to cause lazyOnView load
-    await obsidian.page.evaluate(() => {
-        const workspace = app.workspace as any;
-        const leaf = workspace.getActiveLeaf?.() ?? workspace.activeLeaf ?? null;
-        workspace.trigger("active-leaf-change", leaf);
-    });
+    await triggerActiveLeafChange(obsidian);
 
-    const deadline3 = Date.now() + 8000;
-    let loaded = false;
-    while (Date.now() < deadline3) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) {
-            loaded = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    const loaded = await waitForPluginEnabled(obsidian, targetPluginId);
     expect(loaded).toBe(true);
 });

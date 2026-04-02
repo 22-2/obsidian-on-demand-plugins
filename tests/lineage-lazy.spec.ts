@@ -1,36 +1,20 @@
-
-import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, pluginUnderTestId, repoRoot } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    useOnDemandPluginsWithTargets,
+} from "./test-utils";
 
 const lineagePluginId = "lineage";
 
-function useLineagePlugin() {
-    test.use({
-        vaultOptions: {
-            logLevel: "info",
-            enableBrowserConsoleLogging: true,
-            fresh: true,
-            plugins: [
-                {
-                    path: repoRoot,
-                },
-                {
-                    path: path.resolve(repoRoot, "myfiles", lineagePluginId),
-                },
-            ],
-        },
-    });
-}
-
-useLineagePlugin();
+useOnDemandPluginsWithTargets(lineagePluginId);
 
 test("Lineage plugin should not be loaded at startup when configured as lazy", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
-    obsidian.page.on('console', msg => {
+    obsidian.page.on("console", (msg) => {
         // filter out some noise if needed
-        // console.log(`[BROWSER] ${msg.text()}`); 
+        // console.log(`[BROWSER] ${msg.text()}`);
     });
 
     await obsidian.waitReady();
@@ -90,6 +74,6 @@ test("Lineage plugin should not be loaded at startup when configured as lazy", a
 
     expect(isInList).toBe(false);
 
-    // Verify Lineage is NOT loaded after reload (simulated via check above, 
+    // Verify Lineage is NOT loaded after reload (simulated via check above,
     // but we can also do a full reload if we want, though checking config is sufficient/faster/more reliable)
 });

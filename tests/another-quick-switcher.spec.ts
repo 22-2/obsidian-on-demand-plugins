@@ -1,24 +1,14 @@
-import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, pluginUnderTestId, repoRoot } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    readCommunityPlugins,
+    useOnDemandPluginsWithTargets,
+} from "./test-utils";
 
 const targetPluginId = "obsidian-another-quick-switcher";
 
-test.use({
-    vaultOptions: {
-        enableBrowserConsoleLogging: true,
-        logLevel: "info",
-        fresh: true,
-        plugins: [
-            {
-                path: repoRoot,
-            },
-            {
-                path: path.resolve(repoRoot, "myfiles", targetPluginId),
-            },
-        ],
-    },
-});
+useOnDemandPluginsWithTargets(targetPluginId);
 
 test("Another Quick Switcher: should NOT be loaded at startup when set to lazy", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
@@ -48,10 +38,7 @@ test("Another Quick Switcher: should NOT be loaded at startup when set to lazy",
     console.log(`Plugin enabled state: ${isEnabled}`);
 
     // Check community-plugins.json
-    const communityPlugins = await obsidian.page.evaluate(async () => {
-        const raw = await app.vault.adapter.read('.obsidian/community-plugins.json');
-        return JSON.parse(raw) as string[];
-    });
+    const communityPlugins = await readCommunityPlugins(obsidian);
     console.log(`community-plugins.json: ${JSON.stringify(communityPlugins)}`);
     expect(communityPlugins).not.toContain(targetPluginId);
 

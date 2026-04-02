@@ -1,6 +1,13 @@
 import { expect, test } from "obsidian-e2e-toolkit";
 import type OnDemandPlugin from "src/main";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    targetPluginId,
+    triggerActiveLeafChange,
+    useOnDemandPlugins,
+    waitForPluginEnabled,
+} from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -111,26 +118,10 @@ test("lazy mode with useView:true loads plugin when matching view is activated",
     expect(setupResult.viewTypes).toContain("markdown");
 
     // Simulate an active-leaf-change event on a markdown leaf to trigger the loader
-    await obsidian.page.evaluate(() => {
-        const workspace = app.workspace as unknown as {
-            getActiveLeaf?: () => unknown;
-            activeLeaf?: unknown;
-            trigger: (event: string, leaf: unknown) => void;
-        };
-        const leaf = workspace.getActiveLeaf?.() ?? workspace.activeLeaf ?? null;
-        workspace.trigger("active-leaf-change", leaf);
-    });
+    await triggerActiveLeafChange(obsidian);
 
     // Wait up to 8 s for the plugin to be enabled
-    const deadline = Date.now() + 8000;
-    let enabled = false;
-    while (Date.now() < deadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) {
-            enabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 300));
-    }
+    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
 
     expect(enabled).toBe(true);
 });

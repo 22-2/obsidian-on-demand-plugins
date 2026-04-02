@@ -1,17 +1,7 @@
-import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, repoRoot } from "./test-utils";
+import { ensureBuilt, useOnDemandPluginsWithTargets } from "./test-utils";
 
-test.use({
-    vaultOptions: {
-        logLevel: "info",
-        fresh: true,
-        plugins: [
-            { path: repoRoot },
-            { path: path.resolve(repoRoot, "myfiles", "lineage") },
-        ],
-    },
-});
+useOnDemandPluginsWithTargets("lineage", { enableBrowserConsoleLogging: false });
 
 test("capture enabled plugins snapshot before reload (lineage should be unloaded)", async ({ obsidian }) => {
     if (!ensureBuilt()) return;

@@ -1,17 +1,7 @@
-import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, repoRoot } from "./test-utils";
+import { ensureBuilt, useOnDemandPluginsWithTargets } from "./test-utils";
 
-test.use({
-    vaultOptions: {
-        logLevel: "info",
-        fresh: true,
-        plugins: [
-            { path: repoRoot },
-            { path: path.resolve(repoRoot, "myfiles", "lineage") },
-        ],
-    },
-});
+useOnDemandPluginsWithTargets("lineage", { enableBrowserConsoleLogging: false });
 
 test("lineage not loaded when lazy-with-file-only and no matching files", async ({ obsidian }) => {
     if (!ensureBuilt()) return;

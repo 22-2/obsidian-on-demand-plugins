@@ -1,5 +1,11 @@
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    readOnDemandStorageValue,
+    targetPluginId,
+    useOnDemandPlugins,
+} from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -9,18 +15,7 @@ test("force rebuild refreshes command cache", async ({ obsidian }) => {
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const appId = (app as any).appId ?? (app as any).app?.appId ?? (app as any).manifest?.id;
-        const getStored = (prefix: string) => {
-            try {
-                const key = `on-demand:${prefix}:${appId}`;
-                const raw = window.localStorage.getItem(key);
-                return raw ? JSON.parse(raw) : null;
-            } catch (e) {
-                return null;
-            }
-        };
-
+    await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
 
@@ -30,13 +25,12 @@ test("force rebuild refreshes command cache", async ({ obsidian }) => {
         } finally {
             app.commands.executeCommandById = original;
         }
-
-        return {
-            cacheCount: getStored("commandCache")?.[pluginId]?.length ?? 0,
-        };
     }, targetPluginId);
 
-    expect(result.cacheCount).toBeGreaterThanOrEqual(0);
+    const cachedCommands = await readOnDemandStorageValue(obsidian, "commandCache", targetPluginId);
+    const cacheCount = Array.isArray(cachedCommands) ? cachedCommands.length : 0;
+
+    expect(cacheCount).toBeGreaterThanOrEqual(0);
 });
 
 test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
@@ -45,7 +39,7 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
+    const manifestVersion = await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
 
@@ -56,23 +50,14 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
             app.commands.executeCommandById = original;
         }
 
-        const manifestVersion = app.plugins.manifests?.[pluginId]?.version ?? null;
-        const appId = (app as any).appId ?? (app as any).app?.appId ?? (app as any).manifest?.id;
-        const getStored = (prefix: string) => {
-            try {
-                const key = `on-demand:${prefix}:${appId}`;
-                const raw = window.localStorage.getItem(key);
-                return raw ? JSON.parse(raw) : null;
-            } catch (e) {
-                return null;
-            }
-        };
-        const cachedVersion = getStored("commandCacheVersions")?.[pluginId] ?? null;
-        return { manifestVersion, cachedVersion };
+        return app.plugins.manifests?.[pluginId]?.version ?? null;
     }, targetPluginId);
 
-    expect(result.manifestVersion).toBeTruthy();
-    expect(result.cachedVersion).toBe(result.manifestVersion);
+    expect(manifestVersion).toBeTruthy();
+
+    const cachedVersion = await readOnDemandStorageValue(obsidian, "commandCacheVersions", targetPluginId);
+
+    expect(cachedVersion).toBe(manifestVersion);
 });
 
 test("disabling keepEnabled plugin syncs settings to disabled", async ({ obsidian }) => {
