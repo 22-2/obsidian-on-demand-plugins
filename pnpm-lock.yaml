@@ -76,8 +76,8 @@ importers:
         specifier: ^2.6.1
         version: 2.6.1
       obsidian-e2e-toolkit:
-        specifier: github:22-2/obsidian-e2e-toolkit#1.0.0
-        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/609fbb1eeee8ad9c2b486b08d6e46396ac634da2(@playwright/test@1.58.2)(playwright@1.58.2)
+        specifier: github:22-2/obsidian-e2e-toolkit#1.0.2
+        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/54aad72c3443f8ac51bffeade4b433bda63d5fc9(@playwright/test@1.58.2)(electron@41.0.3)(playwright@1.58.2)
       obsidian-typings:
         specifier: ^5.13.0
         version: 5.13.0(@pixi/core@7.2.4)(@pixi/display@7.2.4(@pixi/core@7.2.4))(@pixi/utils@7.2.4)(typescript@5.9.3)
@@ -1178,6 +1178,7 @@ packages:
   '@xmldom/xmldom@0.8.11':
     resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   acorn-jsx@5.3.2:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
@@ -2395,12 +2396,13 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/609fbb1eeee8ad9c2b486b08d6e46396ac634da2:
-    resolution: {tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/609fbb1eeee8ad9c2b486b08d6e46396ac634da2}
-    version: 1.0.0
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/54aad72c3443f8ac51bffeade4b433bda63d5fc9:
+    resolution: {tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/54aad72c3443f8ac51bffeade4b433bda63d5fc9}
+    version: 1.0.2
     engines: {node: '>=23.0.0'}
     peerDependencies:
       '@playwright/test': ^1.56.0
+      electron: ^41.0.3
       playwright: ^1.56.0
 
   obsidian-typings@5.13.0:
@@ -5583,7 +5585,7 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.1
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/609fbb1eeee8ad9c2b486b08d6e46396ac634da2(@playwright/test@1.58.2)(playwright@1.58.2):
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/54aad72c3443f8ac51bffeade4b433bda63d5fc9(@playwright/test@1.58.2)(electron@41.0.3)(playwright@1.58.2):
     dependencies:
       '@electron/asar': 4.1.0
       '@playwright/test': 1.58.2
