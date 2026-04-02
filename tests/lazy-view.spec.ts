@@ -1,5 +1,12 @@
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    targetPluginId,
+    triggerActiveLeafChange,
+    useOnDemandPlugins,
+    waitForPluginEnabled,
+} from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -29,25 +36,9 @@ test("lazyOnView loads plugin on view activation", async ({ obsidian }) => {
 
     expect(result.mode).toBe("lazyOnView");
 
-    await obsidian.page.evaluate(() => {
-        const workspace = app.workspace as unknown as {
-            getActiveLeaf?: () => unknown;
-            activeLeaf?: unknown;
-            trigger: (event: string, leaf: unknown) => void;
-        };
-        const leaf = workspace.getActiveLeaf?.() ?? workspace.activeLeaf ?? null;
-        workspace.trigger("active-leaf-change", leaf);
-    });
+    await triggerActiveLeafChange(obsidian);
 
-    const deadline = Date.now() + 8000;
-    let enabled = false;
-    while (Date.now() < deadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) {
-            enabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 300));
-    }
+    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
 
     expect(enabled).toBe(true);
 });

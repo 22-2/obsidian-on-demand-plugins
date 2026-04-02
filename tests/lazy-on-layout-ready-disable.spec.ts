@@ -1,5 +1,12 @@
 import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    targetPluginId,
+    useOnDemandPlugins,
+    waitForPluginDisabled,
+    waitForPluginEnabled,
+} from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -34,26 +41,13 @@ test("disabling a lazyOnLayoutReady plugin should not re-enable it", async ({ ob
 
     // 2. Enable the plugin (simulating that onLayoutReady loaded it)
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    const enableDeadline = Date.now() + 8000;
-    while (Date.now() < enableDeadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) break;
-        await new Promise((r) => setTimeout(r, 200));
-    }
-    expect(await obsidian.isPluginEnabled(targetPluginId)).toBe(true);
+    expect(await waitForPluginEnabled(obsidian, targetPluginId)).toBe(true);
 
     // 3. User manually disables the plugin
     await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // Wait for disable to complete
-    const disableDeadline = Date.now() + 8000;
-    let disabled = false;
-    while (Date.now() < disableDeadline) {
-        if (!(await obsidian.isPluginEnabled(targetPluginId))) {
-            disabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    const disabled = await waitForPluginDisabled(obsidian, targetPluginId);
     expect(disabled).toBe(true);
 
     // 4. Wait a bit and verify the plugin stays disabled (the bug would re-enable it)
@@ -83,11 +77,7 @@ test("disabling a lazyOnLayoutReady plugin preserves its lazy mode", async ({ ob
 
     // 2. Enable the plugin first
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    const enableDeadline = Date.now() + 8000;
-    while (Date.now() < enableDeadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) break;
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    await waitForPluginEnabled(obsidian, targetPluginId);
 
     // 3. Disable the plugin — with the Observe & Sync strategy,
     //    lazyOnLayoutReady mode is left untouched (no settings sync)
@@ -99,11 +89,7 @@ test("disabling a lazyOnLayoutReady plugin preserves its lazy mode", async ({ ob
     await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // Wait for disable to take effect
-    const disableDeadline = Date.now() + 8000;
-    while (Date.now() < disableDeadline) {
-        if (!(await obsidian.isPluginEnabled(targetPluginId))) break;
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    await waitForPluginDisabled(obsidian, targetPluginId);
 
     // 4. Verify plugin remains disabled after a delay
     await new Promise((r) => setTimeout(r, 3000));

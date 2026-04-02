@@ -1,6 +1,12 @@
 import { expect, test } from "obsidian-e2e-toolkit";
 import OnDemandPlugin from "src/main";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    readCommunityPlugins,
+    targetPluginId,
+    useOnDemandPlugins,
+} from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -23,19 +29,8 @@ test("apply changes writes community-plugins.json", async ({ obsidian }) => {
         }
     }, targetPluginId);
 
-    // Read the written community-plugins.json via the app adapter
-    const fileContent = await obsidian.page.evaluate(() => {
-        const path = (app.vault as any).configDir + "/community-plugins.json";
-        try {
-            return app.vault.adapter.read(path);
-        } catch (e) {
-            return null;
-        }
-    });
+    const parsed = await readCommunityPlugins(obsidian);
 
-    expect(fileContent).toBeTruthy();
-    const parsed = JSON.parse(fileContent as string);
-    expect(Array.isArray(parsed)).toBe(true);
     // Should include the on-demand plugin and the kept plugin
     expect(parsed).toContain(pluginUnderTestId);
     expect(parsed).toContain(targetPluginId);

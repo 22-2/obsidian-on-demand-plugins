@@ -1,6 +1,15 @@
 import { expect, test } from "obsidian-e2e-toolkit";
 import OnDemandPlugin from "src/main";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import {
+    ensureBuilt,
+    pluginUnderTestId,
+    readCommunityPlugins,
+    readOnDemandStorageValue,
+    targetPluginId,
+    triggerActiveLeafChange,
+    useOnDemandPlugins,
+    waitForPluginEnabled,
+} from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -50,13 +59,8 @@ test("force rebuild refreshes command cache", async ({ obsidian }) => {
         }
     }, targetPluginId);
 
-    const cacheCount = await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const appId = (app as any).appId ?? (app as any).app?.appId ?? (app as any).manifest?.id;
-        const key = `on-demand:commandCache:${appId}`;
-        const raw = window.localStorage.getItem(key);
-        const cache = raw ? JSON.parse(raw) : {};
-        return cache[pluginId]?.length ?? 0;
-    }, targetPluginId);
+    const cachedCommands = await readOnDemandStorageValue(obsidian, "commandCache", targetPluginId);
+    const cacheCount = Array.isArray(cachedCommands) ? cachedCommands.length : 0;
 
     expect(cacheCount).toBeGreaterThanOrEqual(0);
 });
@@ -87,25 +91,9 @@ test("lazyOnView loads plugin on view activation", async ({ obsidian }) => {
 
     expect(result.mode).toBe("lazyOnView");
 
-    await obsidian.page.evaluate(() => {
-        const workspace = app.workspace as unknown as {
-            getActiveLeaf?: () => unknown;
-            activeLeaf?: unknown;
-            trigger: (event: string, leaf: unknown) => void;
-        };
-        const leaf = workspace.getActiveLeaf?.() ?? workspace.activeLeaf ?? null;
-        workspace.trigger("active-leaf-change", leaf);
-    });
+    await triggerActiveLeafChange(obsidian);
 
-    const deadline = Date.now() + 8000;
-    let enabled = false;
-    while (Date.now() < deadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) {
-            enabled = true;
-            break;
-        }
-        await new Promise((r) => setTimeout(r, 300));
-    }
+    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
 
     expect(enabled).toBe(true);
 });
@@ -133,11 +121,8 @@ test("enabling disabled plugin syncs settings to keepEnabled", async ({ obsidian
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
 
     // Wait for enable to complete
-    const enableDeadline = Date.now() + 8000;
-    while (Date.now() < enableDeadline) {
-        if (await obsidian.isPluginEnabled(targetPluginId)) break;
-        await new Promise((r) => setTimeout(r, 200));
-    }
+    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
+    expect(enabled).toBe(true);
 
     // 3. Verify settings synced to "keepEnabled"
     const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
@@ -157,7 +142,7 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
+    const manifestVersion = await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
 
@@ -168,22 +153,14 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
             app.commands.executeCommandById = original;
         }
 
-        const manifestVersion = app.plugins.manifests?.[pluginId]?.version ?? null;
-        const cachedVersion = plugin.data?.commandCacheVersions?.[pluginId] ?? null;
-        return { manifestVersion, cachedVersion };
+        return app.plugins.manifests?.[pluginId]?.version ?? null;
     }, targetPluginId);
 
-    expect(result.manifestVersion).toBeTruthy();
+    expect(manifestVersion).toBeTruthy();
 
-    const cachedVersion = await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const appId = (app as any).appId;
-        const key = `on-demand:commandCacheVersions:${appId}`;
-        const raw = window.localStorage.getItem(key);
-        const versions = raw ? JSON.parse(raw) : {};
-        return versions[pluginId] ?? null;
-    }, targetPluginId);
+    const cachedVersion = await readOnDemandStorageValue(obsidian, "commandCacheVersions", targetPluginId);
 
-    expect(cachedVersion).toBe(result.manifestVersion);
+    expect(cachedVersion).toBe(manifestVersion);
 });
 
 test("apply changes writes community-plugins.json", async ({ obsidian }) => {
@@ -205,19 +182,8 @@ test("apply changes writes community-plugins.json", async ({ obsidian }) => {
         }
     }, targetPluginId);
 
-    // Read the written community-plugins.json via the app adapter
-    const fileContent = await obsidian.page.evaluate(() => {
-        const path = (app.vault as any).configDir + "/community-plugins.json";
-        try {
-            return app.vault.adapter.read(path);
-        } catch (e) {
-            return null;
-        }
-    });
+    const parsed = await readCommunityPlugins(obsidian);
 
-    expect(fileContent).toBeTruthy();
-    const parsed = JSON.parse(fileContent as string);
-    expect(Array.isArray(parsed)).toBe(true);
     // Should include the on-demand plugin and the kept plugin
     expect(parsed).toContain(pluginUnderTestId);
     expect(parsed).toContain(targetPluginId);
