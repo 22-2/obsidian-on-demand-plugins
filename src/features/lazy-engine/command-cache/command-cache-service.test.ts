@@ -48,7 +48,9 @@ describe("CommandCacheService", () => {
                 addCommand: vi.fn().mockImplementation((cmd: { id: string }) => {
                     mockCtx.obsidianCommands.commands[cmd.id] = cmd;
                 }),
-                removeCommand: vi.fn(),
+                removeCommand: vi.fn().mockImplementation((id: string) => {
+                    delete mockCtx.obsidianCommands.commands[id];
+                }),
             },
             obsidianPlugins: {
                 enabledPlugins: new Set(),
@@ -218,6 +220,47 @@ describe("CommandCacheService", () => {
             await service.refreshCommandCache(undefined, true, onProgress);
 
             expect(onProgress).toHaveBeenCalledTimes(1);
+            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
+        });
+    });
+
+    describe("forceReloadPluginCache", () => {
+        it("should remove and re-register wrappers when wrapper commands were active", async () => {
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+
+            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
+            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
+
+            await service.refreshCommandsForPlugin("test-plugin");
+
+            mockCtx.obsidianCommands.commands = {};
+            service.registerCachedCommandsForPlugin("test-plugin");
+
+            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string };
+            mockCtx.obsidianCommands.commands.cmd1 = addedCmd;
+
+            await service.forceReloadPluginCache("test-plugin");
+
+            expect(mockCtx.obsidianCommands.removeCommand).toHaveBeenCalledWith("cmd1");
+            expect(mockCtx.obsidianCommands.addCommand).toHaveBeenCalledTimes(2);
+            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
+        });
+
+        it("should refresh and persist without registering wrappers when none were active", async () => {
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+
+            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
+            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
+
+            await service.refreshCommandsForPlugin("test-plugin");
+
+            vi.clearAllMocks();
+
+            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1 updated" } };
+            await service.forceReloadPluginCache("test-plugin");
+
+            expect(mockCtx.obsidianCommands.removeCommand).not.toHaveBeenCalled();
+            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
             expect(storageMs.saveLocalStorage).toHaveBeenCalled();
         });
     });

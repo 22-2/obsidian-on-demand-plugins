@@ -94,6 +94,21 @@ export class CommandCacheService {
         this.store.persist();
     }
 
+    async forceReloadPluginCache(pluginId: string): Promise<void> {
+        const cachedIds = this.store.getIds(pluginId);
+        const hadWrappers = cachedIds ? Array.from(cachedIds).some((commandId) => this.isWrapperCommand(commandId)) : false;
+
+        // Keep the command palette clean: if wrappers were active, remove them before rebuilding.
+        this.removeCachedCommandsForPlugin(pluginId);
+
+        await this.refreshCommandsForPlugin(pluginId);
+        this.store.persist();
+
+        if (hadWrappers) {
+            this.registerCachedCommandsForPlugin(pluginId);
+        }
+    }
+
     // ---------------------------------------------------------------------------
     // Wrapper registration
     // ---------------------------------------------------------------------------

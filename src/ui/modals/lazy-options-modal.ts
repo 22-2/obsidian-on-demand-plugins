@@ -2,6 +2,7 @@ import log from "loglevel";
 import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type { LazyOptions } from "src/core/types";
+import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import type OnDemandPlugin from "src/main";
 
 const logger = log.getLogger("OnDemandPlugin/LazyOptionsModal");
@@ -46,6 +47,36 @@ export class LazyOptionsModal extends Modal {
             text: "Configure advanced activation rules for this plugin. Plugins also load automatically when their commands run.",
             cls: "setting-item-description",
         });
+
+        new Setting(contentEl)
+            .setName("Cache")
+            .setDesc("Force reload command cache for this plugin only.")
+            .addButton((btn) =>
+                btn
+                    .setButtonText("Reload this plugin cache")
+                    .setWarning()
+                    .onClick(() => {
+                        void (async () => {
+                            btn.setDisabled(true);
+                            try {
+                                const lazyEngine = this.plugin.features.get(LazyEngineFeature);
+                                if (!lazyEngine) {
+                                    new Notice("Lazy engine is not available");
+                                    return;
+                                }
+
+                                await lazyEngine.commandCache.forceReloadPluginCache(this.pluginId);
+                                new Notice(`Reloaded command cache for ${this.pluginId}`);
+                            } catch (error: unknown) {
+                                const message = error instanceof Error ? error.message : String(error);
+                                new Notice(`Failed to reload cache for ${this.pluginId}`);
+                                logger.error("Failed to force reload plugin cache", this.pluginId, message);
+                            } finally {
+                                btn.setDisabled(false);
+                            }
+                        })();
+                    }),
+            );
 
         // --- View Settings ---
         new Setting(contentEl)
