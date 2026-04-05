@@ -1,24 +1,23 @@
 {
     "compilerOptions": {
-        // Project Structure
+        // Project structure
         "paths": {
-            "*": ["./*"]
+            "src/*": ["./src/*"]
         },
 
-        // Input / Output
-        "noEmit": true,
+        // Module system
         "module": "ESNext",
         "target": "ESNext",
         "moduleResolution": "bundler",
         "allowSyntheticDefaultImports": true,
         "verbatimModuleSyntax": true,
+        "noEmit": true,
 
-        
-        // Type Checking
+        // Type checking
         "strict": true,
         "erasableSyntaxOnly": true,
 
-        // Type Definitions
+        // Type definitions
         "types": ["obsidian-typings"],
         "lib": ["DOM", "ESNext"]
     },
