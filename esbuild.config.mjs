@@ -52,7 +52,7 @@ const context = await esbuild.context({
 		"@lezer/highlight",
 		"@lezer/lr",
 		...builtins
-],
+    ],
 	format: "cjs",
 	target: "esnext",
 	logLevel: "info",
