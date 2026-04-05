@@ -84,12 +84,12 @@ export class BackupFeature implements AppFeature {
         }
 
         // 3. Save backup
-        const timestamp = moment().format("YYYYMMDD-HHmmss");
+        const timestamp = window.moment().format("YYYYMMDD-HHmmss");
         const dataBackupPath = normalizePath(`${this.backupDir}/data_${timestamp}.json`);
         const communityBackupPath = normalizePath(`${this.backupDir}/community-plugins_${timestamp}.json`);
 
         try {
-            await adapter.write(dataBackupPath, dataContent);
+                const timestamp = window.moment().format("YYYYMMDD-HHmmss");
             await adapter.write(communityBackupPath, communityContent);
             logger.info(`Created backup at ${timestamp}`);
         } catch (e) {

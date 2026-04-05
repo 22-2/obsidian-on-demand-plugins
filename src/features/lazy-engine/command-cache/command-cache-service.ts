@@ -12,10 +12,12 @@ export class CommandCacheService {
     private registeredWrappers = new Set<string>();
     private wrapperCommands = new Map<string, unknown>();
 
-    constructor(
-        private ctx: PluginContext,
-        private pluginLoader: PluginLoader,
-    ) {
+    private ctx: PluginContext;
+    private pluginLoader: PluginLoader;
+
+    constructor(ctx: PluginContext, pluginLoader: PluginLoader) {
+        this.ctx = ctx;
+        this.pluginLoader = pluginLoader;
         this.store = new CommandCacheStore(ctx);
     }
 

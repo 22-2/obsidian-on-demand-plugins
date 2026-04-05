@@ -20,19 +20,22 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
         void this.initializeLazyViewForLeaf(leaf);
     }, 100, true);
 
+    private commandRegistry: CommandRegistry;
+
     constructor(
         ctx: PluginContext,
         pluginLoader: PluginLoader & {
             ensurePluginLoaded(pluginId: string): Promise<boolean>;
         },
-        private commandRegistry: CommandRegistry,
+        commandRegistry: CommandRegistry,
         lockStrategy: LockStrategy<LeafResource>,
     ) {
         super(ctx, pluginLoader, lockStrategy);
+        this.commandRegistry = commandRegistry;
     }
 
     registerActiveLeafReload(): void {
-        this.ctx.registerEvent(this.ctx.app.workspace.on("active-leaf-change", this.debouncedInitializeLazyViewForLeaf));
+        this.ctx.registerEvent(this.ctx.app.workspace.on("active-leaf-change" as any, this.debouncedInitializeLazyViewForLeaf as any));
 
         // Initial load
         this.ctx.app.workspace.onLayoutReady(() =>

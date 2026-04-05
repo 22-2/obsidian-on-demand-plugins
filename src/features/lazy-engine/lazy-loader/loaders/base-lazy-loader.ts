@@ -12,13 +12,23 @@ const logger = log.getLogger("OnDemandPlugin/BaseLazyLoader");
  * for both view-based and file-based lazy loading.
  */
 export abstract class BaseLazyLoader<TLockTarget> {
+    protected ctx: PluginContext;
+    protected pluginLoader: PluginLoader & {
+        ensurePluginLoaded(pluginId: string): Promise<boolean>;
+    };
+    protected lockStrategy: LockStrategy<TLockTarget>;
+
     constructor(
-        protected ctx: PluginContext,
-        protected pluginLoader: PluginLoader & {
+        ctx: PluginContext,
+        pluginLoader: PluginLoader & {
             ensurePluginLoaded(pluginId: string): Promise<boolean>;
         },
-        protected lockStrategy: LockStrategy<TLockTarget>,
-    ) {}
+        lockStrategy: LockStrategy<TLockTarget>,
+    ) {
+        this.ctx = ctx;
+        this.pluginLoader = pluginLoader;
+        this.lockStrategy = lockStrategy;
+    }
 
     /**
      * Template method for lazy loading a plugin.

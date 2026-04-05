@@ -7,10 +7,13 @@ import type { PluginContext } from "src/core/plugin-context";
 const logger = log.getLogger("OnDemandPlugin/CommandExecutor");
 
 export class CommandExecutor {
-    constructor(
-        private ctx: PluginContext,
-        private commandRegistry: CommandRegistry,
-    ) {}
+    private ctx: PluginContext;
+    private commandRegistry: CommandRegistry;
+
+    constructor(ctx: PluginContext, commandRegistry: CommandRegistry) {
+        this.ctx = ctx;
+        this.commandRegistry = commandRegistry;
+    }
 
     /**
      * Execute a command by invoking its registered callback function.

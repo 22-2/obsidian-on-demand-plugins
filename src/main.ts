@@ -18,8 +18,10 @@ import { SettingsTab } from "src/ui/settings-tab";
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
 
 export default class OnDemandPlugin extends Plugin {
-    data: LazySettings;
-    settings: DeviceSettings;
+    // Assigned during onload via loadSettings().
+    data!: LazySettings;
+    // Assigned during onload via loadSettings().
+    settings!: DeviceSettings;
     device = "desktop/global";
     manifests: PluginManifest[] = [];
 

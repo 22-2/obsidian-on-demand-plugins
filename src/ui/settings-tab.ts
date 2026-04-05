@@ -18,7 +18,8 @@ export class SettingsTab extends PluginSettingTab {
     dropdowns: DropdownComponent[] = [];
     filterMethod: PluginMode | undefined;
     filterString: string | undefined;
-    pluginListContainer: HTMLElement;
+    // Created in buildDom() before buildPluginList() runs.
+    pluginListContainer!: HTMLElement;
     pluginSettings: { [pluginId: string]: PluginSettings } = {};
     pendingPluginIds = new Set<string>();
     isDirty = false;
@@ -118,8 +119,8 @@ export class SettingsTab extends PluginSettingTab {
             .setDesc("Specify the default mode for newly discovered plugins or those not yet configured.")
             .addDropdown((dropdown) => {
                 this.addModeOptions(dropdown);
-                dropdown.setValue(this.plugin.settings.defaultMode).onChange((value: PluginMode) => {
-                    this.plugin.settings.defaultMode = value;
+                dropdown.setValue(this.plugin.settings.defaultMode).onChange((value: string) => {
+                    this.plugin.settings.defaultMode = value as PluginMode;
                     this.isDirty = true;
                     this.updateApplyButton();
                 });
@@ -286,13 +287,14 @@ export class SettingsTab extends PluginSettingTab {
             setting.addDropdown((dropdown) => {
                 this.dropdowns.push(dropdown);
                 this.addModeOptions(dropdown);
-                dropdown.setValue(currentValue).onChange((value: PluginMode) => {
+                dropdown.setValue(currentValue).onChange((value: string) => {
                     // Update the config, and defer apply until user confirms
+                    const mode = value as PluginMode;
                     this.pluginSettings[plugin.id] = {
-                        mode: value,
+                        mode,
                         userConfigured: true,
                     };
-                    this.ensurelazyOnViewEntry(plugin.id, value);
+                    this.ensurelazyOnViewEntry(plugin.id, mode);
                     this.pendingPluginIds.add(plugin.id);
                     this.isDirty = true;
                     this.updateApplyButton();

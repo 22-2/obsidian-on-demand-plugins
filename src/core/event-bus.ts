@@ -5,7 +5,7 @@ export type EventHandler<T = unknown> = (payload: T) => void | Promise<void>;
  * Features can emit events without knowing which other features are listening.
  */
 export class EventBus {
-    private handlers = new Map<string, Set<EventHandler>>();
+    private handlers = new Map<string, Set<EventHandler<unknown>>>();
 
     /**
      * Subscribe to an event.
@@ -14,14 +14,14 @@ export class EventBus {
         if (!this.handlers.has(event)) {
             this.handlers.set(event, new Set());
         }
-        this.handlers.get(event)!.add(handler);
+        this.handlers.get(event)!.add(handler as EventHandler<unknown>);
     }
 
     /**
      * Unsubscribe from an event.
      */
     off<T = unknown>(event: string, handler: EventHandler<T>): void {
-        this.handlers.get(event)?.delete(handler);
+        this.handlers.get(event)?.delete(handler as EventHandler<unknown>);
     }
 
     /**

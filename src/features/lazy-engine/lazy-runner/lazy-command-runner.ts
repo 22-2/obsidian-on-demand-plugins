@@ -17,8 +17,12 @@ export class LazyCommandRunner implements PluginLoader {
     private commandExecutor!: CommandExecutor;
     /** Injected after construction to break circular dependency. */
     private commandRegistry!: CommandRegistry;
+    // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
+    private ctx: PluginContext;
 
-    constructor(private ctx: PluginContext) {}
+    constructor(ctx: PluginContext) {
+        this.ctx = ctx;
+    }
 
     /**
      * Setter injection — called by ServiceContainer after both services are created.
