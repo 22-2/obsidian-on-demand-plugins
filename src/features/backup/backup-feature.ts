@@ -89,9 +89,10 @@ export class BackupFeature implements AppFeature {
         const communityBackupPath = normalizePath(`${this.backupDir}/community-plugins_${timestamp}.json`);
 
         try {
-                const timestamp = window.moment().format("YYYYMMDD-HHmmss");
+            // Write both data and community backups. Data backup must be saved as well.
+            await adapter.write(dataBackupPath, dataContent);
             await adapter.write(communityBackupPath, communityContent);
-            logger.info(`Created backup at ${timestamp}`);
+            logger.info(`Created backups at ${timestamp}`);
         } catch (e) {
             logger.error("Failed to write backup files", e);
             return;
@@ -106,7 +107,8 @@ export class BackupFeature implements AppFeature {
         let result;
         try {
             result = await adapter.list(this.backupDir);
-        } catch {
+        } catch (e) {
+            logger.warn("Failed to list backup directory for rotation, skipping rotation", e);
             return;
         }
 
