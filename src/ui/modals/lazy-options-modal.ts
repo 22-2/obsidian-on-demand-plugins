@@ -8,15 +8,22 @@ import type OnDemandPlugin from "src/main";
 const logger = log.getLogger("OnDemandPlugin/LazyOptionsModal");
 
 export class LazyOptionsModal extends Modal {
+    // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
+    private plugin: OnDemandPlugin;
+    private pluginId: string;
+    private onSave?: () => void;
     private options: LazyOptions;
 
     constructor(
         app: App,
-        private plugin: OnDemandPlugin,
-        private pluginId: string,
-        private onSave?: () => void,
+        plugin: OnDemandPlugin,
+        pluginId: string,
+        onSave?: () => void,
     ) {
         super(app);
+        this.plugin = plugin;
+        this.pluginId = pluginId;
+        this.onSave = onSave;
         const settings = this.plugin.settings.plugins[this.pluginId];
 
         // Initialize options from existing settings or defaults

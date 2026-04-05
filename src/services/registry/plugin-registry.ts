@@ -6,16 +6,26 @@ import { ON_DEMAND_PLUGIN_ID } from "src/core/constants";
 const logger = log.getLogger("OnDemandPlugin/PluginRegistry");
 
 export class PluginRegistry {
+    // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
+    private app: App;
+    private obsidianPlugins: {
+        manifests: Record<string, PluginManifest>;
+        enabledPlugins: Set<string>;
+    };
+
     manifests: PluginManifest[] = [];
     enabledPluginsFromDisk = new Set<string>();
 
     constructor(
-        private app: App,
-        private obsidianPlugins: {
+        app: App,
+        obsidianPlugins: {
             manifests: Record<string, PluginManifest>;
             enabledPlugins: Set<string>;
         },
-    ) {}
+    ) {
+        this.app = app;
+        this.obsidianPlugins = obsidianPlugins;
+    }
 
     reloadManifests() {
         const manifests = Object.values(this.obsidianPlugins.manifests);

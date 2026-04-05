@@ -12,15 +12,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export class SettingsService {
-    data: LazySettings;
+    // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
+    private plugin: OnDemandPlugin;
+
+    // Populated in load().
+    data!: LazySettings;
     /** Currently active device settings (points to the active profile's settings) */
-    settings: DeviceSettings;
+    // Populated in load() after profile resolution.
+    settings!: DeviceSettings;
     /** ID of the currently active profile */
-    currentProfileId: string;
+    // Populated in load() after profile resolution.
+    currentProfileId!: string;
     /** True if no previous data.json was found during load */
     isFirstLoad = false;
 
-    constructor(private plugin: OnDemandPlugin) {}
+    constructor(plugin: OnDemandPlugin) {
+        this.plugin = plugin;
+    }
 
     async load() {
         // 1. Load raw data

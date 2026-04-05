@@ -6,11 +6,15 @@ import type { PluginContext } from "src/core/plugin-context";
 export class FeatureManager {
     private features: AppFeature[] = [];
 
-    constructor(
-        private ctx: PluginContext,
-        private core: CoreContainer,
-        private events: EventBus,
-    ) {}
+    ctx: PluginContext;
+    core: CoreContainer;
+    events: EventBus;
+
+    constructor(ctx: PluginContext, core: CoreContainer, events: EventBus) {
+        this.ctx = ctx;
+        this.core = core;
+        this.events = events;
+    }
 
     register<T extends AppFeature>(feature: T): T {
         this.features.push(feature);

@@ -35,7 +35,7 @@ test("Lineage plugin should not be loaded at startup when configured as lazy", a
         app.commands.executeCommandById = (id) => {
             if (id === 'app:reload') {
                 console.log("Mocked reload called");
-                return;
+                return true;
             }
             return originalExec.call(app.commands, id);
         };

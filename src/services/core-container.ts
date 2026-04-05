@@ -12,10 +12,14 @@ import { PluginRegistry } from "src/services/registry/plugin-registry";
 import { SettingsService } from "src/services/settings/settings-service";
 
 export class CoreContainer {
+    // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
+    private ctx: PluginContext;
+
     readonly registry: PluginRegistry;
     readonly settingsService: SettingsService;
 
-    constructor(private ctx: PluginContext) {
+    constructor(ctx: PluginContext) {
+        this.ctx = ctx;
         // 1. Registry (no service deps)
         this.registry = new PluginRegistry(ctx.app, ctx.obsidianPlugins);
 

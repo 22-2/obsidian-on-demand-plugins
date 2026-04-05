@@ -24,12 +24,14 @@ export class ConfirmModal extends Modal {
     submitted = false;
     // Resolver for the returned Promise
     resolve!: (value: boolean | null) => void;
+    message: string;
 
     constructor(
         app: App,
-        public message: string,
+        message: string,
     ) {
         super(app);
+        this.message = message;
     }
 
     onOpen(): void {

@@ -68,7 +68,11 @@ export class LeafLockManager {
  * Used by ViewLazyLoader to prevent concurrent processing of the same view type.
  */
 export class LeafViewLockStrategy implements LockStrategy<LeafResource> {
-    constructor(private manager: LeafLockManager) {}
+    private manager: LeafLockManager;
+
+    constructor(manager: LeafLockManager) {
+        this.manager = manager;
+    }
 
     async lock(target: LeafResource): Promise<LockRelease> {
         return this.manager.lock(target.leaf, `view:${target.viewType}`);

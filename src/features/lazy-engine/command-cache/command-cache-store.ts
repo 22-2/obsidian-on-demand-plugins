@@ -7,7 +7,11 @@ export class CommandCacheStore {
     readonly commandCache = new Map<string, CachedCommand>();
     readonly pluginCommandIndex = new Map<string, Set<string>>();
 
-    constructor(private ctx: PluginContext) {}
+    private ctx: PluginContext;
+
+    constructor(ctx: PluginContext) {
+        this.ctx = ctx;
+    }
 
     get(commandId: string): CachedCommand | undefined {
         return this.commandCache.get(commandId);

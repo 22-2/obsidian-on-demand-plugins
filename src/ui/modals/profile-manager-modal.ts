@@ -4,12 +4,18 @@ import { showConfirmModal } from "src/core/confirm-modal";
 import type { SettingsService } from "src/services/settings/settings-service";
 
 export class ProfileManagerModal extends Modal {
+    // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
+    private settingsService: SettingsService;
+    private onProfileChanged: () => void;
+
     constructor(
         app: App,
-        private settingsService: SettingsService,
-        private onProfileChanged: () => void,
+        settingsService: SettingsService,
+        onProfileChanged: () => void,
     ) {
         super(app);
+        this.settingsService = settingsService;
+        this.onProfileChanged = onProfileChanged;
     }
 
     onOpen() {

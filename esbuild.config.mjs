@@ -5,6 +5,7 @@ import process from "process";
 import builtins from "builtin-modules";
 import { obsidianCopyPlugin } from "@22-2/esbuild-plugin-obsidian-copy";
 import dotenv from "dotenv";
+
 dotenv.config();
 
 const pluginsPath = process.env.PLUGINS_PATH;
@@ -50,7 +51,8 @@ const context = await esbuild.context({
 		"@lezer/common",
 		"@lezer/highlight",
 		"@lezer/lr",
-		...builtins],
+		...builtins
+],
 	format: "cjs",
 	target: "esnext",
 	logLevel: "info",

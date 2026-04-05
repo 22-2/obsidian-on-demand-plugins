@@ -7,6 +7,10 @@ import type { SyncDirection } from "src/features/maintenance/maintenance-feature
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 
 export class ToolsModal extends Modal {
+    // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
+    private plugin: OnDemandPlugin;
+    private onComplete: () => void;
+
     private fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;
     private toMode: PluginMode = PLUGIN_MODE.LAZY;
     private confirmTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
@@ -15,10 +19,12 @@ export class ToolsModal extends Modal {
 
     constructor(
         app: App,
-        private plugin: OnDemandPlugin,
-        private onComplete: () => void,
+        plugin: OnDemandPlugin,
+        onComplete: () => void,
     ) {
         super(app);
+        this.plugin = plugin;
+        this.onComplete = onComplete;
     }
 
     onOpen() {
@@ -118,8 +124,8 @@ export class ToolsModal extends Modal {
                 .addOption("lazyToCore", "Plugin data -> Obsidian config")
                 .addOption("coreToLazy", "Obsidian config -> plugin data")
                     .setValue(syncDirection)
-                    .onChange((val: SyncDirection) => {
-                        syncDirection = val;
+                    .onChange((value: string) => {
+                        syncDirection = value as SyncDirection;
                         void refreshPreview();
                     });
             });
@@ -176,16 +182,16 @@ export class ToolsModal extends Modal {
         new Setting(batchContainer).setName("From mode").addDropdown((dd) =>
             this.addModeOptions(dd)
                 .setValue(this.fromMode)
-                .onChange((val: PluginMode) => {
-                    this.fromMode = val;
+                .onChange((value: string) => {
+                    this.fromMode = value as PluginMode;
                 }),
         );
 
         new Setting(batchContainer).setName("To mode").addDropdown((dd) =>
             this.addModeOptions(dd)
                 .setValue(this.toMode)
-                .onChange((val: PluginMode) => {
-                    this.toMode = val;
+                .onChange((value: string) => {
+                    this.toMode = value as PluginMode;
                 }),
         );
         

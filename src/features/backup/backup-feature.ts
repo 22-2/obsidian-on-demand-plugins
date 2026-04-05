@@ -3,7 +3,7 @@ import type { AppFeature } from "src/core/feature";
 import type { PluginContext } from "src/core/plugin-context";
 
 // Needed dynamic import from obsidian
-import { moment, normalizePath } from "obsidian";
+import { normalizePath } from "obsidian";
 
 const logger = log.getLogger("OnDemandPlugin/BackupFeature");
 
@@ -84,14 +84,15 @@ export class BackupFeature implements AppFeature {
         }
 
         // 3. Save backup
-        const timestamp = moment().format("YYYYMMDD-HHmmss");
+        const timestamp = window.moment().format("YYYYMMDD-HHmmss");
         const dataBackupPath = normalizePath(`${this.backupDir}/data_${timestamp}.json`);
         const communityBackupPath = normalizePath(`${this.backupDir}/community-plugins_${timestamp}.json`);
 
         try {
+            // Write both data and community backups. Data backup must be saved as well.
             await adapter.write(dataBackupPath, dataContent);
             await adapter.write(communityBackupPath, communityContent);
-            logger.info(`Created backup at ${timestamp}`);
+            logger.info(`Created backups at ${timestamp}`);
         } catch (e) {
             logger.error("Failed to write backup files", e);
             return;
@@ -106,7 +107,8 @@ export class BackupFeature implements AppFeature {
         let result;
         try {
             result = await adapter.list(this.backupDir);
-        } catch {
+        } catch (e) {
+            logger.warn("Failed to list backup directory for rotation, skipping rotation", e);
             return;
         }
 
