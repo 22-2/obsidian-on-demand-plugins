@@ -14,11 +14,13 @@
 		"version": "node version-bump.mjs && git add manifest.json versions.json",
 		"test": "vitest",
 		"lint": "pnpm exec eslint ./src --ext .ts,.js,.mjs",
-		"format": "pnpm run lint --fix && pnpm exec prettier --editorconfig --write ./src && pnpx organize-imports-cli tsconfig.json"
+		"format": "pnpm run lint --fix && pnpm exec prettier --editorconfig --write ./src && pnpx organize-imports-cli tsconfig.json",
+        "release": "pnpm dlx semantic-release",
+        "release:dry": "pnpm release --dry-run"
 	},
 	"keywords": [],
 	"author": "22-2",
-    "repository": "https://github.com/22-2/obsidian-on-demand-plugins.git",
+	"repository": "https://github.com/22-2/obsidian-on-demand-plugins.git",
 	"license": "MIT",
 	"pnpm": {
 		"onlyBuiltDependencies": [
@@ -40,10 +42,16 @@
 		"@22-2/esbuild-plugin-obsidian-copy": "git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916",
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.59.1",
+		"@semantic-release/commit-analyzer": "^13.0.1",
+		"@semantic-release/exec": "^7.1.0",
+		"@semantic-release/git": "^10.0.1",
+		"@semantic-release/github": "^12.0.6",
+		"@semantic-release/release-notes-generator": "^14.1.0",
 		"@types/node": "^25.5.2",
 		"@vitest/coverage-v8": "4.1.2",
 		"@vitest/ui": "^4.1.2",
 		"builtin-modules": "5.0.0",
+		"conventional-changelog-conventionalcommits": "^9.3.1",
 		"dotenv": "^17.4.0",
 		"esbuild": "0.28.0",
 		"eslint": "^10.2.0",
