@@ -1,5 +1,5 @@
 import path from "node:path";
-import { access, readFile } from "node:fs/promises";
+import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";
 import { exec } from "node:child_process";
@@ -36,23 +36,151 @@ async function runSafeCommand(command, cwd, label) {
 }
 
 /**
- * Handles the fetch, install, and build process for a single plugin.
- * @param {string} pluginId 
- * @param {string} ownerRepo 
- * @param {string} baseDir 
+ * @typedef {{ repo: string, tag?: string }} PluginSource
  */
-async function setupExternalPlugin(pluginId, ownerRepo, baseDir) {
+
+/**
+ * Normalizes legacy string entries and new tagged entries to one shape.
+ * @param {string | PluginSource} source
+ * @returns {PluginSource}
+ */
+function normalizePluginSource(source) {
+    if (typeof source === "string") {
+        return { repo: source };
+    }
+
+    if (!source || typeof source.repo !== "string" || source.repo.length === 0) {
+        throw new TypeError("plugin source must be a repo string or an object with a repo field");
+    }
+
+    return { repo: source.repo, tag: source.tag };
+}
+
+/**
+ * Parses a GitHub owner/repo identifier.
+ * @param {string} ownerRepo
+ * @returns {{ owner: string, repo: string }}
+ */
+function parseOwnerRepo(ownerRepo) {
+    const [owner, repo] = ownerRepo.split("/");
+    if (!owner || !repo) {
+        throw new TypeError(`invalid GitHub repo identifier: ${ownerRepo}`);
+    }
+
+    return { owner, repo };
+}
+
+/**
+ * Downloads the standard Obsidian release assets for an explicit release tag.
+ * @param {PluginSource} source
+ * @param {string} dest
+ */
+async function fetchTaggedRelease(source, dest) {
+    const { owner, repo } = parseOwnerRepo(source.repo);
+    const releaseApiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/tags/${source.tag}`;
+    const response = await fetch(releaseApiUrl, {
+        headers: {
+            "User-Agent": "obsidian-lazy-plugins-tests"
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`failed to resolve release ${source.tag} for ${source.repo}: ${response.status}`);
+    }
+
+    /** @type {{ assets?: Array<{ name?: string, browser_download_url?: string }> }} */
+    const release = await response.json();
+    const desiredFiles = ["main.js", "manifest.json", "styles.css"];
+
+    await mkdir(dest, { recursive: true });
+
+    for (const fileName of desiredFiles) {
+        const asset = release.assets?.find((entry) => entry.name === fileName);
+        if (!asset?.browser_download_url) {
+            continue;
+        }
+
+        const assetResponse = await fetch(asset.browser_download_url, {
+            headers: {
+                "User-Agent": "obsidian-lazy-plugins-tests"
+            }
+        });
+        if (!assetResponse.ok) {
+            throw new Error(`failed to download ${fileName} for ${source.repo}@${source.tag}: ${assetResponse.status}`);
+        }
+
+        const assetBuffer = Buffer.from(await assetResponse.arrayBuffer());
+        await writeFile(path.join(dest, fileName), assetBuffer);
+    }
+}
+
+/**
+ * Reads the cache marker so a pinned tag change invalidates a stale plugin copy.
+ * @param {string} metadataPath
+ * @returns {Promise<PluginSource | null>}
+ */
+async function readCachedPluginSource(metadataPath) {
+    if (!(await fileExists(metadataPath))) {
+        return null;
+    }
+
+    try {
+        const content = await readFile(metadataPath, "utf8");
+        return normalizePluginSource(JSON.parse(content));
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * @param {PluginSource} source
+ * @param {PluginSource | null} cachedSource
+ * @param {string} manifestPath
+ * @returns {Promise<boolean>}
+ */
+async function shouldRefreshPlugin(source, cachedSource, manifestPath) {
+    if (!(await fileExists(manifestPath))) {
+        return true;
+    }
+
+    if (!cachedSource) {
+        return true;
+    }
+
+    return cachedSource.repo !== source.repo || (cachedSource.tag ?? "") !== (source.tag ?? "");
+}
+
+/**
+ * Handles the fetch, install, and build process for a single plugin.
+ * @param {string} pluginId
+ * @param {string | PluginSource} sourceValue
+ * @param {string} baseDir
+ */
+async function setupExternalPlugin(pluginId, sourceValue, baseDir) {
+    const source = normalizePluginSource(sourceValue);
     const dest = path.resolve(baseDir, "myfiles", pluginId);
     const manifestPath = path.join(dest, "manifest.json");
     const pkgPath = path.join(dest, "package.json");
+    const metadataPath = path.join(dest, ".lazy-plugin-source.json");
 
     try {
-        // Check if the plugin is already cached by looking for manifest.json
-        if (await fileExists(manifestPath)) {
-            console.log(`[global-setup] ${pluginId} already cached, skipping fetch`);
+        const cachedSource = await readCachedPluginSource(metadataPath);
+        const refreshRequired = await shouldRefreshPlugin(source, cachedSource, manifestPath);
+
+        if (!refreshRequired) {
+            console.log(`[global-setup] ${pluginId} already cached at ${source.tag ?? "latest"}, skipping fetch`);
         } else {
-            console.log(`[global-setup] fetching ${ownerRepo} -> ${dest}`);
-            await fetchPlugin(`https://github.com/${ownerRepo}.git`, dest);
+            // Recreate the cache when the pinned source changes so tests never mix old plugin files with a new tag.
+            await rm(dest, { recursive: true, force: true });
+
+            console.log(`[global-setup] fetching ${source.repo}${source.tag ? `@${source.tag}` : ""} -> ${dest}`);
+            if (source.tag) {
+                await fetchTaggedRelease(source, dest);
+            } else {
+                await fetchPlugin(`https://github.com/${source.repo}.git`, dest);
+            }
+
+            await writeFile(metadataPath, `${JSON.stringify(source, null, 4)}\n`, "utf8");
         }
 
         // Run build steps if package.json is present
@@ -62,7 +190,7 @@ async function setupExternalPlugin(pluginId, ownerRepo, baseDir) {
             await runSafeCommand("pnpm run build --silent", dest, `pnpm build (${pluginId})`);
         }
     } catch (err) {
-        console.warn(`[global-setup] Error processing ${pluginId} (${ownerRepo}):`, err?.message || err);
+        console.warn(`[global-setup] Error processing ${pluginId} (${source.repo}):`, err?.message || err);
     }
 }
 
@@ -96,7 +224,7 @@ export default async function globalSetup() {
     }
 
     // 3. Process each plugin sequentially to avoid I/O race conditions
-    for (const [pluginId, ownerRepo] of Object.entries(repoMap)) {
-        await setupExternalPlugin(pluginId, ownerRepo, repoRoot);
+    for (const [pluginId, source] of Object.entries(repoMap)) {
+        await setupExternalPlugin(pluginId, source, repoRoot);
     }
 }

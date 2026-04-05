@@ -1,7 +1,22 @@
 {
-    "lineage": "ycnmhd/obsidian-lineage",
-    "obsidian-another-quick-switcher": "tadashi-aikawa/obsidian-another-quick-switcher",
-    "obsidian-excalidraw-plugin": "zsviczian/obsidian-excalidraw-plugin",
-    "obsidian42-brat": "TfTHacker/obsidian42-brat",
-    "mobile-first-daily-interface": "22-2/mobile-first-daily-interface"
+    "lineage": {
+        "repo": "ycnmhd/obsidian-lineage",
+        "tag": "0.8.5"
+    },
+    "obsidian-another-quick-switcher": {
+        "repo": "tadashi-aikawa/obsidian-another-quick-switcher",
+        "tag": "14.6.0"
+    },
+    "obsidian-excalidraw-plugin": {
+        "repo": "zsviczian/obsidian-excalidraw-plugin",
+        "tag": "2.22.0"
+    },
+    "obsidian42-brat": {
+        "repo": "TfTHacker/obsidian42-brat",
+        "tag": "2.0.4"
+    },
+    "mobile-first-daily-interface": {
+        "repo": "22-2/mobile-first-daily-interface",
+        "tag": "2.0.3"
+    }
 }
