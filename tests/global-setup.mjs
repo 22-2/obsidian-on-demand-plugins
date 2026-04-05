@@ -80,7 +80,7 @@ async function fetchTaggedRelease(source, dest) {
     const releaseApiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/tags/${source.tag}`;
     const response = await fetch(releaseApiUrl, {
         headers: {
-            "User-Agent": "obsidian-lazy-plugins-tests"
+            "User-Agent": "obsidian-on-demand-plugins-tests"
         }
     });
 
@@ -102,7 +102,7 @@ async function fetchTaggedRelease(source, dest) {
 
         const assetResponse = await fetch(asset.browser_download_url, {
             headers: {
-                "User-Agent": "obsidian-lazy-plugins-tests"
+                "User-Agent": "obsidian-on-demand-plugins-tests"
             }
         });
         if (!assetResponse.ok) {

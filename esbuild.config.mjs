@@ -16,7 +16,7 @@ if (!isCI && pluginsPath) {
 	plugins.push(
 		obsidianCopyPlugin({
 			pluginsDir: pluginsPath,
-			targetDirName: "obsidian-lazy-plugins",
+			targetDirName: "obsidian-on-demand-plugins",
 			force: true,
 		}),
 	);

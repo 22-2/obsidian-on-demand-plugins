@@ -1,5 +1,5 @@
 export default {
-    repositoryUrl: "https://github.com/22-2/obsidian-lazy-plugins.git",
+    repositoryUrl: "https://github.com/22-2/obsidian-on-demand-plugins.git",
     branches: ["main"],
     tagFormat: "${version}",
     plugins: [
