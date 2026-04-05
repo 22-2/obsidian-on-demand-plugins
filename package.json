@@ -18,6 +18,7 @@
 	},
 	"keywords": [],
 	"author": "22-2",
+    "repository": "https://github.com/22-2/obsidian-lazy-plugins.git",
 	"license": "MIT",
 	"pnpm": {
 		"onlyBuiltDependencies": [
