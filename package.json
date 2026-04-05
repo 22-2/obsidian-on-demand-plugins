@@ -50,6 +50,7 @@
 		"eslint-plugin-obsidianmd": "^0.1.9",
 		"globals": "^17.4.0",
 		"jiti": "^2.6.1",
+		"moment": "^2.30.1",
 		"obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#1.0.2",
 		"obsidian-typings": "^5.18.0",
 		"playwright": "^1.59.1",
