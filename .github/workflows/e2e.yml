@@ -10,11 +10,13 @@ on:
         required: false
         default: "latest"
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   e2e:
     runs-on: ${{ matrix.os }}
-    env:
-      OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: "${{ github.event_name == 'workflow_dispatch' && github.event.inputs.obsidian_version || 'latest' }}"
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
@@ -23,7 +25,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Setup pnpm (action)
+      - name: Setup pnpm
         uses: pnpm/action-setup@v5
         with:
           version: "10"
@@ -35,8 +37,17 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: pnpm-lock.yaml
 
+      - name: Read Obsidian version from versions.json
+        id: set-version
+        run: |
+          node -e '
+            const fs = require("fs");
+            const ver = JSON.parse(fs.readFileSync("versions.json", "utf8")).obsidian || "latest";
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `obsidian_version=${ver}\n`);
+          '
+
       - name: Cache plugin downloads
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: myfiles
           key: ${{ runner.os }}-myfiles-${{ hashFiles('tests/plugin-sources.json') }}
@@ -44,10 +55,16 @@ jobs:
             ${{ runner.os }}-myfiles-
 
       - name: Cache toolkit assets
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: obsidian-e2e-toolkit-assets
-          key: "${{ runner.os }}-obsidians-e2e-toolkit-v4-${{ env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION }}"
+          key: >-
+            ${{ runner.os }}-obsidians-e2e-toolkit-v4-${{
+              github.event_name == 'workflow_dispatch'
+              && github.event.inputs.obsidian_version
+              || steps.set-version.outputs.obsidian_version
+              || 'latest'
+            }}
           restore-keys: |
             ${{ runner.os }}-obsidians-e2e-toolkit-v4-
 
@@ -60,20 +77,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-playwright-chromium-
 
-      - name: Ensure pnpm (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          npm install -g pnpm@10 || corepack prepare pnpm@10 --activate
-          pnpm -v
-        shell: bash
-
-      - name: Ensure pnpm (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          npm install -g pnpm@10 -s
-          pnpm -v
-        shell: pwsh
-
       - name: Install dependencies
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,42 +84,27 @@ jobs:
           git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
           pnpm install --no-frozen-lockfile
 
-      - name: Install Playwright chromium (Unix)
-        if: matrix.os != 'windows-latest' && steps.playwright-cache.outputs.cache-hit != 'true'
+      - name: Install Playwright chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         env:
           PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
         run: pnpm exec playwright install chromium
-        shell: bash
-
-      - name: Install Playwright chromium (Windows)
-        if: matrix.os == 'windows-latest' && steps.playwright-cache.outputs.cache-hit != 'true'
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
-        run: pnpm exec playwright install chromium
-        shell: pwsh
 
       - name: Build plugin under test
         run: pnpm run build
 
-      - name: Ensure toolkit Obsidian is installed (Unix)
-        if: matrix.os != 'windows-latest'
-        run: |
-          node "${{ github.workspace }}/node_modules/obsidian-e2e-toolkit/scripts/setup.mjs"
+      - name: Ensure toolkit Obsidian is installed
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
-          OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: ${{ env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION }}
-        shell: bash
-
-      - name: Ensure toolkit Obsidian is installed (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          node "$env:GITHUB_WORKSPACE\node_modules\obsidian-e2e-toolkit\scripts\setup.mjs"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
-          OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: ${{ env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION }}
-        shell: pwsh
+          OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: >-
+            ${{
+              github.event_name == 'workflow_dispatch'
+              && github.event.inputs.obsidian_version
+              || steps.set-version.outputs.obsidian_version
+              || 'latest'
+            }}
+        run: node node_modules/obsidian-e2e-toolkit/scripts/setup.mjs
 
       - name: Run E2E tests
         env:
@@ -126,7 +114,8 @@ jobs:
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report-${{ matrix.os }}
           path: playwright-report
+
