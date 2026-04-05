@@ -3,7 +3,7 @@ import type { AppFeature } from "src/core/feature";
 import type { PluginContext } from "src/core/plugin-context";
 
 // Needed dynamic import from obsidian
-import { moment, normalizePath } from "obsidian";
+import { normalizePath } from "obsidian";
 
 const logger = log.getLogger("OnDemandPlugin/BackupFeature");
 

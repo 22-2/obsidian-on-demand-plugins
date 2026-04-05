@@ -13,12 +13,6 @@ export function normalizePath(path: string): string {
     return path;
 }
 
-export const moment = () => {
-    return {
-        format: () => "20260309-150000",
-    };
-};
-
 export const Platform = {
     isDesktop: true,
     isMobile: false,
