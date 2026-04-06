@@ -15,11 +15,12 @@ export function patchSetViewState(deps: PatchViewStateDeps): void {
     register(
         around(WorkspaceLeaf.prototype, {
             setViewState: (next: WorkspaceLeaf["setViewState"]) =>
-                async function (this: WorkspaceLeaf, viewState: ViewState): Promise<void> {
-                    await next.call(this, viewState);
+                async function (this: WorkspaceLeaf, viewState: ViewState, eState?: any): Promise<void> {
+                    const result = await next.call(this, viewState, eState);
                     if (viewState?.type) {
                         await onViewType(viewState.type);
                     }
+                    return result;
                 },
         }),
     );
