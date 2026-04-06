@@ -8,11 +8,7 @@ export class ProfileManagerModal extends Modal {
     private settingsService: SettingsService;
     private onProfileChanged: () => void;
 
-    constructor(
-        app: App,
-        settingsService: SettingsService,
-        onProfileChanged: () => void,
-    ) {
+    constructor(app: App, settingsService: SettingsService, onProfileChanged: () => void) {
         super(app);
         this.settingsService = settingsService;
         this.onProfileChanged = onProfileChanged;
@@ -92,9 +88,9 @@ export class ProfileManagerModal extends Modal {
                         .setDisabled(isDesktopDefault)
                         .onClick(() => {
                             void (async () => {
-                            this.settingsService.setDeviceDefault(id, "desktop");
-                            await this.settingsService.save();
-                            this.onOpen();
+                                this.settingsService.setDeviceDefault(id, "desktop");
+                                await this.settingsService.save();
+                                this.onOpen();
                             })();
                         }),
                 );
@@ -107,9 +103,9 @@ export class ProfileManagerModal extends Modal {
                         .setDisabled(isMobileDefault)
                         .onClick(() => {
                             void (async () => {
-                            this.settingsService.setDeviceDefault(id, "mobile");
-                            await this.settingsService.save();
-                            this.onOpen();
+                                this.settingsService.setDeviceDefault(id, "mobile");
+                                await this.settingsService.save();
+                                this.onOpen();
                             })();
                         }),
                 );

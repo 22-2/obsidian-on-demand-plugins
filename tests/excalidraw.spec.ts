@@ -5,7 +5,7 @@ import {
     pluginUnderTestId,
     useOnDemandPluginsWithExcalidraw,
     waitForPluginEnabled,
-    waitForViewType,
+    waitForViewType
 } from "./test-utils";
 
 useOnDemandPluginsWithExcalidraw();

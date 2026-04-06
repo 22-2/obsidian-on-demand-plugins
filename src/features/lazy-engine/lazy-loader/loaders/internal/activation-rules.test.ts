@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
-import { PLUGIN_MODE, type DeviceSettings, type PLUGIN_MODE } from "src/core/types";
 import type { PluginContext } from "src/core/plugin-context";
+import { PLUGIN_MODE, type DeviceSettings } from "src/core/types";
 import { resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
+import { describe, expect, it } from "vitest";
 
 function createCtx(settings: DeviceSettings, modes: Record<string, PLUGIN_MODE>): PluginContext {
     return {

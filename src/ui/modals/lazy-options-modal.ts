@@ -14,12 +14,7 @@ export class LazyOptionsModal extends Modal {
     private onSave?: () => void;
     private options: LazyOptions;
 
-    constructor(
-        app: App,
-        plugin: OnDemandPlugin,
-        pluginId: string,
-        onSave?: () => void,
-    ) {
+    constructor(app: App, plugin: OnDemandPlugin, pluginId: string, onSave?: () => void) {
         super(app);
         this.plugin = plugin;
         this.pluginId = pluginId;
@@ -125,14 +120,12 @@ export class LazyOptionsModal extends Modal {
                 .setName("File suffixes")
                 .setDesc("Match the end of the file name, one suffix per line.")
                 .addTextArea((text) =>
-                    text
-                        .setValue(this.options.fileCriteria.suffixes?.join("\n") || "")
-                        .onChange((value) => {
-                            this.options.fileCriteria.suffixes = value
-                                .split(/[\n,]/)
-                                .map((s) => s.trim())
-                                .filter((s) => s !== "");
-                        }),
+                    text.setValue(this.options.fileCriteria.suffixes?.join("\n") || "").onChange((value) => {
+                        this.options.fileCriteria.suffixes = value
+                            .split(/[\n,]/)
+                            .map((s) => s.trim())
+                            .filter((s) => s !== "");
+                    }),
                 );
 
             // new Setting(contentEl)
@@ -181,7 +174,7 @@ export class LazyOptionsModal extends Modal {
                         try {
                             this.onSave?.();
                         } catch (e) {
-                            new Notice("Error in onSave callback: " + e);
+                            new Notice("Error in onSave callback: " + (String(e) || "Unknown error"));
                             logger.error("Error in LazyOptionsModal onSave callback", e);
                         }
                         this.close();

@@ -1,16 +1,14 @@
 import type { App, ButtonComponent, DropdownComponent } from "obsidian";
 import { ExtraButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
-import type { PLUGIN_MODE, PluginSettings } from "src/core/types";
+import { FeatureEvents } from "src/core/event-bus";
+import type { PluginSettings, PLUGIN_MODE } from "src/core/types";
 import { PluginModes } from "src/core/types";
 import { isLazyMode } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
-import { ToolsModal } from "src/ui/modals/tools-modal";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { ProfileManagerModal } from "src/ui/modals/profile-manager-modal";
-import { FeatureEvents } from "src/core/event-bus";
-
-
+import { ToolsModal } from "src/ui/modals/tools-modal";
 
 export class SettingsTab extends PluginSettingTab {
     app: App;
@@ -76,9 +74,9 @@ export class SettingsTab extends PluginSettingTab {
                     dropdown.addOption(p.id, p.name);
                 });
                 dropdown.setValue(this.plugin.core.settingsService.currentProfileId);
-                    dropdown.onChange((newProfileId) => {
-                        void this.handleProfileChange(newProfileId, dropdown);
-                    });
+                dropdown.onChange((newProfileId) => {
+                    void this.handleProfileChange(newProfileId, dropdown);
+                });
             })
             .addExtraButton((btn) => {
                 btn.setIcon("settings")

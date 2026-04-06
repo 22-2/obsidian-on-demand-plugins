@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Plugin } from "obsidian";
 import log from "loglevel";
-import { patchRibbonReorder } from "src/patches/ribbon-reorder";
+import { Plugin } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
+import { patchRibbonReorder } from "src/patches/ribbon-reorder";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("patchRibbonReorder", () => {
     let originalAddRibbonIcon: Plugin["addRibbonIcon"] | undefined;
@@ -30,7 +30,9 @@ describe("patchRibbonReorder", () => {
     function createMockCtx(appOverrides: Record<string, unknown> = {}) {
         return {
             app: { updateRibbonDisplay: vi.fn(), ...appOverrides },
-            register: (fn: () => void) => { unregister = fn; },
+            register: (fn: () => void) => {
+                unregister = fn;
+            },
         } as unknown as PluginContext;
     }
 
@@ -100,7 +102,9 @@ describe("patchRibbonReorder", () => {
         const plugin = createPluginInstance();
 
         let result!: ReturnType<Plugin["addRibbonIcon"]>;
-        expect(() => { result = plugin.addRibbonIcon("dice", "Test", vi.fn()); }).not.toThrow();
+        expect(() => {
+            result = plugin.addRibbonIcon("dice", "Test", vi.fn());
+        }).not.toThrow();
         expect(result).toBe(expectedEl);
         expect(warnSpy).toHaveBeenCalledWith("updateRibbonDisplay failed:", error);
 

@@ -1,12 +1,7 @@
 import type { LogLevelDesc } from "loglevel";
 import { default as log } from "loglevel";
 import type { App, WorkspaceLeaf } from "obsidian";
-import type { PLUGIN_MODE } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
-
-function sleep(ms: number) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
 
 export function toggleLoggerBy(level: LogLevelDesc, filter: (name: string) => boolean = () => true): void {
     Object.values(log.getLoggers())

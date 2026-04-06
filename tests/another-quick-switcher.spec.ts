@@ -3,7 +3,7 @@ import {
     ensureBuilt,
     pluginUnderTestId,
     readCommunityPlugins,
-    useOnDemandPluginsWithTargets,
+    useOnDemandPluginsWithTargets
 } from "./test-utils";
 
 const targetPluginId = "obsidian-another-quick-switcher";

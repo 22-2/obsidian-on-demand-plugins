@@ -1,10 +1,10 @@
 import type { App, DropdownComponent } from "obsidian";
 import { Modal, Notice, setIcon, Setting } from "obsidian";
 import type { PLUGIN_MODE } from "src/core/types";
-import { PluginModes, PLUGIN_MODE } from "src/core/types";
-import type OnDemandPlugin from "src/main";
+import { PluginModes } from "src/core/types";
 import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
+import type OnDemandPlugin from "src/main";
 
 export class ToolsModal extends Modal {
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
@@ -17,11 +17,7 @@ export class ToolsModal extends Modal {
     private activeTabId: string = "sync";
     private tabContentEl!: HTMLElement;
 
-    constructor(
-        app: App,
-        plugin: OnDemandPlugin,
-        onComplete: () => void,
-    ) {
+    constructor(app: App, plugin: OnDemandPlugin, onComplete: () => void) {
         super(app);
         this.plugin = plugin;
         this.onComplete = onComplete;
@@ -62,7 +58,7 @@ export class ToolsModal extends Modal {
         tabBtn.onclick = () => {
             if (this.activeTabId === id) return;
 
-            headerEl.querySelectorAll(".lazy-tab-button").forEach(el => el.removeClass("is-active"));
+            headerEl.querySelectorAll(".lazy-tab-button").forEach((el) => el.removeClass("is-active"));
             tabBtn.addClass("is-active");
 
             this.activeTabId = id;
@@ -121,8 +117,8 @@ export class ToolsModal extends Modal {
             .setDesc("Choose which source should update the other.")
             .addDropdown((dropdown) => {
                 dropdown
-                .addOption("lazyToCore", "Plugin data -> Obsidian config")
-                .addOption("coreToLazy", "Obsidian config -> plugin data")
+                    .addOption("lazyToCore", "Plugin data -> Obsidian config")
+                    .addOption("coreToLazy", "Obsidian config -> plugin data")
                     .setValue(syncDirection)
                     .onChange((value: string) => {
                         syncDirection = value as SyncDirection;
@@ -137,11 +133,11 @@ export class ToolsModal extends Modal {
                 .setCta()
                 .onClick(() => {
                     void (async () => {
-                    const feature = this.plugin.features.get(MaintenanceFeature);
-                    const result = await feature!.executeSync(syncDirection);
-                    new Notice(result.message);
-                    if (result.changed > 0) this.onComplete();
-                    await refreshPreview();
+                        const feature = this.plugin.features.get(MaintenanceFeature);
+                        const result = await feature!.executeSync(syncDirection);
+                        new Notice(result.message);
+                        if (result.changed > 0) this.onComplete();
+                        await refreshPreview();
                     })();
                 }),
         );
@@ -158,18 +154,18 @@ export class ToolsModal extends Modal {
                     .setWarning()
                     .onClick(() => {
                         void (async () => {
-                        btn.setDisabled(true);
-                        try {
-                            const feature = this.plugin.features.get(MaintenanceFeature);
-                            await (feature as MaintenanceFeature).rebuildAndApplyCommandCache({
-                                force: true,
-                            });
-                            new Notice("Command cache rebuilt successfully");
-                        } catch {
-                            new Notice("Failed to rebuild command cache");
-                        } finally {
-                            btn.setDisabled(false);
-                        }
+                            btn.setDisabled(true);
+                            try {
+                                const feature = this.plugin.features.get(MaintenanceFeature);
+                                await (feature as MaintenanceFeature).rebuildAndApplyCommandCache({
+                                    force: true,
+                                });
+                                new Notice("Command cache rebuilt successfully");
+                            } catch {
+                                new Notice("Failed to rebuild command cache");
+                            } finally {
+                                btn.setDisabled(false);
+                            }
                         })();
                     }),
             );

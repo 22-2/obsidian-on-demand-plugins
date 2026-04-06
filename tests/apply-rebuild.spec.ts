@@ -8,7 +8,7 @@ import {
     targetPluginId,
     triggerActiveLeafChange,
     useOnDemandPlugins,
-    waitForPluginEnabled,
+    waitForPluginEnabled
 } from "./test-utils";
 
 useOnDemandPlugins();

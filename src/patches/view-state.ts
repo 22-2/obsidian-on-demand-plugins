@@ -1,7 +1,7 @@
+import log from "loglevel";
 import { around } from "monkey-around";
 import type { ViewState } from "obsidian";
 import { WorkspaceLeaf } from "obsidian";
-import log from "loglevel";
 
 const logger = log.getLogger("OnDemandPlugin/ViewStatePatch");
 

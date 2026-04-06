@@ -1,9 +1,9 @@
 import pWaitFor from "p-wait-for";
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as utilsMs from "src/core/utils";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../core/utils", () => ({
     isPluginLoaded: vi.fn(),

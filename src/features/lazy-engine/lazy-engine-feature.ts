@@ -1,15 +1,15 @@
 import type { WorkspaceLeaf } from "obsidian";
+import PQueue from "p-queue";
 import type { EventBus } from "src/core/event-bus";
+import type { AppFeature } from "src/core/feature";
 import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
+import { PLUGIN_MODE } from "src/core/types";
 import { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
 import { FileLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/file-lazy-loader";
 import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
-import PQueue from "p-queue";
-import { PLUGIN_MODE } from "src/core/types";
-import type { AppFeature } from "src/core/feature";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchSetViewState } from "src/patches/view-state";
 import type { CoreContainer } from "src/services/core-container";
@@ -17,7 +17,7 @@ import type { CoreContainer } from "src/services/core-container";
 export class LazyEngineFeature implements AppFeature {
     public commandCache!: CommandCacheService;
     public lazyRunner!: LazyCommandRunner;
-    
+
     private viewLoader!: ViewLazyLoader;
     private fileLoader!: FileLazyLoader;
     private layoutReadyQueue!: PQueue;
@@ -31,24 +31,15 @@ export class LazyEngineFeature implements AppFeature {
         // 1. Core Engine parts
         this.lazyRunner = new LazyCommandRunner(ctx);
         this.commandCache = new CommandCacheService(ctx, this.lazyRunner);
-        
-        // Wire up setter injection 
+
+        // Wire up setter injection
         this.lazyRunner.setCommandRegistry(this.commandCache);
 
         // 2. Loaders setup
         const lockManager = new LeafLockManager();
-        this.viewLoader = new ViewLazyLoader(
-            ctx,
-            this.lazyRunner,
-            this.commandCache,
-            new LeafViewLockStrategy(lockManager)
-        );
+        this.viewLoader = new ViewLazyLoader(ctx, this.lazyRunner, this.commandCache, new LeafViewLockStrategy(lockManager));
 
-        this.fileLoader = new FileLazyLoader(
-            ctx,
-            this.lazyRunner,
-            { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") }
-        );
+        this.fileLoader = new FileLazyLoader(ctx, this.lazyRunner, { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") });
 
         // 3. Patches and Subscriptions
         patchSetViewState({
@@ -87,13 +78,7 @@ export class LazyEngineFeature implements AppFeature {
 
         if (toLoad.length === 0) return;
 
-        const tasks = toLoad.map((manifest) =>
-            this.layoutReadyQueue.add(() =>
-                this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) =>
-                    console.error("Failed loading plugin onLayoutReady", manifest.id, err)
-                )
-            )
-        );
+        const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
 
         await Promise.all(tasks);
         this.commandCache.registerCachedCommands();

@@ -1,8 +1,8 @@
-import { around } from "monkey-around";
 import log from "loglevel";
+import { around } from "monkey-around";
+import type { ViewRegistry } from "obsidian-typings";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
-import type { ViewRegistry } from "obsidian-typings";
 
 const logger = log.getLogger("OnDemandPlugin/ViewRegistryPatch");
 
@@ -15,22 +15,14 @@ function isLazyWithUseView(ctx: PluginContext, pluginId: string): boolean {
     const settings = ctx.getSettings();
     const mode = ctx.getPluginMode(pluginId);
     const pluginSettings = settings.plugins[pluginId];
-    return (
-        mode === PLUGIN_MODE.LAZY &&
-        pluginSettings?.lazyOptions?.useView === true
-    );
+    return mode === PLUGIN_MODE.LAZY && pluginSettings?.lazyOptions?.useView === true;
 }
 
 /**
  * Register a view type.
  * Updates both the runtime map and the persisted plugin settings.
  */
-function trackViewType(
-    ctx: PluginContext,
-    pluginId: string,
-    viewType: string,
-    lazyOnViews: Record<string, string[]>
-): void {
+function trackViewType(ctx: PluginContext, pluginId: string, viewType: string, lazyOnViews: Record<string, string[]>): void {
     // Update the in-memory map used at runtime.
     // This map is used to resolve which plugin should be loaded when a view is opened.
     lazyOnViews[pluginId] ??= [];
@@ -54,10 +46,7 @@ function trackViewType(
 /**
  * Patch ViewRegistry.registerView to capture which view types each lazy plugin registers.
  */
-export function patchViewRegistry(
-    ctx: PluginContext,
-    lazyOnViews: Record<string, string[]>
-): () => void {
+export function patchViewRegistry(ctx: PluginContext, lazyOnViews: Record<string, string[]>): () => void {
     return around(ctx.app.viewRegistry, {
         registerView: (next) =>
             function (this: ViewRegistry, type, creator) {

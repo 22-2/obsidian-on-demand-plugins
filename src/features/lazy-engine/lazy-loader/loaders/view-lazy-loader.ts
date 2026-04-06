@@ -16,9 +16,13 @@ const logger = log.getLogger("OnDemandPlugin/ViewLazyLoader");
  * plugin is loaded and commands are synchronized.
  */
 export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
-    private debouncedInitializeLazyViewForLeaf = debounce((leaf: WorkspaceLeaf) => {
-        void this.initializeLazyViewForLeaf(leaf);
-    }, 100, true);
+    private debouncedInitializeLazyViewForLeaf = debounce(
+        (leaf: WorkspaceLeaf) => {
+            void this.initializeLazyViewForLeaf(leaf);
+        },
+        100,
+        true,
+    );
 
     private commandRegistry: CommandRegistry;
 
@@ -35,7 +39,7 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
     }
 
     registerActiveLeafReload(): void {
-        this.ctx.registerEvent(this.ctx.app.workspace.on("active-leaf-change" as any, this.debouncedInitializeLazyViewForLeaf as any));
+        this.ctx.registerEvent(this.ctx.app.workspace.on("active-leaf-change" as unknown, this.debouncedInitializeLazyViewForLeaf as unknown));
 
         // Initial load
         this.ctx.app.workspace.onLayoutReady(() =>

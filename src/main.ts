@@ -1,17 +1,16 @@
 import log from "loglevel";
 import type { PluginManifest } from "obsidian";
 import { Plugin } from "obsidian";
-import { createPluginContext } from "src/core/plugin-context";
-import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
-import { PLUGIN_MODE } from "src/core/types";
-import { toggleLoggerBy } from "src/core/utils";
-import { FeatureManager } from "src/core/feature-manager";
 import { EventBus, FeatureEvents } from "src/core/event-bus";
+import { FeatureManager } from "src/core/feature-manager";
+import { createPluginContext } from "src/core/plugin-context";
 import { ProgressDialog } from "src/core/progress";
+import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
+import { toggleLoggerBy } from "src/core/utils";
 import { BackupFeature } from "src/features/backup/backup-feature";
+import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
-import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { CoreContainer } from "src/services/core-container";
 import { SettingsTab } from "src/ui/settings-tab";
 

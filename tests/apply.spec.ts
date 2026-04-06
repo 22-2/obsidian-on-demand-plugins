@@ -5,7 +5,7 @@ import {
     pluginUnderTestId,
     readCommunityPlugins,
     targetPluginId,
-    useOnDemandPlugins,
+    useOnDemandPlugins
 } from "./test-utils";
 
 useOnDemandPlugins();

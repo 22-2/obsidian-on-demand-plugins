@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as storageMs from "src/core/storage";
 import * as utilsMs from "src/core/utils";
 import { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../core/utils", () => ({
     isPluginLoaded: vi.fn(),

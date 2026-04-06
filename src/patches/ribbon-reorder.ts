@@ -1,6 +1,6 @@
-import { Plugin } from "obsidian";
-import { around } from "monkey-around";
 import log from "loglevel";
+import { around } from "monkey-around";
+import { Plugin } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
 
 const logger = log.getLogger("OnDemandPlugin/RibbonReorder");
@@ -21,7 +21,7 @@ export function patchRibbonReorder(ctx: PluginContext): void {
         around(Plugin.prototype, {
             addRibbonIcon: (next: AddRibbonIcon) =>
                 function (this: Plugin, ...args: Parameters<AddRibbonIcon>): ReturnType<AddRibbonIcon> {
-                    const result = next.call(this, ...args) as HTMLElement;
+                    const result = next.call(this, ...args);
                     try {
                         ctx.app.updateRibbonDisplay();
                     } catch (error) {

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
+import type { LogLevelDesc } from "loglevel";
 import fs from "node:fs";
 import path from "node:path";
-import type { LogLevelDesc } from "loglevel";
 import { test } from "obsidian-e2e-toolkit";
 import { fileURLToPath } from "url";
 
@@ -220,4 +220,4 @@ export async function readOnDemandStorageValue(
     return record?.[key] ?? null;
 }
 
-export {  pluginUnderTestId, targetPluginId, excalidrawPluginId };
+export { pluginUnderTestId, targetPluginId, excalidrawPluginId };

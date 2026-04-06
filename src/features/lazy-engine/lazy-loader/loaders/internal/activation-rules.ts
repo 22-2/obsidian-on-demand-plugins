@@ -170,4 +170,3 @@ async function matchesCriteria(ctx: PluginContext, file: TFile, criteria: FileAc
 
     return false;
 }
-

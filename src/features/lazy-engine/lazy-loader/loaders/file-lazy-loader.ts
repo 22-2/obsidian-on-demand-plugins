@@ -1,11 +1,11 @@
 import log from "loglevel";
 import type { View, WorkspaceLeaf } from "obsidian";
 import { TFile } from "obsidian";
-import type { LazyCommandRunner as PluginLoader } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
 import type { PluginContext } from "src/core/plugin-context";
 import { BaseLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/base-lazy-loader";
 import { resolvePluginForFile } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
 import type { LockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
+import type { LazyCommandRunner as PluginLoader } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
 
 const logger = log.getLogger("OnDemandPlugin/FileLazyLoader");
 

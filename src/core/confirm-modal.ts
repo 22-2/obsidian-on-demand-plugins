@@ -26,10 +26,7 @@ class ConfirmModal extends Modal {
     resolve!: (value: boolean | null) => void;
     message: string;
 
-    constructor(
-        app: App,
-        message: string,
-    ) {
+    constructor(app: App, message: string) {
         super(app);
         this.message = message;
     }

@@ -25,4 +25,4 @@ declare module "obsidian" {
     }
 }
 
-export {};
+export { };
