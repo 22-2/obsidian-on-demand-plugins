@@ -1,7 +1,7 @@
 import { Plugin } from "obsidian";
 import { around } from "monkey-around";
 import log from "loglevel";
-import type { PluginContext } from "../core/plugin-context";
+import type { PluginContext } from "src/core/plugin-context";
 
 const logger = log.getLogger("OnDemandPlugin/RibbonReorder");
 

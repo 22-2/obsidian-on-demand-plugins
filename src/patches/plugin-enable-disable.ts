@@ -1,9 +1,9 @@
 import { around } from "monkey-around";
 import log from "loglevel";
 import type { Plugins } from "obsidian-typings";
-import { PLUGIN_MODE } from "../core/types";
-import type { PluginContext } from "../core/plugin-context";
-import { LazyEngineFeature } from "../features/lazy-engine/lazy-engine-feature";
+import { PLUGIN_MODE } from "src/core/types";
+import type { PluginContext } from "src/core/plugin-context";
+import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 
 const logger = log.getLogger("OnDemandPlugin/PluginEnableDisablePatch");
 

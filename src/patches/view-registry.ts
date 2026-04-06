@@ -1,7 +1,7 @@
 import { around } from "monkey-around";
 import log from "loglevel";
-import type { PluginContext } from "../core/plugin-context";
-import { PLUGIN_MODE } from "../core/types";
+import type { PluginContext } from "src/core/plugin-context";
+import { PLUGIN_MODE } from "src/core/types";
 import type { ViewRegistry } from "obsidian-typings";
 
 const logger = log.getLogger("OnDemandPlugin/ViewRegistryPatch");

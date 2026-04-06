@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Plugin } from "obsidian";
 import log from "loglevel";
-import { patchRibbonReorder } from "./ribbon-reorder";
-import type { PluginContext } from "../core/plugin-context";
+import { patchRibbonReorder } from "src/patches/ribbon-reorder";
+import type { PluginContext } from "src/core/plugin-context";
 
 describe("patchRibbonReorder", () => {
     let originalAddRibbonIcon: Plugin["addRibbonIcon"] | undefined;
