@@ -7,6 +7,14 @@ const logger = log.getLogger("OnDemandPlugin/RibbonReorder");
 
 type AddRibbonIcon = (this: Plugin, icon: string, title: string, callback: (evt: MouseEvent) => void) => HTMLElement;
 
+// [fix: Restore ribbon icon order after lazy plugin load · Issue #1 · 22-2/obsidian-on-demand-plugins](https://github.com/22-2/obsidian-on-demand-plugins/issues/1)
+
+// ── Patch ────────────────────────────────────────────────────────────────────
+
+/**
+ * Fixes random ribbon icon order and prevents hidden icons from
+ * reappearing for lazy-loaded plugins.
+ */
 export function patchRibbonReorder(ctx: PluginContext): void {
     if (typeof Plugin.prototype.addRibbonIcon !== "function") return;
 
