@@ -39,7 +39,7 @@
 		"store2": "^2.14.4"
 	},
 	"devDependencies": {
-		"@22-2/esbuild-plugin-obsidian-copy": "git+https://github.com/22-2/esbuild-plugin-obsidian-copy.git#3677bb62f4af684968629eb8fc508260240fb916",
+		"@22-2/esbuild-plugin-obsidian-copy": "github:22-2/esbuild-plugin-obsidian-copy#3677bb62f4af684968629eb8fc508260240fb916",
 		"@eslint/js": "^10.0.1",
 		"@playwright/test": "^1.59.1",
 		"@semantic-release/commit-analyzer": "^13.0.1",
@@ -51,7 +51,7 @@
 		"@vitest/ui": "^4.1.2",
 		"builtin-modules": "5.0.0",
 		"conventional-changelog-conventionalcommits": "^9.3.1",
-		"dotenv": "^17.4.0",
+		"dotenv": "^17.4.1",
 		"esbuild": "0.28.0",
 		"eslint": "^10.2.0",
 		"eslint-plugin-obsidianmd": "^0.1.9",
