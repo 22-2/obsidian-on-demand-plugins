@@ -11,7 +11,7 @@ describe("BackupFeature", () => {
         remove: ReturnType<typeof vi.fn>;
     };
     let mockCtx: {
-        _plugin: { manifest: { dir: string } };
+        _plugin: { manifest: { dir: string }; core: { settingsService: { isFirstLoad: boolean; data: { profiles: Record<string, unknown> } } } };
         app: {
             vault: {
                 adapter: typeof mockAdapter;
@@ -37,6 +37,14 @@ describe("BackupFeature", () => {
                 manifest: {
                     dir: "mock/plugin/dir",
                 },
+                core: {
+                    settingsService: {
+                        isFirstLoad: false,
+                        data: {
+                            profiles: {},
+                        },
+                    },
+                },
             },
             app: {
                 vault: {
@@ -52,18 +60,26 @@ describe("BackupFeature", () => {
                 },
             },
         };
+
+        mockAdapter.exists.mockResolvedValue(true);
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profiles": {}}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return "";
+        });
+        mockAdapter.list.mockResolvedValue({ folders: [], files: [] });
     });
 
-    it("should initialize the backup directory correctly after onload", () => {
+    it("should initialize the backup directory correctly after onload", async () => {
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx as never);
+        await backupFeature.onload(mockCtx as never);
         expect((backupFeature as unknown as { backupDir: string }).backupDir).toBe("mock/plugin/dir/backups");
     });
 
     it("should create backup folder if it doesn't exist", async () => {
         mockAdapter.exists.mockResolvedValue(false);
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx as never);
+        await backupFeature.onload(mockCtx as never);
 
         await backupFeature.ensureBackupFolder();
 
@@ -79,7 +95,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx as never);
+        await backupFeature.onload(mockCtx as never);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
@@ -93,7 +109,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx as never);
+        await backupFeature.onload(mockCtx as never);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
@@ -108,7 +124,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx as never);
+        await backupFeature.onload(mockCtx as never);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
@@ -129,7 +145,7 @@ describe("BackupFeature", () => {
         mockAdapter.list.mockResolvedValue({ folders: [], files: [] });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx as never);
+    await backupFeature.onload(mockCtx as never);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).toHaveBeenCalledTimes(2);
@@ -142,6 +158,35 @@ describe("BackupFeature", () => {
 
         expect(dataWriteCall![1]).toBe(validData);
         expect(communityWriteCall![1]).toBe(validCommunity);
+    });
+
+    it("should create immutable initial-install backup whenever it is missing", async () => {
+        mockAdapter.exists.mockImplementation(async (path: string) => path === "mock/plugin/dir/backups");
+
+        const validData = '{"profiles": {}}';
+        const validCommunity = '["plugin1"]';
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return validData;
+            if (path.includes("community-plugins.json")) return validCommunity;
+            return "";
+        });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+
+        expect(mockAdapter.mkdir).toHaveBeenCalledWith("mock/plugin/dir/backups/initial-install");
+        expect(mockAdapter.write).toHaveBeenCalledWith("mock/plugin/dir/backups/initial-install/data.json", validData);
+        expect(mockAdapter.write).toHaveBeenCalledWith("mock/plugin/dir/backups/initial-install/community-plugins.json", validCommunity);
+        expect(mockAdapter.list).not.toHaveBeenCalled();
+    });
+
+    it("should not overwrite immutable initial-install backup when it already exists", async () => {
+        mockAdapter.exists.mockResolvedValue(true);
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
     });
 
     it("should rotate old backups keeping only the latest 3", async () => {
@@ -173,7 +218,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-        backupFeature.onload(mockCtx as never);
+    await backupFeature.onload(mockCtx as never);
         await (backupFeature as unknown as { rotateBackups: () => Promise<void> }).rotateBackups();
 
         // Length starts at 5, we keep 3, so we remove 2 data and 2 community = 4 removes

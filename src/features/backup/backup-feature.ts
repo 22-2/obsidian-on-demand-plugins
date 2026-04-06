@@ -6,6 +6,7 @@ import type { PluginContext } from "src/core/plugin-context";
 import { normalizePath } from "obsidian";
 
 const logger = log.getLogger("OnDemandPlugin/BackupFeature");
+const INITIAL_INSTALL_BACKUP_DIRNAME = "initial-install";
 
 function hasProfilesRecord(value: unknown): value is { profiles: Record<string, unknown> } {
     return typeof value === "object" && value !== null && "profiles" in value && typeof value.profiles === "object" && value.profiles !== null;
@@ -15,10 +16,12 @@ export class BackupFeature implements AppFeature {
     private backupDir!: string;
     private ctx!: PluginContext;
 
-    onload(ctx: PluginContext) {
+    async onload(ctx: PluginContext) {
         this.ctx = ctx;
         const dir = this.ctx._plugin.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
+
+        await this.createInitialInstallBackupIfNeeded();
 
         // Whenever settings are saved, we create a backup
         // @ts-expect-error - Custom workspace event
@@ -39,7 +42,39 @@ export class BackupFeature implements AppFeature {
         }
     }
 
-    async createBackup() {
+    private async createInitialInstallBackupIfNeeded() {
+        if (!this.ctx) return;
+
+        const initialBackupDir = normalizePath(`${this.backupDir}/${INITIAL_INSTALL_BACKUP_DIRNAME}`);
+        const adapter = this.ctx.app.vault.adapter;
+
+        await this.ensureBackupFolder();
+
+        if (!(await adapter.exists(initialBackupDir))) {
+            await adapter.mkdir(initialBackupDir);
+        }
+
+        const dataBackupPath = normalizePath(`${initialBackupDir}/data.json`);
+        const communityBackupPath = normalizePath(`${initialBackupDir}/community-plugins.json`);
+
+        // Reason: this snapshot represents the post-install baseline and must remain immutable,
+        // so once both files exist we never overwrite them on later loads.
+        if ((await adapter.exists(dataBackupPath)) && (await adapter.exists(communityBackupPath))) {
+            return;
+        }
+
+        await this.createBackup({
+            dataBackupPath,
+            communityBackupPath,
+            rotate: false,
+        });
+    }
+
+    async createBackup(options?: {
+        dataBackupPath?: string;
+        communityBackupPath?: string;
+        rotate?: boolean;
+    }) {
         if (!this.ctx) return;
 
         await this.ensureBackupFolder();
@@ -85,8 +120,8 @@ export class BackupFeature implements AppFeature {
 
         // 3. Save backup
         const timestamp = window.moment().format("YYYYMMDD-HHmmss");
-        const dataBackupPath = normalizePath(`${this.backupDir}/data_${timestamp}.json`);
-        const communityBackupPath = normalizePath(`${this.backupDir}/community-plugins_${timestamp}.json`);
+        const dataBackupPath = options?.dataBackupPath ?? normalizePath(`${this.backupDir}/data_${timestamp}.json`);
+        const communityBackupPath = options?.communityBackupPath ?? normalizePath(`${this.backupDir}/community-plugins_${timestamp}.json`);
 
         try {
             // Write both data and community backups. Data backup must be saved as well.
@@ -99,7 +134,9 @@ export class BackupFeature implements AppFeature {
         }
 
         // 4. Rotate backups
-        await this.rotateBackups();
+        if (options?.rotate !== false) {
+            await this.rotateBackups();
+        }
     }
 
     private async rotateBackups() {
