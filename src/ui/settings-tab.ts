@@ -1,7 +1,7 @@
 import type { App, ButtonComponent, DropdownComponent } from "obsidian";
 import { ExtraButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
-import type { PluginMode, PluginSettings } from "src/core/types";
+import type { PLUGIN_MODE, PluginSettings } from "src/core/types";
 import { PluginModes } from "src/core/types";
 import { isLazyMode } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
@@ -16,7 +16,7 @@ export class SettingsTab extends PluginSettingTab {
     app: App;
     plugin: OnDemandPlugin;
     dropdowns: DropdownComponent[] = [];
-    filterMethod: PluginMode | undefined;
+    filterMethod: PLUGIN_MODE | undefined;
     filterString: string | undefined;
     // Created in buildDom() before buildPluginList() runs.
     pluginListContainer!: HTMLElement;
@@ -120,7 +120,7 @@ export class SettingsTab extends PluginSettingTab {
             .addDropdown((dropdown) => {
                 this.addModeOptions(dropdown);
                 dropdown.setValue(this.plugin.settings.defaultMode).onChange((value: string) => {
-                    this.plugin.settings.defaultMode = value as PluginMode;
+                    this.plugin.settings.defaultMode = value as PLUGIN_MODE;
                     this.isDirty = true;
                     this.updateApplyButton();
                 });
@@ -183,11 +183,11 @@ export class SettingsTab extends PluginSettingTab {
                 Object.keys(PluginModes)
                     .filter((key) => key !== "lazyOnView")
                     .forEach((key) => {
-                        dropdown.addOption(key, PluginModes[key as PluginMode]);
+                        dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]);
                     });
                 dropdown.setValue(this.filterMethod ?? "");
                 dropdown.onChange((value: string) => {
-                    this.filterMethod = value === "" ? undefined : (value as PluginMode);
+                    this.filterMethod = value === "" ? undefined : (value as PLUGIN_MODE);
                     this.buildPluginList();
                 });
             });
@@ -289,7 +289,7 @@ export class SettingsTab extends PluginSettingTab {
                 this.addModeOptions(dropdown);
                 dropdown.setValue(currentValue).onChange((value: string) => {
                     // Update the config, and defer apply until user confirms
-                    const mode = value as PluginMode;
+                    const mode = value as PLUGIN_MODE;
                     this.pluginSettings[plugin.id] = {
                         mode,
                         userConfigured: true,
@@ -315,7 +315,7 @@ export class SettingsTab extends PluginSettingTab {
         }
     }
 
-    private ensurelazyOnViewEntry(pluginId: string, mode: PluginMode) {
+    private ensurelazyOnViewEntry(pluginId: string, mode: PLUGIN_MODE) {
         if (!this.plugin.settings.lazyOnViews) {
             this.plugin.settings.lazyOnViews = {};
         }
@@ -359,7 +359,7 @@ export class SettingsTab extends PluginSettingTab {
         Object.keys(PluginModes)
             .filter((key) => key !== "lazyOnView")
             .forEach((key) => {
-                el.addOption(key, PluginModes[key as PluginMode]);
+                el.addOption(key, PluginModes[key as PLUGIN_MODE]);
             });
     }
 

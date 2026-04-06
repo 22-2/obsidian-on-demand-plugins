@@ -2,7 +2,7 @@ import log from "loglevel";
 import type { PluginManifest } from "obsidian";
 import { Plugin } from "obsidian";
 import { createPluginContext } from "src/core/plugin-context";
-import type { DeviceSettings, LazySettings, PluginMode } from "src/core/types";
+import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 import { toggleLoggerBy } from "src/core/utils";
 import { FeatureManager } from "src/core/feature-manager";
@@ -33,7 +33,7 @@ export default class OnDemandPlugin extends Plugin {
         const ctx = createPluginContext(this);
         this.core = new CoreContainer(ctx);
         this.events = new EventBus();
-        
+
         this.features = new FeatureManager(ctx, this.core, this.events);
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
@@ -150,7 +150,7 @@ export default class OnDemandPlugin extends Plugin {
         }
     }
 
-    async updatePluginSettings(pluginId: string, mode: PluginMode) {
+    async updatePluginSettings(pluginId: string, mode: PLUGIN_MODE) {
         this.settings.plugins[pluginId] = { mode, userConfigured: true };
         await this.saveSettings();
         const lazyEngine = this.features.get(LazyEngineFeature);
@@ -184,11 +184,11 @@ export default class OnDemandPlugin extends Plugin {
         this.manifests = this.core.registry.manifests;
     }
 
-    getPluginMode(pluginId: string): PluginMode {
+    getPluginMode(pluginId: string): PLUGIN_MODE {
         return this.settings.plugins?.[pluginId]?.mode ?? this.getDefaultModeForPlugin(pluginId);
     }
 
-    getDefaultModeForPlugin(pluginId: string): PluginMode {
+    getDefaultModeForPlugin(pluginId: string): PLUGIN_MODE {
         if (this.isPluginEnabledOnDisk(pluginId)) {
             return PLUGIN_MODE.ALWAYS_ENABLED;
         }

@@ -10,8 +10,6 @@ type AddRibbonIcon = (this: Plugin, icon: string, title: string, callback: (evt:
 export function patchRibbonReorder(ctx: PluginContext): void {
     if (typeof Plugin.prototype.addRibbonIcon !== "function") return;
 
-    let warned = false;
-
     ctx.register(
         around(Plugin.prototype, {
             addRibbonIcon: (next: AddRibbonIcon) =>
@@ -21,11 +19,9 @@ export function patchRibbonReorder(ctx: PluginContext): void {
                         if (typeof ctx.app.updateRibbonDisplay === "function") {
                             ctx.app.updateRibbonDisplay();
                         }
-                    } catch (e) {
-                        if (!warned) {
-                            logger.warn("updateRibbonDisplay failed:", e);
-                            warned = true;
-                        }
+                    } catch (error) {
+                        // Intentionally log every failure so repeated instability remains visible.
+                        logger.warn("updateRibbonDisplay failed:", error);
                     }
                     return result;
                 },

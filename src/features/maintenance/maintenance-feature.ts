@@ -1,6 +1,5 @@
 import type { AppFeature } from "src/core/feature";
 import type { PluginContext } from "src/core/plugin-context";
-import type { PluginMode } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 import type { CoreContainer } from "src/services/core-container";
 import type { PluginRegistry } from "src/services/registry/plugin-registry";
@@ -86,7 +85,7 @@ export class MaintenanceFeature implements AppFeature {
             const isOnDisk = onDisk.has(manifest.id);
             const currentMode = this.ctx.getPluginMode(manifest.id);
 
-            const targetMode: PluginMode | null = isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_DISABLED ? PLUGIN_MODE.ALWAYS_ENABLED : !isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_ENABLED ? PLUGIN_MODE.ALWAYS_DISABLED : null;
+            const targetMode: PLUGIN_MODE | null = isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_DISABLED ? PLUGIN_MODE.ALWAYS_ENABLED : !isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_ENABLED ? PLUGIN_MODE.ALWAYS_DISABLED : null;
 
             if (targetMode) {
                 settings.plugins[manifest.id] = {
@@ -122,7 +121,7 @@ export class MaintenanceFeature implements AppFeature {
         };
     }
 
-    applyBatchModeReplace(fromMode: PluginMode, toMode: PluginMode): number {
+    applyBatchModeReplace(fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE): number {
         let changed = 0;
         const manifests = this.ctx.getManifests();
         const settings = this.ctx.getSettings();

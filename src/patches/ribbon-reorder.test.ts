@@ -82,7 +82,7 @@ describe("patchRibbonReorder", () => {
         expect(() => patchRibbonReorder(ctx)).not.toThrow();
     });
 
-    it("isolates updateRibbonDisplay exceptions and logs a warning once", () => {
+    it("isolates updateRibbonDisplay exceptions and logs a warning every time", () => {
         setupPrototype();
         const expectedEl = { tagName: "DIV" };
         (Plugin.prototype as unknown as Record<string, unknown>).addRibbonIcon = vi.fn().mockReturnValue(expectedEl);
@@ -104,10 +104,10 @@ describe("patchRibbonReorder", () => {
         expect(result).toBe(expectedEl);
         expect(warnSpy).toHaveBeenCalledWith("updateRibbonDisplay failed:", error);
 
-        // Second call should NOT log again (once-only guard)
+        // Second call should also log so repeated failures remain visible.
         warnSpy.mockClear();
         expect(() => plugin.addRibbonIcon("dice", "Test2", vi.fn())).not.toThrow();
-        expect(warnSpy).not.toHaveBeenCalled();
+        expect(warnSpy).toHaveBeenCalledWith("updateRibbonDisplay failed:", error);
 
         warnSpy.mockRestore();
     });

@@ -1,6 +1,9 @@
 import { around } from "monkey-around";
 import type { ViewState } from "obsidian";
 import { WorkspaceLeaf } from "obsidian";
+import log from "loglevel";
+
+const logger = log.getLogger("OnDemandPlugin/ViewStatePatch");
 
 interface PatchViewStateDeps {
     register: (unload: () => void) => void;
@@ -15,10 +18,16 @@ export function patchSetViewState(deps: PatchViewStateDeps): void {
     register(
         around(WorkspaceLeaf.prototype, {
             setViewState: (next: WorkspaceLeaf["setViewState"]) =>
-                async function (this: WorkspaceLeaf, viewState: ViewState, eState?: any): Promise<void> {
+                async function (this: WorkspaceLeaf, viewState: ViewState, eState?: unknown): Promise<void> {
                     const result = await next.call(this, viewState, eState);
                     if (viewState?.type) {
-                        await onViewType(viewState.type);
+                        // Patch hook failures should not block Obsidian's view transition.
+                        try {
+                            await onViewType(viewState.type);
+                        } catch (error) {
+                            // Intentionally log every failure so repeated instability remains visible.
+                            logger.warn("setViewState hook failed:", error);
+                        }
                     }
                     return result;
                 },

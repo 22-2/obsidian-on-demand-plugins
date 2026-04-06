@@ -4,4 +4,4 @@
  */
 export { SettingsTab } from "src/ui/settings-tab";
 export { DEFAULT_DEVICE_SETTINGS, DEFAULT_SETTINGS, PluginModes } from "./types";
-export type { CachedCommandEntry, CommandCache, CommandCacheVersions, DeviceSettings, LazySettings, PluginMode, PluginSettings } from "./types";
+export type { CachedCommandEntry, CommandCache, CommandCacheVersions, DeviceSettings, LazySettings, PLUGIN_MODE as PluginMode, PluginSettings } from "./types";

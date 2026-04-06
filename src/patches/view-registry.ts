@@ -1,7 +1,10 @@
 import { around } from "monkey-around";
+import log from "loglevel";
 import type { PluginContext } from "../core/plugin-context";
 import { PLUGIN_MODE } from "../core/types";
 import type { ViewRegistry } from "obsidian-typings";
+
+const logger = log.getLogger("OnDemandPlugin/ViewRegistryPatch");
 
 /**
  * Return true if the given plugin is in LAZY mode with `useView` enabled.
@@ -57,10 +60,16 @@ export function patchViewRegistry(
     return around(ctx.app.viewRegistry, {
         registerView: (next) =>
             function (this: ViewRegistry, type, creator) {
-                const loadingId = ctx.app.plugins.loadingPluginId as string | undefined;
+                // Keep registerView behavior intact even if lazy tracking fails.
+                try {
+                    const loadingId = ctx.app.plugins.loadingPluginId as string | undefined;
 
-                if (loadingId && type && isLazyWithUseView(ctx, loadingId)) {
-                    trackViewType(ctx, loadingId, type, lazyOnViews);
+                    if (loadingId && type && isLazyWithUseView(ctx, loadingId)) {
+                        trackViewType(ctx, loadingId, type, lazyOnViews);
+                    }
+                } catch (error) {
+                    // Intentionally log every failure so repeated instability remains visible.
+                    logger.warn("registerView tracking failed:", error);
                 }
 
                 return next.call(this, type, creator);
