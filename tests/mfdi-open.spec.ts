@@ -6,7 +6,7 @@ import {
     useOnDemandPluginsWithTargets,
     waitForPluginDisabled,
     waitForPluginEnabled,
-    waitForViewType,
+    waitForViewType
 } from "./test-utils";
 
 const MFDI_PLUGIN_ID = "mobile-first-daily-interface";

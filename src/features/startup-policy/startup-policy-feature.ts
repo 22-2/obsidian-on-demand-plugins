@@ -39,8 +39,7 @@ export class StartupPolicyFeature implements AppFeature {
         this.registry = core.registry;
     }
 
-    onunload() {
-    }
+    onunload() {}
 
     /** Apply startup policy reusing an externally created ProgressDialog. */
     public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[]) {
@@ -79,7 +78,6 @@ export class StartupPolicyFeature implements AppFeature {
             await this.cleanupAndReload(lazyOnViews, !cancelled, progress, stopIntercepting);
         }
     }
-
 
     // -------------------------------------------------------------------------
     // Plugin loading

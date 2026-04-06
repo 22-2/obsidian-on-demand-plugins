@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { PLUGIN_MODE, type DeviceSettings, type PluginMode } from "src/core/types";
 import type { PluginContext } from "src/core/plugin-context";
+import { PLUGIN_MODE, type DeviceSettings } from "src/core/types";
 import { resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
+import { describe, expect, it } from "vitest";
 
-function createCtx(settings: DeviceSettings, modes: Record<string, PluginMode>): PluginContext {
+function createCtx(settings: DeviceSettings, modes: Record<string, PLUGIN_MODE>): PluginContext {
     return {
         getSettings: () => settings,
         getPluginMode: (pluginId: string) => modes[pluginId] ?? PLUGIN_MODE.ALWAYS_DISABLED,

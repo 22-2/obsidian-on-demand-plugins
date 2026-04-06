@@ -1,4 +1,4 @@
-export type EventHandler<T = unknown> = (payload: T) => void | Promise<void>;
+type EventHandler<T = unknown> = (payload: T) => void | Promise<void>;
 
 /**
  * Simple, type-safe EventBus for inter-feature communication.

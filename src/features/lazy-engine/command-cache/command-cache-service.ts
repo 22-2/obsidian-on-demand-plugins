@@ -5,8 +5,6 @@ import { isLazyMode, isPluginLoaded } from "src/core/utils";
 import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
 
 // Re-export for consumers
-export type { CachedCommand } from "src/core/interfaces";
-
 export class CommandCacheService {
     private store: CommandCacheStore;
     private registeredWrappers = new Set<string>();

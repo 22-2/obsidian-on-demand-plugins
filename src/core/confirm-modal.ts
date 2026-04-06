@@ -20,16 +20,13 @@ export async function showConfirmModal(app: App, args: { message: string }): Pro
     return new ConfirmModal(app, args.message).openAndWait();
 }
 
-export class ConfirmModal extends Modal {
+class ConfirmModal extends Modal {
     submitted = false;
     // Resolver for the returned Promise
     resolve!: (value: boolean | null) => void;
     message: string;
 
-    constructor(
-        app: App,
-        message: string,
-    ) {
+    constructor(app: App, message: string) {
         super(app);
         this.message = message;
     }

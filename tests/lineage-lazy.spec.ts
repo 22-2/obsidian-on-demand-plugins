@@ -2,7 +2,7 @@ import { expect, test } from "obsidian-e2e-toolkit";
 import {
     ensureBuilt,
     pluginUnderTestId,
-    useOnDemandPluginsWithTargets,
+    useOnDemandPluginsWithTargets
 } from "./test-utils";
 
 const lineagePluginId = "lineage";

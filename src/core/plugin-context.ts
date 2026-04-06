@@ -7,8 +7,8 @@
  */
 import type { App, EventRef, PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "obsidian-typings";
+import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
 import type OnDemandPlugin from "src/main";
-import type { DeviceSettings, LazySettings, PluginMode } from "src/core/types";
 
 /**
  * Minimal view of Obsidian's `Commands` object used by services.
@@ -52,10 +52,10 @@ export interface PluginContext {
     getManifests(): PluginManifest[];
 
     /** Resolve the PluginMode for a given plugin. */
-    getPluginMode(pluginId: string): PluginMode;
+    getPluginMode(pluginId: string): PLUGIN_MODE;
 
     /** Get the default mode for a plugin (based on community-plugins.json state). */
-    getDefaultModeForPlugin(pluginId: string): PluginMode;
+    getDefaultModeForPlugin(pluginId: string): PLUGIN_MODE;
 
     /** Derive a pluginId from a command id (e.g. "myplugin:do-thing" → "myplugin"). */
     getCommandPluginId(commandId: string): string | null;

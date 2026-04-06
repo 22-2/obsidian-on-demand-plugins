@@ -1,7 +1,7 @@
-import type { CoreContainer } from "src/services/core-container";
 import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";
 import type { PluginContext } from "src/core/plugin-context";
+import type { CoreContainer } from "src/services/core-container";
 
 export class FeatureManager {
     private features: AppFeature[] = [];

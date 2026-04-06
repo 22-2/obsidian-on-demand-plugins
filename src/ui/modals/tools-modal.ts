@@ -1,27 +1,22 @@
 import type { App, DropdownComponent } from "obsidian";
 import { Modal, Notice, setIcon, Setting } from "obsidian";
-import type { PluginMode } from "src/core/types";
 import { PluginModes, PLUGIN_MODE } from "src/core/types";
-import type OnDemandPlugin from "src/main";
 import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
+import type OnDemandPlugin from "src/main";
 
 export class ToolsModal extends Modal {
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
     private plugin: OnDemandPlugin;
     private onComplete: () => void;
 
-    private fromMode: PluginMode = PLUGIN_MODE.ALWAYS_DISABLED;
-    private toMode: PluginMode = PLUGIN_MODE.LAZY;
+    private fromMode: PLUGIN_MODE = PLUGIN_MODE.ALWAYS_DISABLED;
+    private toMode: PLUGIN_MODE = PLUGIN_MODE.LAZY;
     private confirmTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
     private activeTabId: string = "sync";
     private tabContentEl!: HTMLElement;
 
-    constructor(
-        app: App,
-        plugin: OnDemandPlugin,
-        onComplete: () => void,
-    ) {
+    constructor(app: App, plugin: OnDemandPlugin, onComplete: () => void) {
         super(app);
         this.plugin = plugin;
         this.onComplete = onComplete;
@@ -54,17 +49,17 @@ export class ToolsModal extends Modal {
         const tabBtn = headerEl.createEl("button", {
             cls: ["lazy-tab-button", this.activeTabId === id ? "is-active" : ""],
         });
-        
+
         const iconSpan = tabBtn.createSpan({ cls: "lazy-tab-button-icon" });
         setIcon(iconSpan, icon);
         tabBtn.createSpan({ text: label, cls: "lazy-tab-button-text" });
 
         tabBtn.onclick = () => {
             if (this.activeTabId === id) return;
-            
-            headerEl.querySelectorAll(".lazy-tab-button").forEach(el => el.removeClass("is-active"));
+
+            headerEl.querySelectorAll(".lazy-tab-button").forEach((el) => el.removeClass("is-active"));
             tabBtn.addClass("is-active");
-            
+
             this.activeTabId = id;
             this.renderActiveTab();
         };
@@ -121,8 +116,8 @@ export class ToolsModal extends Modal {
             .setDesc("Choose which source should update the other.")
             .addDropdown((dropdown) => {
                 dropdown
-                .addOption("lazyToCore", "Plugin data -> Obsidian config")
-                .addOption("coreToLazy", "Obsidian config -> plugin data")
+                    .addOption("lazyToCore", "Plugin data -> Obsidian config")
+                    .addOption("coreToLazy", "Obsidian config -> plugin data")
                     .setValue(syncDirection)
                     .onChange((value: string) => {
                         syncDirection = value as SyncDirection;
@@ -137,11 +132,11 @@ export class ToolsModal extends Modal {
                 .setCta()
                 .onClick(() => {
                     void (async () => {
-                    const feature = this.plugin.features.get(MaintenanceFeature);
-                    const result = await feature!.executeSync(syncDirection);
-                    new Notice(result.message);
-                    if (result.changed > 0) this.onComplete();
-                    await refreshPreview();
+                        const feature = this.plugin.features.get(MaintenanceFeature);
+                        const result = await feature!.executeSync(syncDirection);
+                        new Notice(result.message);
+                        if (result.changed > 0) this.onComplete();
+                        await refreshPreview();
                     })();
                 }),
         );
@@ -158,18 +153,18 @@ export class ToolsModal extends Modal {
                     .setWarning()
                     .onClick(() => {
                         void (async () => {
-                        btn.setDisabled(true);
-                        try {
-                            const feature = this.plugin.features.get(MaintenanceFeature);
-                            await (feature as MaintenanceFeature).rebuildAndApplyCommandCache({
-                                force: true,
-                            });
-                            new Notice("Command cache rebuilt successfully");
-                        } catch {
-                            new Notice("Failed to rebuild command cache");
-                        } finally {
-                            btn.setDisabled(false);
-                        }
+                            btn.setDisabled(true);
+                            try {
+                                const feature = this.plugin.features.get(MaintenanceFeature);
+                                await (feature as MaintenanceFeature).rebuildAndApplyCommandCache({
+                                    force: true,
+                                });
+                                new Notice("Command cache rebuilt successfully");
+                            } catch {
+                                new Notice("Failed to rebuild command cache");
+                            } finally {
+                                btn.setDisabled(false);
+                            }
                         })();
                     }),
             );
@@ -183,7 +178,7 @@ export class ToolsModal extends Modal {
             this.addModeOptions(dd)
                 .setValue(this.fromMode)
                 .onChange((value: string) => {
-                    this.fromMode = value as PluginMode;
+                    this.fromMode = value as PLUGIN_MODE;
                 }),
         );
 
@@ -191,10 +186,10 @@ export class ToolsModal extends Modal {
             this.addModeOptions(dd)
                 .setValue(this.toMode)
                 .onChange((value: string) => {
-                    this.toMode = value as PluginMode;
+                    this.toMode = value as PLUGIN_MODE;
                 }),
         );
-        
+
         new Setting(container).addButton((btn) =>
             btn
                 .setButtonText("Replace all")
@@ -236,11 +231,9 @@ export class ToolsModal extends Modal {
     }
 
     private addModeOptions(dropdown: DropdownComponent): DropdownComponent {
-        Object.keys(PluginModes)
-            .filter((key) => key !== "lazyOnView")
-            .forEach((key) => {
-                dropdown.addOption(key, PluginModes[key as PluginMode]);
-            });
+        Object.keys(PluginModes).forEach((key) => {
+            dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]);
+        });
         return dropdown;
     }
 

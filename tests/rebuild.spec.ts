@@ -4,7 +4,7 @@ import {
     pluginUnderTestId,
     readOnDemandStorageValue,
     targetPluginId,
-    useOnDemandPlugins,
+    useOnDemandPlugins
 } from "./test-utils";
 
 useOnDemandPlugins();

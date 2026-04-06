@@ -111,7 +111,7 @@ export class LazyCommandRunner implements PluginLoader {
             });
             return true;
         } catch (error) {
-            logger.warn(`Timeout waiting for command ${commandId} to become ready ${error}`);
+            logger.warn(`Timeout waiting for command ${commandId} to become ready ${error instanceof Error ? error.message : String(error)}`);
             return false;
         }
     }

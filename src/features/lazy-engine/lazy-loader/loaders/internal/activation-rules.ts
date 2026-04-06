@@ -127,7 +127,7 @@ export async function resolvePluginForFile(ctx: PluginContext, file: TFile): Pro
  * @param criteria - The activation criteria to match against
  * @returns True if the file matches any of the criteria
  */
-export async function matchesCriteria(ctx: PluginContext, file: TFile, criteria: FileActivationCriteria): Promise<boolean> {
+async function matchesCriteria(ctx: PluginContext, file: TFile, criteria: FileActivationCriteria): Promise<boolean> {
     const { app } = ctx;
 
     // 1. Suffix check (e.g. "foo.excalidraw" for "foo.excalidraw.md")
@@ -170,4 +170,3 @@ export async function matchesCriteria(ctx: PluginContext, file: TFile, criteria:
 
     return false;
 }
-

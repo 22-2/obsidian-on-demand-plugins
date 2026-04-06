@@ -5,7 +5,7 @@ import {
     pluginUnderTestId,
     targetPluginId,
     useOnDemandPlugins,
-    waitForPluginEnabled,
+    waitForPluginEnabled
 } from "./test-utils";
 
 useOnDemandPlugins();

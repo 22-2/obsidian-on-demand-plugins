@@ -7,19 +7,14 @@ export const PLUGIN_MODE = {
     ALWAYS_DISABLED: "alwaysDisabled",
     LAZY: "lazy",
     ALWAYS_ENABLED: "alwaysEnabled",
-    /**
-     * @deprecated
-     */
-    LAZY_ON_VIEW: "lazyOnView",
     LAZY_ON_LAYOUT_READY: "lazyOnLayoutReady",
 } as const;
 
-export type PluginMode = (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE];
+export type PLUGIN_MODE = (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE];
 
-export const PluginModes: Record<PluginMode, string> = {
+export const PluginModes: Record<PLUGIN_MODE, string> = {
     [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",
     [PLUGIN_MODE.LAZY]: "🤲 Lazy on demand",
-    lazyOnView: "Lazy on command/view (legacy)",
     [PLUGIN_MODE.LAZY_ON_LAYOUT_READY]: "🚀 Lazy on layout ready",
     [PLUGIN_MODE.ALWAYS_ENABLED]: "✅ Always enabled",
 };
@@ -32,7 +27,7 @@ export interface LazyOptions {
 }
 
 export interface PluginSettings {
-    mode?: PluginMode;
+    mode?: PLUGIN_MODE;
     userConfigured?: boolean;
     lazyOptions?: LazyOptions;
 }
@@ -45,7 +40,7 @@ export interface FileActivationCriteria {
 
 // Settings per device (desktop/mobile)
 export interface DeviceSettings {
-    defaultMode: PluginMode;
+    defaultMode: PLUGIN_MODE;
     showDescriptions: boolean;
     plugins: { [pluginId: string]: PluginSettings };
     lazyOnViews: { [pluginId: string]: string[] };

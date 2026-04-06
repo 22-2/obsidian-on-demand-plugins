@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 import { Modal } from "obsidian";
 
-export interface ProgressDialogOptions {
+interface ProgressDialogOptions {
     title?: string;
     status?: string;
     total?: number;

@@ -7,7 +7,7 @@ import {
     triggerActiveLeafChange,
     useOnDemandPlugins,
     waitForPluginDisabled,
-    waitForPluginEnabled,
+    waitForPluginEnabled
 } from "./test-utils";
 
 useOnDemandPlugins();
@@ -54,18 +54,24 @@ test("manual enable/disable is stable for lazy (command)", async ({ obsidian }) 
     }
 });
 
-test("manual enable/disable is stable for lazyOnView", async ({ obsidian }) => {
+test("manual enable/disable is stable for lazy + useView", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    // Configure plugin as lazyOnView
+    // Configure plugin as lazy + useView
     await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
         try {
-            await plugin.updatePluginSettings(pluginId, "lazyOnView");
+            await plugin.updatePluginSettings(pluginId, "lazy");
+            plugin.settings.plugins[pluginId].lazyOptions = {
+                useView: true,
+                viewTypes: ["markdown"],
+                useFile: false,
+                fileCriteria: {},
+            };
             plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
             plugin.settings.lazyOnViews[pluginId] = ["markdown"];
             await plugin.saveSettings();
@@ -84,7 +90,7 @@ test("manual enable/disable is stable for lazyOnView", async ({ obsidian }) => {
     await waitForPluginDisabled(obsidian, targetPluginId);
     // If disable didn't complete in this environment, continue — we'll verify load via view trigger below.
 
-    // Trigger view change to cause lazyOnView load
+    // Trigger view change to cause lazy + useView load
     await triggerActiveLeafChange(obsidian);
 
     const loaded = await waitForPluginEnabled(obsidian, targetPluginId);
