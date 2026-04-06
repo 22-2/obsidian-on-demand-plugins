@@ -7,7 +7,7 @@ import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature"
 
 const logger = log.getLogger("OnDemandPlugin/PluginEnableDisablePatch");
 
-// ── Pure helpers (easy to unit-test) ─────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────
 
 /**
  * Sync command wrappers for a plugin via the lazy engine, if available.
@@ -59,21 +59,18 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
             enablePlugin: (next: Plugins["enablePlugin"]) =>
                 async function (this: Plugins, pluginId: string) {
                     const result = await next.call(this, pluginId);
-
                     try {
                         // Only sync ALWAYS_DISABLED → ALWAYS_ENABLED; preserve LAZY mode.
                         await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.ALWAYS_ENABLED, "enablePlugin");
                     } catch (error) {
                         logger.warn("enablePlugin sync failed:", error);
                     }
-
                     return result;
                 },
 
             disablePlugin: (next: Plugins["disablePlugin"]) =>
                 async function (this: Plugins, pluginId: string) {
                     const result = await next.call(this, pluginId);
-
                     try {
                         // Only sync ALWAYS_ENABLED → ALWAYS_DISABLED; preserve LAZY mode.
                         await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_ENABLED, PLUGIN_MODE.ALWAYS_DISABLED, "disablePlugin");

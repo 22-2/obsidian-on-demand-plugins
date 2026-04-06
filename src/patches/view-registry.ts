@@ -6,6 +6,8 @@ import type { ViewRegistry } from "obsidian-typings";
 
 const logger = log.getLogger("OnDemandPlugin/ViewRegistryPatch");
 
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
 /**
  * Return true if the given plugin is in LAZY mode with `useView` enabled.
  */
@@ -51,7 +53,6 @@ function trackViewType(
 
 /**
  * Patch ViewRegistry.registerView to capture which view types each lazy plugin registers.
- * Returns a cleanup function to undo the monkey-patch.
  */
 export function patchViewRegistry(
     ctx: PluginContext,
@@ -63,7 +64,6 @@ export function patchViewRegistry(
                 // Keep registerView behavior intact even if lazy tracking fails.
                 try {
                     const loadingId = ctx.app.plugins.loadingPluginId as string | undefined;
-
                     if (loadingId && type && isLazyWithUseView(ctx, loadingId)) {
                         trackViewType(ctx, loadingId, type, lazyOnViews);
                     }
