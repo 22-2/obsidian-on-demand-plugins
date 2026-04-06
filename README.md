@@ -43,7 +43,7 @@ Add a screenshot of the On‑Demand Plugins settings page to make the setup clea
 ## ⚠️ Recommended Usage & Warnings
 
 ### Important: Backup community-plugins.json
-This plugin modifies `community-plugins.json` directly to enable bulk plugin switching. **Before using this plugin, please back up your `community-plugins.json` file** (located in your vault's `.obsidian` directory) to prevent any potential data loss.
+This plugin modifies `community-plugins.json` directly to enable bulk plugin switching. Up to 3 automatic backups of `community-plugins.json` and `data.json` are created under this plugin's folder whenever settings change. An additional backup is also created right after installation and is never changed or deleted. Even so, please keep your own backup just in case.
 
 ### Monkey-patching and Stability
 This plugin relies on monkey-patching Obsidian's internal functions to achieve its features. As a result, future Obsidian updates may cause instability or break the plugin's functionality. Please use this plugin with understanding of these risks.
