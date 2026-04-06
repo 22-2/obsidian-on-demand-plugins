@@ -14,7 +14,7 @@ function getVaultId(app: App): string {
     throw new Error("invalid App/Plugin ID");
 }
 
-export function vaultKey(app: App, prefix: string) {
+function vaultKey(app: App, prefix: string) {
     const appId = getVaultId(app);
     return `on-demand:${prefix}:${appId}`;
 }

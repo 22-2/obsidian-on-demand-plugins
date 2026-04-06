@@ -72,7 +72,7 @@ export function ensureBuilt() {
     return true;
 }
 
-export async function pollUntil(
+async function pollUntil(
     condition: () => Promise<boolean>,
     timeoutMs = defaultPollTimeoutMs,
     intervalMs = defaultPollIntervalMs,
@@ -92,7 +92,7 @@ export async function pollUntil(
     return false;
 }
 
-export async function waitForPluginState(
+async function waitForPluginState(
     obsidian: ObsidianTestContext,
     pluginId: string,
     shouldBeEnabled: boolean,
@@ -220,4 +220,4 @@ export async function readOnDemandStorageValue(
     return record?.[key] ?? null;
 }
 
-export { repoRoot, pluginUnderTestId, targetPluginId, excalidrawPluginId };
+export {  pluginUnderTestId, targetPluginId, excalidrawPluginId };

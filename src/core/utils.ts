@@ -4,7 +4,7 @@ import type { App, WorkspaceLeaf } from "obsidian";
 import type { PluginMode } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 
-export function sleep(ms: number) {
+function sleep(ms: number) {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 

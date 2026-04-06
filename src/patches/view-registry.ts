@@ -6,7 +6,7 @@ import type { ViewRegistry } from "obsidian-typings";
 /**
  * Return true if the given plugin is in LAZY mode with `useView` enabled.
  */
-export function isLazyWithUseView(ctx: PluginContext, pluginId: string): boolean {
+function isLazyWithUseView(ctx: PluginContext, pluginId: string): boolean {
     const settings = ctx.getSettings();
     const mode = ctx.getPluginMode(pluginId);
     const pluginSettings = settings.plugins[pluginId];
@@ -20,7 +20,7 @@ export function isLazyWithUseView(ctx: PluginContext, pluginId: string): boolean
  * Register a view type.
  * Updates both the runtime map and the persisted plugin settings.
  */
-export function trackViewType(
+function trackViewType(
     ctx: PluginContext,
     pluginId: string,
     viewType: string,

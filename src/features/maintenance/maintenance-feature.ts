@@ -10,12 +10,12 @@ import { FeatureEvents } from "src/core/event-bus";
 
 export type SyncDirection = "coreToLazy" | "lazyToCore";
 
-export interface SyncPreviewResult {
+interface SyncPreviewResult {
     label: string;
     summary: string;
 }
 
-export interface SyncResult {
+interface SyncResult {
     changed: number;
     message: string;
 }
