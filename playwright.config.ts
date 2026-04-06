@@ -12,13 +12,22 @@ if (process.platform === "linux") {
 
 export default defineConfig({
     testDir: "./tests",
+
     timeout: isMac ? 90_000 : 30_000,
+
     expect: { timeout: 5_000 },
+
+    workers: process.env.CI ? 1 : undefined,
+
     reporter: [["list"], ["html", { open: "never" }]],
+
     use: {
         headless: true,
         trace: "on-first-retry",
+        screenshot: "only-on-failure",
     },
+
     globalSetup: "./tests/global-setup.mjs",
+
     projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
 });
