@@ -13,10 +13,10 @@ useOnDemandPlugins();
 
 /**
  * Regression test: mode="lazy" + useView=true should collect viewTypes
- * during the Apply Changes startup phase, just like "lazyOnView" does.
+ * during the Apply Changes startup phase.
  *
- * Bug: ViewRegistryInterceptor only watched LAZY_ON_VIEW plugins, so plugins
- * in LAZY mode with lazyOptions.useView=true never had their viewTypes populated.
+ * Bug: ViewRegistryInterceptor previously skipped some lazy+useView plugins,
+ * so their viewTypes were not populated during apply.
  */
 test("lazy mode with useView:true collects viewTypes during apply", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
@@ -37,7 +37,7 @@ test("lazy mode with useView:true collects viewTypes during apply", async ({ obs
                 delete plugin.settings.lazyOnViews[pluginId];
             }
 
-            // Set to "lazy" mode (NOT "lazyOnView") with useView: true
+            // Set to "lazy" mode with useView: true
             await plugin.updatePluginSettings(pluginId, "lazy");
 
             // Set lazyOptions.useView = true  (viewTypes intentionally empty — should be auto-populated)

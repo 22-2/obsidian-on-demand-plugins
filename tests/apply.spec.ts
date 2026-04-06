@@ -53,7 +53,13 @@ test("automatic view type detection during Apply changes", async ({ obsidian }) 
                 await plugin.saveSettings();
             }
 
-            await plugin.updatePluginSettings(pluginId, "lazyOnView");
+            await plugin.updatePluginSettings(pluginId, "lazy");
+            plugin.settings.plugins[pluginId].lazyOptions = {
+                useView: true,
+                viewTypes: [],
+                useFile: false,
+                fileCriteria: {},
+            };
             await plugin.applyStartupPolicyAndRestart([pluginId]);
 
             return plugin.settings.lazyOnViews?.[pluginId] ?? null;

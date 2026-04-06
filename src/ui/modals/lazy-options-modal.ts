@@ -20,13 +20,15 @@ export class LazyOptionsModal extends Modal {
         this.pluginId = pluginId;
         this.onSave = onSave;
         const settings = this.plugin.settings.plugins[this.pluginId];
+        const legacyViewTypes = this.plugin.settings.lazyOnViews?.[pluginId] ?? [];
 
         // Initialize options from existing settings or defaults
         this.options = settings?.lazyOptions
             ? structuredClone(settings.lazyOptions)
             : {
-                  useView: settings?.mode === "lazyOnView",
-                  viewTypes: this.plugin.settings.lazyOnViews?.[pluginId] || [],
+                  // Legacy view rules are represented by LAZY + lazyOptions/useView.
+                  useView: settings?.mode === "lazy" && legacyViewTypes.length > 0,
+                  viewTypes: legacyViewTypes,
                   useFile: false,
                   fileCriteria: this.plugin.settings.lazyOnFiles?.[pluginId] || {},
               };

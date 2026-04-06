@@ -7,10 +7,6 @@ export const PLUGIN_MODE = {
     ALWAYS_DISABLED: "alwaysDisabled",
     LAZY: "lazy",
     ALWAYS_ENABLED: "alwaysEnabled",
-    /**
-     * @deprecated
-     */
-    LAZY_ON_VIEW: "lazyOnView",
     LAZY_ON_LAYOUT_READY: "lazyOnLayoutReady",
 } as const;
 
@@ -19,7 +15,6 @@ export type PLUGIN_MODE = (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE];
 export const PluginModes: Record<PLUGIN_MODE, string> = {
     [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",
     [PLUGIN_MODE.LAZY]: "🤲 Lazy on demand",
-    [PLUGIN_MODE.LAZY_ON_VIEW]: "Lazy on command/view (legacy)",
     [PLUGIN_MODE.LAZY_ON_LAYOUT_READY]: "🚀 Lazy on layout ready",
     [PLUGIN_MODE.ALWAYS_ENABLED]: "✅ Always enabled",
 };

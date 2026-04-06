@@ -16,7 +16,7 @@ test("opening .excalidraw.md triggers lazy load and shows Excalidraw view", asyn
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    // configure lazyOnView for Excalidraw
+    // configure lazy loading for Excalidraw
     const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;
@@ -56,7 +56,7 @@ test("layout-restore triggers lazy load for already-open Excalidraw file", async
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    // configure lazyOnView for Excalidraw
+    // configure lazy loading for Excalidraw
     await pluginHandle.evaluate(async (plugin, pluginId) => {
         const original = app.commands.executeCommandById;
         app.commands.executeCommandById = () => true;

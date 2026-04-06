@@ -10,7 +10,7 @@ import {
 
 useOnDemandPlugins();
 
-test("lazyOnView loads plugin on view activation", async ({ obsidian }) => {
+test("lazy mode with useView loads plugin on view activation", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
@@ -21,7 +21,13 @@ test("lazyOnView loads plugin on view activation", async ({ obsidian }) => {
         app.commands.executeCommandById = () => true;
 
         try {
-            await plugin.updatePluginSettings(pluginId, "lazyOnView");
+            await plugin.updatePluginSettings(pluginId, "lazy");
+            plugin.settings.plugins[pluginId].lazyOptions = {
+                useView: true,
+                viewTypes: ["markdown"],
+                useFile: false,
+                fileCriteria: {},
+            };
             plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
             plugin.settings.lazyOnViews[pluginId] = ["markdown"];
             await plugin.saveSettings();
@@ -34,7 +40,7 @@ test("lazyOnView loads plugin on view activation", async ({ obsidian }) => {
         };
     }, targetPluginId);
 
-    expect(result.mode).toBe("lazyOnView");
+    expect(result.mode).toBe("lazy");
 
     await triggerActiveLeafChange(obsidian);
 

@@ -1,7 +1,6 @@
 import type { App, DropdownComponent } from "obsidian";
 import { Modal, Notice, setIcon, Setting } from "obsidian";
-import type { PLUGIN_MODE } from "src/core/types";
-import { PluginModes } from "src/core/types";
+import { PluginModes, PLUGIN_MODE } from "src/core/types";
 import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 import type OnDemandPlugin from "src/main";
@@ -232,11 +231,9 @@ export class ToolsModal extends Modal {
     }
 
     private addModeOptions(dropdown: DropdownComponent): DropdownComponent {
-        Object.keys(PluginModes)
-            .filter((key) => key !== "lazyOnView")
-            .forEach((key) => {
-                dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]);
-            });
+        Object.keys(PluginModes).forEach((key) => {
+            dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]);
+        });
         return dropdown;
     }
 

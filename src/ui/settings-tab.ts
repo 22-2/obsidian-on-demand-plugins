@@ -178,11 +178,9 @@ export class SettingsTab extends PluginSettingTab {
             .addDropdown((dropdown) => {
                 // Empty key represents the "All" option
                 dropdown.addOption("", "All");
-                Object.keys(PluginModes)
-                    .filter((key) => key !== "lazyOnView")
-                    .forEach((key) => {
-                        dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]);
-                    });
+                Object.keys(PluginModes).forEach((key) => {
+                    dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]);
+                });
                 dropdown.setValue(this.filterMethod ?? "");
                 dropdown.onChange((value: string) => {
                     this.filterMethod = value === "" ? undefined : (value as PLUGIN_MODE);
@@ -221,7 +219,7 @@ export class SettingsTab extends PluginSettingTab {
 
     private async handleSaveChanges(): Promise<void> {
         const count = this.pendingPluginIds.size;
-        this.normalizelazyOnViews();
+        this.normalizeLazyOnViews();
         await this.plugin.saveSettings();
         this.plugin.configureLogger(); // Apply log level immediately
 
@@ -292,7 +290,7 @@ export class SettingsTab extends PluginSettingTab {
                         mode,
                         userConfigured: true,
                     };
-                    this.ensurelazyOnViewEntry(plugin.id, mode);
+                    this.ensureLazyViewEntry(plugin.id, mode);
                     this.pendingPluginIds.add(plugin.id);
                     this.isDirty = true;
                     this.updateApplyButton();
@@ -313,7 +311,7 @@ export class SettingsTab extends PluginSettingTab {
         }
     }
 
-    private ensurelazyOnViewEntry(pluginId: string, mode: PLUGIN_MODE) {
+    private ensureLazyViewEntry(pluginId: string, mode: PLUGIN_MODE) {
         if (!this.plugin.settings.lazyOnViews) {
             this.plugin.settings.lazyOnViews = {};
         }
@@ -329,7 +327,7 @@ export class SettingsTab extends PluginSettingTab {
         }
     }
 
-    private normalizelazyOnViews() {
+    private normalizeLazyOnViews() {
         if (!this.plugin.settings.lazyOnViews) {
             this.plugin.settings.lazyOnViews = {};
         }
@@ -354,11 +352,9 @@ export class SettingsTab extends PluginSettingTab {
      * Add the dropdown select options for each delay type
      */
     addModeOptions(el: DropdownComponent) {
-        Object.keys(PluginModes)
-            .filter((key) => key !== "lazyOnView")
-            .forEach((key) => {
-                el.addOption(key, PluginModes[key as PLUGIN_MODE]);
-            });
+        Object.keys(PluginModes).forEach((key) => {
+            el.addOption(key, PluginModes[key as PLUGIN_MODE]);
+        });
     }
 
     /**
