@@ -18,7 +18,10 @@ main.js
 # obsidian
 data.json
 /.directory
-myfiles/
+myfiles/*
+
+!myfiles/my-commands-plugin/
+!myfiles/my-commands-plugin/main.js
 data copy.json
 repomix-output.md
 .obsidian-e2e-toolkit/

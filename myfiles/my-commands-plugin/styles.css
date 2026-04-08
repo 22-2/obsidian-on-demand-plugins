@@ -1,0 +1,129 @@
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+If your plugin does not need CSS, delete this file.
+
+*/
+
+.carnelian-input-dialog-input {
+    width: 95%;
+}
+
+.hide-status-bar .status-bar {
+    display: none;
+}
+
+/* .view-header またはその子孫要素にフォーカスがない場合にスタイルを適用 */
+.hide-view-header
+    .view-header:has(.view-header-title-parent):not(:focus-within) {
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    border: none !important;
+    margin: 0 !important;
+    /* visibility: hidden; や opacity: 0; も検討できますが、
+     元のコードの意図（レイアウト上のスペースも消す）を尊重して height/width 0 を維持します */
+}
+
+.hide-embedded-backlink .embedded-backlinks {
+    display: none;
+}
+
+/* ファイルパスプレビューのスクロール */
+.file-path-preview-container {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid var(--background-modifier-border);
+    padding: 0.5em;
+    border-radius: 4px;
+}
+
+.file-path-preview-container pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin: 0.5em 0;
+}
+
+/* ファイルリストのスクロール */
+.file-list-container {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 1em;
+}
+.two-column-layout {
+    display: flex;
+    height: 500px;
+    gap: 10px;
+}
+.search-col,
+.selected-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+}
+.col-header {
+    padding: 8px;
+    font-weight: bold;
+    background: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.col-header-title {
+    line-height: 1.2;
+}
+
+.file-selector-search-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+}
+
+/* SearchComponent wrapper in Obsidian */
+.file-selector-search-controls .search-input-container {
+    flex: 1;
+    min-width: 120px;
+}
+
+.file-selector-search-controls input {
+    width: 100%;
+}
+.col-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
+}
+.file-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 4px;
+}
+.file-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+.file-item-path {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    display: block;
+}
+.file-item-name {
+    font-weight: bold;
+}
+.file-item.is-selected {
+    background-color: var(--background-modifier-active-hover);
+}
+
+.modal.file-selector-modal {
+    width: 80%;
+}
