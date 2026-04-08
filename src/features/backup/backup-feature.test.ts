@@ -161,7 +161,8 @@ describe("BackupFeature", () => {
     });
 
     it("should create immutable initial-install backup whenever it is missing", async () => {
-        mockAdapter.exists.mockImplementation(async (path: string) => path === "mock/plugin/dir/backups");
+        // Keep this callback synchronous to satisfy lint rules for void-expected arguments.
+        mockAdapter.exists.mockImplementation((path: string) => path === "mock/plugin/dir/backups");
 
         const validData = '{"profiles": {}}';
         const validCommunity = '["plugin1"]';
