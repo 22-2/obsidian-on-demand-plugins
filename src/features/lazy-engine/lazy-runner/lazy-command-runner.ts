@@ -1,5 +1,6 @@
 import { Mutex } from "async-mutex";
 import log from "loglevel";
+import { Notice } from "obsidian";
 import type { ViewRegistry } from "obsidian-typings";
 import { pEvent } from "p-event";
 import pTimeout from "p-timeout";
@@ -54,7 +55,10 @@ export class LazyCommandRunner implements PluginLoader {
 
         try {
             const ready = await this.waitForCommand(cached.id);
-            if (!ready) return;
+            if (!ready) {
+                this.showMissingCommandNotice(cached.id, cached.pluginId);
+                return;
+            }
 
             if (this.ctx.getData().showConsoleLog) {
                 logger.debug(`Executing lazy command: ${cached.id}`);
@@ -71,6 +75,12 @@ export class LazyCommandRunner implements PluginLoader {
                 logger.error(`Error executing lazy command ${commandId}:`, error);
             }
         }
+    }
+
+    private showMissingCommandNotice(commandId: string, pluginId: string): void {
+        // Command metadata can be cached while the source plugin later disables the command,
+        // so tell users why lazy execution could not find the real command implementation.
+        new Notice(`Command not available: ${commandId} (plugin: ${pluginId}). It may be disabled in plugin settings.`);
     }
 
     async ensurePluginLoaded(pluginId: string): Promise<boolean> {

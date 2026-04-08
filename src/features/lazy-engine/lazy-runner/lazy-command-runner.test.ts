@@ -1,4 +1,5 @@
 import pWaitFor from "p-wait-for";
+import { Notice } from "obsidian";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as utilsMs from "src/core/utils";
@@ -29,6 +30,7 @@ describe("LazyCommandRunner", () => {
 
     beforeEach(() => {
         vi.resetAllMocks();
+        (Notice as unknown as { clearMessages: () => void }).clearMessages();
 
         mockCtx = {
             app: {
@@ -144,6 +146,25 @@ describe("LazyCommandRunner", () => {
             await runner.runLazyCommand("cmd1");
 
             expect(executeSpy).toHaveBeenCalledWith("cmd1");
+        });
+
+        it("should show notice when the real command never becomes available", async () => {
+            mockRegistry.getCachedCommand.mockReturnValue({
+                id: "cmd1",
+                pluginId: "test-plugin",
+                name: "Cmd 1",
+                icon: "",
+            });
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);
+            vi.spyOn(runner, "waitForCommand").mockResolvedValue(false);
+
+            await runner.runLazyCommand("cmd1");
+
+            const notice = Notice as unknown as { messages: string[] };
+            expect(notice.messages.length).toBe(1);
+            expect(notice.messages[0]).toContain("cmd1");
+            expect(notice.messages[0]).toContain("test-plugin");
         });
     });
 

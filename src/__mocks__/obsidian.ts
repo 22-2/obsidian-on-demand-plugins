@@ -2,7 +2,19 @@ export const App = class {};
 export const Modal = class {};
 export const Plugin = class {};
 export const Setting = class {};
-export const Notice = class {};
+export const Notice = class {
+    static messages: string[] = [];
+
+    constructor(message?: string) {
+        if (typeof message === "string") {
+            Notice.messages.push(message);
+        }
+    }
+
+    static clearMessages() {
+        Notice.messages = [];
+    }
+};
 export const ExtraButtonComponent = class {};
 export const Menu = class {};
 export const DropdownComponent = class {};
