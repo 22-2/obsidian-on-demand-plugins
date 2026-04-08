@@ -3,6 +3,11 @@ import type { CachedCommand, PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { isLazyMode, isPluginLoaded } from "src/core/utils";
 import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
+import pTimeout from "p-timeout";
+import pWaitFor from "p-wait-for";
+import log from "loglevel";
+
+const logger = log.getLogger("OnDemandPlugin/CommandCacheService");
 
 // Re-export for consumers
 export class CommandCacheService {
@@ -73,8 +78,8 @@ export class CommandCacheService {
             await this.ctx.obsidianPlugins.enablePlugin(pluginId);
         }
 
-        if (!isPluginLoaded(this.ctx.app, pluginId)) {
-            await this.pluginLoader.waitForPluginLoaded(pluginId);
+        if (!this.isPluginReadyForCommandSnapshot(pluginId)) {
+            await this.waitForPluginReadyForCommandSnapshot(pluginId);
         }
 
         const commands = Object.values(this.ctx.obsidianCommands.commands) as CachedCommand[];
@@ -240,5 +245,35 @@ export class CommandCacheService {
     private isLazyMode(pluginId: string): boolean {
         const mode = this.ctx.getPluginMode(pluginId);
         return isLazyMode(mode);
+    }
+
+    private isPluginReadyForCommandSnapshot(pluginId: string): boolean {
+        if (isPluginLoaded(this.ctx.app, pluginId)) {
+            return true;
+        }
+
+        // Some plugins finish registering commands slightly before Obsidian flips its internal
+        // loaded flag, so command discovery should proceed as soon as the target commands exist.
+        return Object.values(this.ctx.obsidianCommands.commands).some((command) => {
+            const commandId = (command as { id?: unknown }).id;
+            return typeof commandId === "string" && this.ctx.getCommandPluginId(commandId) === pluginId;
+        });
+    }
+
+    private async waitForPluginReadyForCommandSnapshot(pluginId: string, timeoutMs = 8000): Promise<void> {
+        try {
+            await pTimeout(
+                pWaitFor(() => this.isPluginReadyForCommandSnapshot(pluginId), {
+                    interval: 100,
+                }),
+                {
+                    milliseconds: timeoutMs,
+                },
+            );
+        } catch {
+            // Keep the cache refresh moving even if Obsidian never flips the loaded flag.
+            // The subsequent command snapshot will still capture whatever registered successfully.
+            logger.warn(`Timeout waiting for plugin ${pluginId} to be ready for command snapshot`);
+        }
     }
 }

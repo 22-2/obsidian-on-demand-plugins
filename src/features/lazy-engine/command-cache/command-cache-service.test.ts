@@ -67,7 +67,7 @@ describe("CommandCacheService", () => {
     });
 
     describe("getCommandsForPlugin", () => {
-        it("should enable and wait for plugin to load before retrieving commands", async () => {
+        it("should enable plugin and snapshot commands even if the loaded flag lags behind registration", async () => {
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
 
             mockCtx.obsidianCommands.commands = {
@@ -79,7 +79,7 @@ describe("CommandCacheService", () => {
             const result = await service.getCommandsForPlugin("test-plugin");
 
             expect(mockCtx.obsidianPlugins.enablePlugin).toHaveBeenCalledWith("test-plugin");
-            expect(mockPluginLoader.waitForPluginLoaded).toHaveBeenCalledWith("test-plugin");
+            expect(mockPluginLoader.waitForPluginLoaded).not.toHaveBeenCalled();
 
             expect(result).toHaveLength(1);
             expect(result[0].id).toBe("test-cmd-1");
