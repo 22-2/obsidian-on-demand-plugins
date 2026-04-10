@@ -1,10 +1,10 @@
 {
-  "id": "on-demand-plugins",
-  "name": "On-Demand Plugins",
-  "version": "3.3.1",
-  "minAppVersion": "1.11.5",
-  "description": "Boost startup speed by loading plugins only when you actually use them.",
-  "author": "22-2",
-  "authorUrl": "https://github.com/22-2",
-  "isDesktopOnly": false
+    "id": "on-demand-plugins",
+    "name": "On-Demand Plugins",
+    "version": "3.3.1",
+    "minAppVersion": "1.11.5",
+    "description": "Boost startup speed by loading plugins only when you actually use them.",
+    "author": "22-2",
+    "authorUrl": "https://github.com/22-2",
+    "isDesktopOnly": false
 }
