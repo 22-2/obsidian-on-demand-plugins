@@ -2,6 +2,7 @@
     "compilerOptions": {
         // Project structure
         "paths": {
+            "/*": ["./*"],
             "src/*": ["./src/*"]
         },
 
