@@ -138,7 +138,8 @@ export class StartupPolicyFeature implements AppFeature {
         while (true) {
             if (isCancelled() || ids.every((id) => isPluginLoaded(this.ctx.app, id))) return;
             if (Date.now() >= deadline) return;
-            await new Promise((r) => setTimeout(r, 100));
+            // Use the window timer API to align with popout-window execution context.
+            await new Promise((r) => window.setTimeout(r, 100));
         }
     }
 

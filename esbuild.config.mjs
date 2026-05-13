@@ -2,11 +2,11 @@
 
 import esbuild from "esbuild";
 import process from "process";
-import builtins from "builtin-modules";
+import { builtinModules } from "node:module";
 import { obsidianCopyPlugin } from "@22-2/esbuild-plugin-obsidian-copy";
-import dotenv from "dotenv";
 
-dotenv.config();
+// Keep both `node:*` and bare names externalized because dependencies may import either form.
+const builtins = Array.from(new Set([...builtinModules, ...builtinModules.map((name) => name.replace(/^node:/, ""))]));
 
 const pluginsPath = process.env.PLUGINS_PATH;
 const isCI = !!process.env.CI;

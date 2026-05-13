@@ -30,7 +30,8 @@ export class CommandExecutor {
 
         if (activeEditor && activeEditor.editor) {
             const editor = activeEditor.editor;
-            const activeElement = document.activeElement;
+            // Use activeDocument so commands also behave correctly in popout windows.
+            const activeElement = activeDocument.activeElement;
 
             // Follow conditions from obsidian's source
             if (activeEditor instanceof MarkdownView) {

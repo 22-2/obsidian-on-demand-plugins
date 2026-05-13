@@ -12,7 +12,7 @@ export class ToolsModal extends Modal {
 
     private fromMode: PLUGIN_MODE = PLUGIN_MODE.ALWAYS_DISABLED;
     private toMode: PLUGIN_MODE = PLUGIN_MODE.LAZY;
-    private confirmTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
+    private confirmTimeout: number | null = null;
     private activeTabId: string = "sync";
     private tabContentEl!: HTMLElement;
 
@@ -202,8 +202,9 @@ export class ToolsModal extends Modal {
 
                     if (btn.buttonEl.innerText === "Replace all") {
                         btn.setButtonText("Click to confirm").setWarning();
-                        if (this.confirmTimeout) globalThis.clearTimeout(this.confirmTimeout);
-                        this.confirmTimeout = globalThis.setTimeout(() => {
+                        // Use window timers so confirm flow remains consistent in popout windows.
+                        if (this.confirmTimeout) window.clearTimeout(this.confirmTimeout);
+                        this.confirmTimeout = window.setTimeout(() => {
                             btn.setButtonText("Replace all");
                             btn.buttonEl.removeClass("mod-warning");
                         }, 3000);
@@ -211,7 +212,7 @@ export class ToolsModal extends Modal {
                     }
 
                     if (this.confirmTimeout) {
-                        globalThis.clearTimeout(this.confirmTimeout);
+                        window.clearTimeout(this.confirmTimeout);
                         this.confirmTimeout = null;
                     }
 

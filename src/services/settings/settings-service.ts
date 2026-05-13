@@ -162,7 +162,8 @@ export class SettingsService {
     }
 
     createProfile(name: string, sourceProfileId?: string): string {
-        const newId = globalThis.crypto.randomUUID();
+        // Use activeWindow for UUID generation so popout-window contexts share the same compatibility path.
+        const newId = activeWindow.crypto.randomUUID();
         const sourceSettings = sourceProfileId && this.data.profiles[sourceProfileId] ? this.data.profiles[sourceProfileId].settings : DEFAULT_DEVICE_SETTINGS;
 
         // Deep copy settings to avoid reference issues

@@ -3,6 +3,12 @@ import globals from "globals";
 import obsidianmd from "eslint-plugin-obsidianmd";
 import { defineConfig } from "eslint/config"
 
+/**
+ * `globals` is consumed from JS config, so we annotate the shape once
+ * to keep strict eslint rules from treating `.browser/.node` access as unsafe.
+ */
+const typedGlobals = /** @type {{ browser: Record<string, "readonly" | "writable" | "off">, node: Record<string, "readonly" | "writable" | "off"> }} */ (globals);
+
 export default defineConfig([
     // @ts-expect-error
     ...obsidianmd.configs.recommended,
@@ -10,8 +16,8 @@ export default defineConfig([
         files: ["**/*.{ts,tsx,mts,cts}"],
         languageOptions: {
             globals: {
-                ...globals.browser,
-                ...globals.node,
+                ...typedGlobals.browser,
+                ...typedGlobals.node,
             },
             parserOptions: {
                 project: true,
@@ -23,8 +29,8 @@ export default defineConfig([
         files: ["src/**/*.test.ts"],
         languageOptions: {
             globals: {
-                ...globals.browser,
-                ...globals.node,
+                ...typedGlobals.browser,
+                ...typedGlobals.node,
             },
         },
         rules: {
