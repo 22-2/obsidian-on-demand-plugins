@@ -4,17 +4,17 @@ import { exit } from "process";
 function updateVersion(version: string) {
     const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
     packageJson.version = version;
-    writeFileSync("package.json", JSON.stringify(packageJson, null, "  "));
+    writeFileSync("package.json", JSON.stringify(packageJson, null, 4));
 
     const manifest = JSON.parse(readFileSync("manifest.json", "utf8"));
     const { minAppVersion } = manifest;
     manifest.version = version;
-    writeFileSync("manifest.json", JSON.stringify(manifest, null, "  "));
+    writeFileSync("manifest.json", JSON.stringify(manifest, null, 4));
 
     // update versions.json with target version and minAppVersion from manifest.json
     const versions = JSON.parse(readFileSync("versions.json", "utf8"));
     versions[version] = minAppVersion;
-    writeFileSync("versions.json", JSON.stringify(versions, null, "  "));
+    writeFileSync("versions.json", JSON.stringify(versions, null, 4));
 }
 
 const [_1, _2, version] = process.argv;
