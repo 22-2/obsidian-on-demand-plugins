@@ -2,14 +2,22 @@ import path from "node:path";
 import { access, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { promisify } from "node:util";
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { fetchPlugin } from "obsidian-e2e-toolkit";
 
-const execP = promisify(exec);
+const execFileP = promisify(execFile);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Anchor fixture setup to this file so Playwright, pnpm, and CI all prepare plugins
+// in the same repo-local myfiles directory that the tests later mount.
+const repoRoot = path.resolve(__dirname, "..");
+const requiredPluginFiles = ["manifest.json", "main.js"];
 
 /**
  * Utility to check if a file or directory exists asynchronously.
- * @param {string} filePath 
+ * @param {string} filePath
  * @returns {Promise<boolean>}
  */
 async function fileExists(filePath) {
@@ -22,16 +30,57 @@ async function fileExists(filePath) {
 }
 
 /**
- * Helper to execute shell commands with localized error handling.
+ * Helper to execute shell commands while preserving stderr in failures.
  * @param {string} command - Command to run.
+ * @param {string[]} args - Command arguments.
  * @param {string} cwd - Working directory.
  * @param {string} label - Context label for logging.
  */
-async function runSafeCommand(command, cwd, label) {
+async function runCommand(command, args, cwd, label) {
     try {
-        await execP(command, { cwd });
+        await execFileP(command, args, { cwd });
     } catch (err) {
-        console.warn(`[global-setup] ${label} failed (ignored):`, err?.message || err);
+        const details = [err?.message, err?.stdout, err?.stderr]
+            .filter((value) => typeof value === "string" && value.length > 0)
+            .join("\n");
+
+        throw new Error(`[global-setup] ${label} failed: ${details || err}`);
+    }
+}
+
+function getGitHubApiHeaders() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    const baseHeaders = {
+        Accept: "application/vnd.github+json",
+        "User-Agent": "obsidian-on-demand-plugins-tests"
+    };
+
+    // CI runners share public egress, so authenticated API calls avoid flaky
+    // tag lookups when GitHub applies low unauthenticated rate limits.
+    return token ? { ...baseHeaders, Authorization: `Bearer ${token}` } : baseHeaders;
+}
+
+function getGitHubDownloadHeaders() {
+    const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+    const baseHeaders = {
+        "User-Agent": "obsidian-on-demand-plugins-tests"
+    };
+
+    return token ? { ...baseHeaders, Authorization: `Bearer ${token}` } : baseHeaders;
+}
+
+function getMissingPluginFiles(pluginDir) {
+    return requiredPluginFiles.filter((fileName) => !existsSync(path.join(pluginDir, fileName)));
+}
+
+function validatePreparedPlugin(pluginId, pluginDir) {
+    if (!existsSync(pluginDir)) {
+        throw new Error(`[global-setup] ${pluginId} was not downloaded to ${pluginDir}`);
+    }
+
+    const missingFiles = getMissingPluginFiles(pluginDir);
+    if (missingFiles.length > 0) {
+        throw new Error(`[global-setup] ${pluginId} is missing required files: ${missingFiles.join(", ")}`);
     }
 }
 
@@ -77,11 +126,9 @@ function parseOwnerRepo(ownerRepo) {
  */
 async function fetchTaggedRelease(source, dest) {
     const { owner, repo } = parseOwnerRepo(source.repo);
-    const releaseApiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/tags/${source.tag}`;
+    const releaseApiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/tags/${encodeURIComponent(source.tag)}`;
     const response = await fetch(releaseApiUrl, {
-        headers: {
-            "User-Agent": "obsidian-on-demand-plugins-tests"
-        }
+        headers: getGitHubApiHeaders()
     });
 
     if (!response.ok) {
@@ -101,9 +148,7 @@ async function fetchTaggedRelease(source, dest) {
         }
 
         const assetResponse = await fetch(asset.browser_download_url, {
-            headers: {
-                "User-Agent": "obsidian-on-demand-plugins-tests"
-            }
+            headers: getGitHubDownloadHeaders()
         });
         if (!assetResponse.ok) {
             throw new Error(`failed to download ${fileName} for ${source.repo}@${source.tag}: ${assetResponse.status}`);
@@ -112,6 +157,18 @@ async function fetchTaggedRelease(source, dest) {
         const assetBuffer = Buffer.from(await assetResponse.arrayBuffer());
         await writeFile(path.join(dest, fileName), assetBuffer);
     }
+}
+
+async function cloneTaggedPlugin(source, dest, pluginId) {
+    await rm(dest, { recursive: true, force: true });
+
+    console.warn(`[global-setup] falling back to git checkout for ${pluginId} at ${source.repo}@${source.tag}`);
+    await runCommand(
+        "git",
+        ["clone", "--depth", "1", "--branch", source.tag, `https://github.com/${source.repo}.git`, dest],
+        repoRoot,
+        `git clone (${pluginId})`,
+    );
 }
 
 /**
@@ -174,10 +231,24 @@ async function setupExternalPlugin(pluginId, sourceValue, baseDir) {
             await rm(dest, { recursive: true, force: true });
 
             console.log(`[global-setup] fetching ${source.repo}${source.tag ? `@${source.tag}` : ""} -> ${dest}`);
-            if (source.tag) {
-                await fetchTaggedRelease(source, dest);
-            } else {
-                await fetchPlugin(`https://github.com/${source.repo}.git`, dest);
+            try {
+                if (source.tag) {
+                    await fetchTaggedRelease(source, dest);
+                } else {
+                    await fetchPlugin(`https://github.com/${source.repo}.git`, dest);
+                }
+            } catch (err) {
+                if (!source.tag) {
+                    throw err;
+                }
+
+                await cloneTaggedPlugin(source, dest, pluginId);
+            }
+
+            if (source.tag && getMissingPluginFiles(dest).length > 0) {
+                // Tagged release assets are ideal because they already contain the built plugin,
+                // but cloning the exact tag keeps CI green when GitHub omits or rate-limits assets.
+                await cloneTaggedPlugin(source, dest, pluginId);
             }
 
             await writeFile(metadataPath, `${JSON.stringify(source, null, 4)}\n`, "utf8");
@@ -186,11 +257,13 @@ async function setupExternalPlugin(pluginId, sourceValue, baseDir) {
         // Run build steps if package.json is present
         if (await fileExists(pkgPath)) {
             console.log(`[global-setup] installing/building plugin: ${pluginId}`);
-            await runSafeCommand("pnpm install --silent", dest, `pnpm install (${pluginId})`);
-            await runSafeCommand("pnpm run build --silent", dest, `pnpm build (${pluginId})`);
+            await runCommand("pnpm", ["install", "--silent"], dest, `pnpm install (${pluginId})`);
+            await runCommand("pnpm", ["run", "build", "--silent"], dest, `pnpm build (${pluginId})`);
         }
+
+        validatePreparedPlugin(pluginId, dest);
     } catch (err) {
-        console.warn(`[global-setup] Error processing ${pluginId} (${source.repo}):`, err?.message || err);
+        throw new Error(`[global-setup] Error processing ${pluginId} (${source.repo}): ${err?.message || err}`);
     }
 }
 
@@ -198,13 +271,15 @@ async function setupExternalPlugin(pluginId, sourceValue, baseDir) {
  * Main global setup function for Playwright/E2E testing.
  */
 export default async function globalSetup() {
-    const repoRoot = process.cwd();
-
     // 1. Ensure the main project is built
     const mainJsPath = path.resolve(repoRoot, "main.js");
     if (!(await fileExists(mainJsPath))) {
         console.log("[global-setup] main.js missing, running build:nocheck");
-        await runSafeCommand("pnpm run build:nocheck --silent", repoRoot, "main build");
+        await runCommand("pnpm", ["run", "build:nocheck", "--silent"], repoRoot, "main build");
+    }
+
+    if (!(await fileExists(mainJsPath))) {
+        throw new Error(`[global-setup] ${mainJsPath} not found after build`);
     }
 
     // 2. Load plugin mapping
@@ -223,8 +298,20 @@ export default async function globalSetup() {
         return;
     }
 
+    const failures = [];
+
+    // Fail before launching Obsidian when fixture preparation is incomplete;
+    // otherwise every spec degrades into misleading "plugin path not found" noise.
     // 3. Process each plugin sequentially to avoid I/O race conditions
     for (const [pluginId, source] of Object.entries(repoMap)) {
-        await setupExternalPlugin(pluginId, source, repoRoot);
+        try {
+            await setupExternalPlugin(pluginId, source, repoRoot);
+        } catch (err) {
+            failures.push(`- ${pluginId}: ${err?.message || err}`);
+        }
+    }
+
+    if (failures.length > 0) {
+        throw new Error(`[global-setup] Failed to prepare external plugins:\n${failures.join("\n")}`);
     }
 }
