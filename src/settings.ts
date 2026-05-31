@@ -62,8 +62,8 @@ export class SettingsTab extends PluginSettingTab {
   dropdowns: DropdownComponent[] = []
   filterMethod: LoadingMethod | undefined
   filterString: string | undefined
-  containerEl: HTMLElement
-  pluginListContainer: HTMLElement
+  containerEl!: HTMLElement
+  pluginListContainer!: HTMLElement
   pluginSettings: { [pluginId: string]: PluginSettings } = {}
 
   constructor (app: App, plugin: LazyPlugin) {
@@ -137,8 +137,8 @@ export class SettingsTab extends PluginSettingTab {
         this.addDelayOptions(dropdown)
         dropdown
           .setValue(this.lazyPlugin.settings.defaultStartupType || '')
-          .onChange(async (value: LoadingMethod) => {
-            this.lazyPlugin.settings.defaultStartupType = value || null
+          .onChange(async (value) => {
+            this.lazyPlugin.settings.defaultStartupType = (value as LoadingMethod) || null
             await this.lazyPlugin.saveSettings()
           })
       })
@@ -160,10 +160,11 @@ export class SettingsTab extends PluginSettingTab {
       .addDropdown(dropdown => {
         dropdown.addOption('', 'Set all plugins to be:')
         this.addDelayOptions(dropdown)
-        dropdown.onChange(async (value: LoadingMethod) => {
+        dropdown.onChange(async (value) => {
+          const startupType = value as LoadingMethod
           // Update all plugins and save the config, but don't reload the plugins (would slow the UI down)
           this.lazyPlugin.manifests.forEach(plugin => {
-            this.pluginSettings[plugin.id] = { startupType: value }
+            this.pluginSettings[plugin.id] = { startupType }
           })
           // Update all the dropdowns
           this.dropdowns.forEach(dropdown => dropdown.setValue(value))
@@ -215,9 +216,9 @@ export class SettingsTab extends PluginSettingTab {
             this.addDelayOptions(dropdown)
             dropdown
               .setValue(currentValue)
-              .onChange(async (value: LoadingMethod) => {
+              .onChange(async (value) => {
                 // Update the config file, and disable/enable the plugin if needed
-                await this.lazyPlugin.updatePluginSettings(plugin.id, value)
+                await this.lazyPlugin.updatePluginSettings(plugin.id, value as LoadingMethod)
                 this.lazyPlugin.setPluginStartup(plugin.id).then()
               })
           })

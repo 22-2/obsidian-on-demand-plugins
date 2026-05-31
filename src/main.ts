@@ -11,10 +11,10 @@ import {
 const lazyPluginId = require('../manifest.json').id
 
 export default class LazyPlugin extends Plugin {
-  data: LazySettings
-  settings: DeviceSettings
+  data!: LazySettings
+  settings!: DeviceSettings
   device = 'desktop/global'
-  manifests: PluginManifest[]
+  manifests!: PluginManifest[]
   pendingTimeouts: NodeJS.Timeout[] = []
 
   async onload () {
