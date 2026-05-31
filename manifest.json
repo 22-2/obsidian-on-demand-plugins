@@ -1,6 +1,6 @@
 {
 	"id": "lazy-plugins",
-	"name": "Lazy Plugin Loader",
+	"name": "Lazy Loader",
 	"version": "1.0.21",
 	"minAppVersion": "1.6.0",
 	"description": "Load plugins with a delay on startup, so that you can get your app startup down into the sub-second loading time.",
