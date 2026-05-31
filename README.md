@@ -1,4 +1,4 @@
-# Lazy Plugin Loader for Obsidian
+# Lazy Loader
 
 Load plugins with a delay on Obsidian startup, so that you can get your app startup down into the sub-second loading time.
 
