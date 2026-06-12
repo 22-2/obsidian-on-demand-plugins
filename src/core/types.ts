@@ -41,6 +41,9 @@ export interface FileActivationCriteria {
 // Settings per device (desktop/mobile)
 export interface DeviceSettings {
     defaultMode: PLUGIN_MODE;
+    // When true, settings/cache entries for plugin IDs no longer present in the
+    // installed manifests are pruned during the manifest reconcile pass.
+    pruneUninstalledEntries: boolean;
     showDescriptions: boolean;
     plugins: { [pluginId: string]: PluginSettings };
     lazyOnViews: { [pluginId: string]: string[] };
@@ -49,6 +52,7 @@ export interface DeviceSettings {
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
     defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
+    pruneUninstalledEntries: false,
     showDescriptions: true,
     plugins: {},
     lazyOnViews: {},

@@ -60,7 +60,18 @@ export class SettingsService {
             if (profile.settings.defaultMode === undefined) {
                 profile.settings.defaultMode = DEFAULT_DEVICE_SETTINGS.defaultMode;
             }
+            if (profile.settings.pruneUninstalledEntries === undefined) {
+                profile.settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;
+            }
         });
+
+        // 5b. Drop dead command-cache fields. These were persisted in data.json by
+        // older versions; the live cache now lives in vault-scoped storage, so any
+        // copy here is stale bloat. Removed wholesale (the profiles migration's
+        // delete pattern) instead of pruned per plugin ID, and runs every load so
+        // already-migrated installs get cleaned too.
+        delete this.data.commandCache;
+        delete this.data.commandCacheVersions;
 
         // 6. Set the active settings reference
         this.settings = this.data.profiles[this.currentProfileId].settings;
