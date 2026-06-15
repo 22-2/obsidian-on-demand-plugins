@@ -54,6 +54,14 @@ export default class OnDemandPlugin extends Plugin {
 
         this.registerEventHandlers();
 
+        // Opt-in cleanup at startup. Runs after loadAll() so the BackupFeature is
+        // available to snapshot the pre-clean state first. Order vs. the lazy
+        // engine is irrelevant: stale entries are keyed by uninstalled plugins,
+        // which every manifest-driven path already skips.
+        if (this.settings.pruneUninstalledEntries && (await this.backupAndPruneUninstalledEntries())) {
+            await this.saveSettings();
+        }
+
         this.addSettingTab(new SettingsTab(this.app, this));
     }
 
@@ -145,9 +153,65 @@ export default class OnDemandPlugin extends Plugin {
             }
         }
 
+        // Opt-in cleanup: drop persisted state for plugins that are no longer
+        // installed, so uninstalled entries don't accumulate indefinitely.
+        if (this.settings.pruneUninstalledEntries && (await this.backupAndPruneUninstalledEntries())) {
+            hasChanges = true;
+        }
+
         if (hasChanges) {
             await this.saveSettings();
         }
+    }
+
+    /**
+     * The current profile's maps whose keys are plugin IDs and may hold entries
+     * for uninstalled plugins. The legacy in-data command cache is intentionally
+     * excluded: it is dead data (the live cache lives in vault-scoped storage) and
+     * is removed wholesale during settings load rather than pruned per key.
+     */
+    private pruneTargetMaps(): Record<string, unknown>[] {
+        return [this.settings.plugins, this.settings.lazyOnViews, this.settings.lazyOnFiles];
+    }
+
+    /** True when any prune target holds an entry for a plugin not in the current manifests. */
+    private hasUninstalledPluginEntries(): boolean {
+        const installed = new Set(this.manifests.map((m) => m.id));
+        return this.pruneTargetMaps().some((map) => Object.keys(map).some((id) => !installed.has(id)));
+    }
+
+    /**
+     * Snapshot the current on-disk state via the backup feature (only when there is
+     * something to remove, to avoid empty backups) and then prune in memory.
+     * Persisting is left to the caller so the settings UI's deferred-save flow is
+     * not disturbed. Returns true when anything was pruned.
+     */
+    async backupAndPruneUninstalledEntries(): Promise<boolean> {
+        if (!this.hasUninstalledPluginEntries()) return false;
+        // Back up before overwriting data.json with the pruned result, so the
+        // removed entries can be recovered from the timestamped snapshot.
+        await this.features.get(BackupFeature)?.createBackup();
+        return this.pruneUninstalledPluginEntries();
+    }
+
+    /**
+     * Remove persisted entries keyed by plugin IDs that are absent from the
+     * current installed manifests. Returns true when anything was removed.
+     */
+    pruneUninstalledPluginEntries(): boolean {
+        const installed = new Set(this.manifests.map((m) => m.id));
+        let removed = false;
+
+        for (const map of this.pruneTargetMaps()) {
+            for (const id of Object.keys(map)) {
+                if (!installed.has(id)) {
+                    delete map[id];
+                    removed = true;
+                }
+            }
+        }
+
+        return removed;
     }
 
     async updatePluginSettings(pluginId: string, mode: PLUGIN_MODE) {

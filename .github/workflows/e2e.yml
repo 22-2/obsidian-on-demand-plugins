@@ -33,7 +33,7 @@ jobs:
             - name: Setup Node
               uses: actions/setup-node@v6
               with:
-                  node-version: "24.x"
+                  node-version: '24.15.0'
                   cache: "pnpm"
                   cache-dependency-path: pnpm-lock.yaml
 
@@ -70,7 +70,7 @@ jobs:
 
             - name: Cache Playwright browsers
               id: playwright-cache
-              uses: actions/cache@v4
+              uses: actions/cache@v5
               with:
                   path: .cache/ms-playwright
                   key: ${{ runner.os }}-playwright-chromium-${{ hashFiles('pnpm-lock.yaml') }}
@@ -85,10 +85,18 @@ jobs:
                   pnpm install --no-frozen-lockfile
 
             - name: Install Playwright chromium
+              # macOS runner では cdn.playwright.dev からの DL が 100% 表示後に
+              # スタールすることがある。Playwright 側に全体タイムアウトが無いため、
+              # 試行ごとのタイムアウト + リトライでハングを防ぐ。
               if: steps.playwright-cache.outputs.cache-hit != 'true'
+              uses: nick-fields/retry@v4
               env:
                   PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
-              run: pnpm exec playwright install chromium
+              with:
+                  timeout_minutes: 10
+                  max_attempts: 3
+                  shell: bash
+                  command: pnpm exec playwright install chromium
 
             - name: Build plugin under test
               run: pnpm run build

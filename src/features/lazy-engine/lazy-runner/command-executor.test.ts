@@ -23,6 +23,10 @@ describe("CommandExecutor", () => {
             },
         } as unknown as Document;
 
+        // The executor reads `activeDocument` (Obsidian's global for the active window)
+        // rather than `document`, so the mock must be exposed under that name too.
+        (globalThis as unknown as { activeDocument: Document }).activeDocument = globalThis.document;
+
         mockCtx = {
             app: {
                 workspace: {

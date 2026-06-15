@@ -14,6 +14,7 @@ describe("resolvePluginForViewType", () => {
     it("resolves plugin when both useView and useFile are enabled", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.LAZY,
+            pruneUninstalledEntries: false,
             showDescriptions: true,
             plugins: {
                 "plugin-a": {
@@ -40,6 +41,7 @@ describe("resolvePluginForViewType", () => {
     it("resolves legacy lazyOnViews entry even when lazyOnFiles also exists", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.LAZY,
+            pruneUninstalledEntries: false,
             showDescriptions: true,
             plugins: {},
             lazyOnViews: {
@@ -60,6 +62,7 @@ describe("resolvePluginForViewType", () => {
     it("returns null for non-lazy mode even if view rule matches", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
+            pruneUninstalledEntries: false,
             showDescriptions: true,
             plugins: {
                 "plugin-c": {

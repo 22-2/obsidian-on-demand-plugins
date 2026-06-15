@@ -125,6 +125,23 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         new Setting(this.containerEl)
+            .setName("Auto-remove uninstalled entries")
+            .setDesc("Prune the current profile's saved settings and command cache for plugins that are no longer installed. Cleanup runs at plugin startup and immediately when enabled.")
+            .addToggle((toggle) => {
+                toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange((value) => {
+                    this.plugin.settings.pruneUninstalledEntries = value;
+                    // Prune immediately (backing up first) so the effect is visible at
+                    // once; the deferred save flow persists it, avoiding an early save
+                    // of other pending edits.
+                    if (value) {
+                        void this.plugin.backupAndPruneUninstalledEntries();
+                    }
+                    this.isDirty = true;
+                    this.updateApplyButton();
+                });
+            });
+
+        new Setting(this.containerEl)
             .setName("Maintenance and batch operations")
             .setDesc("Rebuild command cache, sync with Obsidian settings, or batch-update plugin modes.")
             .addButton((button) => {
