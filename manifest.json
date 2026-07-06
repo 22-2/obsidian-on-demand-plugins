@@ -1,7 +1,7 @@
 {
     "id": "on-demand-plugins",
     "name": "On-Demand",
-    "version": "3.4.0",
+    "version": "3.4.1",
     "minAppVersion": "1.11.5",
     "description": "Boost startup speed by loading plugins only when you actually use them.",
     "author": "22-2",
