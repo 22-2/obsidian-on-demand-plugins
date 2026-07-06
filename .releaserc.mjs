@@ -14,6 +14,7 @@ export default {
                     { type: "style", release: "minor" },
                     { type: "fix", release: "patch" },
                     { type: "refactor", release: "patch" },
+                    {type: "chore", scope: "release", release: "patch"},
                     { revert: true, release: "patch" },
                 ],
             },
