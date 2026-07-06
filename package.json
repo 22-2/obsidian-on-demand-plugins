@@ -14,7 +14,7 @@
         "build:nocheck": "node esbuild.config.mjs production",
         "version": "node version-bump.mjs && git add manifest.json versions.json",
         "test": "vitest",
-        "lint": "pnpm exec eslint ./src --ext .ts,.js,.mjs",
+        "lint": "pnpm exec eslint ./src",
         "format": "pnpm run lint --fix && pnpm exec prettier --editorconfig --write ./src && pnpx organize-imports-cli tsconfig.json",
         "release": "pnpm dlx semantic-release",
         "release:dry": "pnpm release --dry-run"
