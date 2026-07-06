@@ -23,12 +23,6 @@
     "author": "22-2",
     "repository": "https://github.com/22-2/obsidian-on-demand-plugins.git",
     "license": "MIT",
-    "pnpm": {
-        "onlyBuiltDependencies": [
-            "electron",
-            "obsidian-e2e-toolkit"
-        ]
-    },
     "dependencies": {
         "async-mutex": "^0.5.0",
         "loglevel": "^1.9.2",
