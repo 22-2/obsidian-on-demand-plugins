@@ -190,7 +190,9 @@ export class ToolsModal extends Modal {
                 }),
         );
 
-        new Setting(container).addButton((btn) =>
+        new Setting(container)
+            .setClass("lazy-replace-setting")
+            .addButton((btn) =>
             btn
                 .setButtonText("Replace all")
                 .setClass("replace-button")

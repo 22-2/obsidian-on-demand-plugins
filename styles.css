@@ -92,8 +92,8 @@
     line-height: var(--line-height-tight);
 }
 
-.lazy-tools-modal .setting-item-control:has(.replace-button) {
-    width: 100%;        
+.lazy-tools-modal .lazy-replace-setting .setting-item-control {
+    width: 100%;
 }
 
 .lazy-tools-modal .setting-item-control .replace-button {
