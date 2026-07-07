@@ -37,6 +37,26 @@
     margin-top: 0.5em;
 }
 
+.lazy-plugin-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.lazy-plugin-section.lazy-plugin-section-collapsed .lazy-plugin-section-content {
+    display: none;
+}
+
+.lazy-plugin-toggle-row {
+    display: flex;
+    justify-content: center;
+    margin-top: 14px;
+}
+
+.lazy-plugin-toggle-button {
+    min-width: 180px;
+}
+
 /* Profile Manager Modal */
 .lazy-profile-list {
     display: flex;

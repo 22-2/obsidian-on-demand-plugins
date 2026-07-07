@@ -17,7 +17,11 @@ export class SettingsTab extends PluginSettingTab {
     filterMethod: PLUGIN_MODE | undefined;
     filterString: string | undefined;
     // Created in buildDom() before buildPluginList() runs.
+    pluginSectionContainer!: HTMLElement;
+    pluginSectionContent!: HTMLElement;
     pluginListContainer!: HTMLElement;
+    pluginToggleButton?: HTMLButtonElement;
+    isPluginListOpen = false;
     pluginSettings: { [pluginId: string]: PluginSettings } = {};
     pendingPluginIds = new Set<string>();
     isDirty = false;
@@ -166,8 +170,24 @@ export class SettingsTab extends PluginSettingTab {
 
         this.updateApplyButton();
 
-        // Plugin list header: results count, keyword filter, and filter dropdown (dropdown placed to the right of the keyword input)
-        new Setting(this.containerEl)
+        // Plugin list wrapper: heading, search, filter, and the list itself.
+        this.pluginSectionContainer = this.containerEl.createDiv("lazy-plugin-section");
+
+        const pluginToggleRow = this.pluginSectionContainer.createDiv("lazy-plugin-toggle-row");
+        const toggleButton = pluginToggleRow.createEl("button", {
+            cls: "mod-cta lazy-plugin-toggle-button",
+            text: "0 Plugins",
+        }) as HTMLButtonElement;
+        toggleButton.type = "button";
+        toggleButton.addEventListener("click", () => {
+            this.isPluginListOpen = !this.isPluginListOpen;
+            this.updatePluginSectionVisibility();
+        });
+        this.pluginToggleButton = toggleButton;
+
+        this.pluginSectionContent = this.pluginSectionContainer.createDiv("lazy-plugin-section-content");
+
+        new Setting(this.pluginSectionContent)
             .setName("Plugins")
             .setHeading()
             .setDesc("Filter by: ")
@@ -197,7 +217,10 @@ export class SettingsTab extends PluginSettingTab {
             });
 
         // Add an element to contain the plugin list
-        this.pluginListContainer = this.containerEl.createEl("div");
+        this.pluginListContainer = this.pluginSectionContent.createEl("div", {
+            cls: "lazy-plugin-list-body",
+        });
+
         this.buildPluginList();
     }
 
@@ -316,6 +339,23 @@ export class SettingsTab extends PluginSettingTab {
 
         if (this.resultsCountEl) {
             this.resultsCountEl.setText(`${count} plugins`);
+        }
+
+        this.updatePluginToggleButton(count);
+        this.updatePluginSectionVisibility();
+    }
+
+    private updatePluginToggleButton(count: number): void {
+        if (!this.pluginToggleButton) return;
+        this.pluginToggleButton.textContent = `${count} Plugins`;
+    }
+
+    private updatePluginSectionVisibility(): void {
+        if (!this.pluginSectionContainer) return;
+        if (this.isPluginListOpen) {
+            this.pluginSectionContainer.classList.remove("lazy-plugin-section-collapsed");
+        } else {
+            this.pluginSectionContainer.classList.add("lazy-plugin-section-collapsed");
         }
     }
 
