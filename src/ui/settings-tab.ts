@@ -33,23 +33,14 @@ export class SettingsTab extends PluginSettingTab {
     }
 
     display(): void {
-        void this.displayAsync();
-    }
-
-    private async displayAsync(): Promise<void> {
         const { containerEl } = this;
         this.containerEl = containerEl;
 
-        // Update the list of installed plugins
+        // Update the list of installed plugins and render immediately.
+        // Settings are already loaded during plugin startup, so avoid blocking
+        // the settings UI on disk I/O when the tab is opened.
         this.plugin.updateManifests();
-
-        // Load settings to ensure we have the latest profiles
-        await this.plugin.loadSettings();
         this.pluginSettings = this.plugin.settings.plugins;
-
-        // Set initial configuration for any newly installed plugins
-        await this.plugin.setupDefaultPluginConfigurations();
-
         this.pendingPluginIds.clear();
 
         this.buildDom();
