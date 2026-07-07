@@ -23,6 +23,7 @@ export class SettingsTab extends PluginSettingTab {
     pluginToggleButton?: HTMLButtonElement;
     isPluginListOpen = false;
     pluginSettings: { [pluginId: string]: PluginSettings } = {};
+    private pluginListBuilt = false;
     pendingPluginIds = new Set<string>();
     isDirty = false;
     applyButton?: ButtonComponent;
@@ -187,6 +188,10 @@ export class SettingsTab extends PluginSettingTab {
 
         this.pluginSectionContent = this.pluginSectionContainer.createDiv("lazy-plugin-section-content");
 
+        if (!this.isPluginListOpen) {
+            this.pluginSectionContainer.classList.add("lazy-plugin-section-collapsed");
+        }
+
         new Setting(this.pluginSectionContent)
             .setName("Plugins")
             .setHeading()
@@ -221,7 +226,11 @@ export class SettingsTab extends PluginSettingTab {
             cls: "lazy-plugin-list-body",
         });
 
-        this.buildPluginList();
+        if (this.isPluginListOpen) {
+            this.buildPluginList();
+        } else {
+            this.updatePluginToggleButton(this.plugin.manifests.length);
+        }
     }
 
     private async handleProfileChange(newProfileId: string, dropdown: DropdownComponent): Promise<void> {
@@ -276,6 +285,7 @@ export class SettingsTab extends PluginSettingTab {
     }
 
     buildPluginList() {
+        this.pluginListBuilt = true;
         this.pluginListContainer.textContent = "";
         let count = 0;
         // Add the delay settings for each installed plugin
@@ -354,6 +364,13 @@ export class SettingsTab extends PluginSettingTab {
         if (!this.pluginSectionContainer) return;
         if (this.isPluginListOpen) {
             this.pluginSectionContainer.classList.remove("lazy-plugin-section-collapsed");
+            if (!this.pluginListBuilt) {
+                setTimeout(() => {
+                    if (this.isPluginListOpen && !this.pluginListBuilt) {
+                        this.buildPluginList();
+                    }
+                }, 0);
+            }
         } else {
             this.pluginSectionContainer.classList.add("lazy-plugin-section-collapsed");
         }
