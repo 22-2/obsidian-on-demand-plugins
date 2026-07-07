@@ -68,3 +68,56 @@ describe("SettingsService legacy command-cache cleanup", () => {
         expect(service.data.commandCacheVersions).toBeUndefined();
     });
 });
+
+describe("SettingsService load normalization", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+    });
+
+    it("normalizes invalid profile map fields to empty objects", async () => {
+        const { service } = createService(
+            migratedDataWith({
+                profiles: {
+                    Default: {
+                        id: "Default",
+                        name: "Default",
+                        settings: {
+                            defaultMode: "lazy",
+                            pruneUninstalledEntries: true,
+                            showDescriptions: false,
+                            plugins: null,
+                            lazyOnViews: null,
+                            lazyOnFiles: null,
+                        },
+                    },
+                },
+            }),
+        );
+
+        await service.load();
+
+        expect(service.data.profiles.Default.settings.plugins).toEqual({});
+        expect(service.data.profiles.Default.settings.lazyOnViews).toEqual({});
+        expect(service.data.profiles.Default.settings.lazyOnFiles).toEqual({});
+    });
+
+    it("falls back to a default profile when top-level profile shape is invalid", async () => {
+        const plugin: MockPlugin = {
+            loadData: vi.fn().mockResolvedValue({
+                profiles: null,
+                desktopProfileId: null,
+                mobileProfileId: null,
+            }),
+            saveData: vi.fn().mockResolvedValue(undefined),
+            app: {},
+        };
+        const service = new SettingsService(plugin as unknown as OnDemandPlugin);
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default"]);
+        expect(service.data.desktopProfileId).toBe("Default");
+        expect(service.data.mobileProfileId).toBe("Default");
+        expect(service.currentProfileId).toBe("Default");
+    });
+});
