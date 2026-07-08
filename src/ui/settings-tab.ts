@@ -351,7 +351,7 @@ export class SettingsTab extends PluginSettingTab {
             this.resultsCountEl.setText(`${count} plugins`);
         }
 
-        this.updatePluginToggleButton(count);
+        this.updatePluginToggleButton(this.plugin.manifests.length);
         this.updatePluginSectionVisibility();
     }
 
