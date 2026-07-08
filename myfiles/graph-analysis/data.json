@@ -1,0 +1,33 @@
+{
+  "noInfinity": true,
+  "noZero": true,
+  "allFileExtensions": true,
+  "showImgThumbnails": true,
+  "addUnresolved": true,
+  "coTags": true,
+  "excludeLinked": true,
+  "defaultSubtypeType": "Co-Citations",
+  "debugMode": false,
+  "superDebugMode": false,
+  "exclusionRegex": "",
+  "exclusionTags": [],
+  "algsToShow": [
+    "Random",
+    "Co-Citations",
+    "HITS",
+    "PageRank",
+    "Betweenness Centrality",
+    "Adamic Adar",
+    "Common Neighbours",
+    "Jaccard",
+    "Overlap",
+    "Louvain",
+    "Clustering Coefficient"
+  ],
+  "algorithmRenames": {
+    "Co-Citations": "共演チェック",
+    "Adamic Adar": "兄弟チェック",
+    "Jaccard": "同担率チェック",
+    "Overlap": "同担率チェックLite"
+  }
+}
