@@ -120,4 +120,33 @@ describe("SettingsService load normalization", () => {
         expect(service.data.mobileProfileId).toBe("Default");
         expect(service.currentProfileId).toBe("Default");
     });
+
+    it("seeds a default profile when the profiles map is an empty record", async () => {
+        // `{}` is a valid record but has no profile to activate; without seeding,
+        // load() would throw at `profiles[currentProfileId].settings`.
+        const { service } = createService(migratedDataWith({ profiles: {} }));
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default"]);
+        expect(service.currentProfileId).toBe("Default");
+        expect(service.settings).toEqual(DEFAULT_DEVICE_SETTINGS);
+    });
+
+    it("drops corrupt (null) profile entries and still activates a valid profile", async () => {
+        const { service } = createService(
+            migratedDataWith({
+                profiles: {
+                    Broken: null,
+                    Default: { id: "Default", name: "Default", settings: { ...DEFAULT_DEVICE_SETTINGS } },
+                },
+            }),
+        );
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default"]);
+        expect(service.currentProfileId).toBe("Default");
+        expect(service.settings.plugins).toEqual({});
+    });
 });

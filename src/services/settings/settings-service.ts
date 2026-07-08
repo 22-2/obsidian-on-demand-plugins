@@ -40,8 +40,20 @@ export class SettingsService {
         // the shared DEFAULT_SETTINGS object during runtime edits).
         this.data = Object.assign(structuredClone(DEFAULT_SETTINGS), loaded);
 
-        // 2b. Ensure top-level profile references are valid before migration
-        if (!isRecord(this.data.profiles)) {
+        // 2b. Ensure top-level profile references are valid before migration.
+        // First drop any corrupt (null/non-object) profile entries so a later
+        // `profiles[id].settings` read can't throw. An empty object is a valid
+        // record but has no profiles to activate, so treat "no usable profiles"
+        // (missing map, or all entries pruned) the same as a fresh install and
+        // seed the Default profile.
+        if (isRecord(this.data.profiles)) {
+            for (const [id, profile] of Object.entries(this.data.profiles)) {
+                if (!isRecord(profile)) {
+                    delete this.data.profiles[id];
+                }
+            }
+        }
+        if (!isRecord(this.data.profiles) || Object.keys(this.data.profiles).length === 0) {
             this.data.profiles = {
                 [DEFAULT_PROFILE_ID]: {
                     id: DEFAULT_PROFILE_ID,
