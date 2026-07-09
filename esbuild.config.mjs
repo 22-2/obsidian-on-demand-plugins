@@ -5,7 +5,14 @@ import process from "process";
 import { builtinModules } from "node:module";
 import { obsidianCopyPlugin } from "@22-2/esbuild-plugin-obsidian-copy";
 
-process.loadEnvFile();
+// .env is only used locally to supply PLUGINS_PATH; CI has no .env, so ignore load failures
+try {
+	process.loadEnvFile();
+} catch {
+	// fall back to whatever is already in process.env
+    console.warn("Failed to load .env file; continuing with existing environment variables.");
+}
+
 // Keep both `node:*` and bare names externalized because dependencies may import either form.
 const builtins = Array.from(new Set([...builtinModules, ...builtinModules.map((name) => name.replace(/^node:/, ""))]));
 const pluginsPath = process.env.PLUGINS_PATH;
