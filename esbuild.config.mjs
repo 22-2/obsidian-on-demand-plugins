@@ -5,18 +5,18 @@ import process from "process";
 import { builtinModules } from "node:module";
 import { obsidianCopyPlugin } from "@22-2/esbuild-plugin-obsidian-copy";
 
+process.loadEnvFile();
 // Keep both `node:*` and bare names externalized because dependencies may import either form.
 const builtins = Array.from(new Set([...builtinModules, ...builtinModules.map((name) => name.replace(/^node:/, ""))]));
-
 const pluginsPath = process.env.PLUGINS_PATH;
 const isCI = !!process.env.CI;
-
 const plugins = [];
+console.log(`Building for ${isCI ? "CI" : "local"} environment...`);
 if (!isCI && pluginsPath) {
 	plugins.push(
 		obsidianCopyPlugin({
 			pluginsDir: pluginsPath,
-			targetDirName: "obsidian-on-demand-plugins",
+			targetDirName: "on-demand-plugins",
 			force: true,
 		}),
 	);
