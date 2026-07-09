@@ -101,7 +101,22 @@ export class StartupPolicyFeature implements AppFeature {
             progress?.setStatus(`Loading ${plugin.name}`);
             progress?.setProgress(i + 1);
 
-            const alreadyReady = isPluginLoaded(this.ctx.app, plugin.id) && isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, plugin.id);
+            let alreadyReady = isPluginLoaded(this.ctx.app, plugin.id) && isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, plugin.id);
+
+            // View types are captured by the session-wide Plugin.registerView
+            // patch, which can only observe calls made while the plugin loads.
+            // A lazy+useView plugin that is already running but has no captured
+            // view types (e.g. it was enabled by a cache reload before it was
+            // configured as lazy) must be reloaded to give the patch a chance
+            // to see its registrations.
+            if (alreadyReady && !this.hasCapturedViewTypes(plugin.id)) {
+                try {
+                    await this.ctx.obsidianPlugins.disablePlugin(plugin.id);
+                    alreadyReady = false;
+                } catch (error) {
+                    logger.warn("Failed to reload plugin for view-type capture", plugin.id, error);
+                }
+            }
 
             if (!alreadyReady) {
                 try {
@@ -121,6 +136,11 @@ export class StartupPolicyFeature implements AppFeature {
             15_000,
             isCancelled,
         );
+        // The loaded flag flips when the synchronous part of onload returns, but
+        // plugins that await in onload (e.g. graph-analysis) register their views
+        // afterwards. Give the registerView patch a bounded window to observe
+        // them before cleanup disables everything again.
+        await this.waitForViewTypeCapture(manifests, 3_000, isCancelled);
         progress?.setProgress(manifests.length + 1);
 
         if (isCancelled()) return;
@@ -129,6 +149,23 @@ export class StartupPolicyFeature implements AppFeature {
         progress?.setStatus("Rebuilding command cache…");
         await this.commandCacheService.refreshCommandCache(targetIds ? Array.from(targetIds) : undefined);
         progress?.setProgress(manifests.length + 2);
+    }
+
+    /** Whether any view types have been captured for the given plugin. */
+    private hasCapturedViewTypes(pluginId: string): boolean {
+        return (this.ctx.getSettings().plugins[pluginId]?.lazyOptions?.viewTypes ?? []).length > 0;
+    }
+
+    /** Poll until every manifest has captured view types, or timeout / cancelled. */
+    private async waitForViewTypeCapture(manifests: PluginManifest[], timeoutMs: number, isCancelled: () => boolean): Promise<void> {
+        if (!manifests.length) return;
+        const deadline = Date.now() + timeoutMs;
+        while (Date.now() < deadline && !isCancelled()) {
+            // Some plugins legitimately never register a view even with useView
+            // enabled, so this wait is bounded rather than mandatory.
+            if (manifests.every((p) => this.hasCapturedViewTypes(p.id))) return;
+            await new Promise((r) => window.setTimeout(r, 100));
+        }
     }
 
     /** Poll until all plugin IDs are loaded, or timeout / cancelled. */
@@ -150,11 +187,18 @@ export class StartupPolicyFeature implements AppFeature {
     private async cleanupAndReload(lazyOnViews: Record<string, string[]>, shouldReload: boolean, progress: ProgressDialog | null, stopIntercepting: () => void) {
         stopIntercepting();
 
-        // Persist lazyOnViews
+        // Persist lazyOnViews. Merge instead of overwrite: the session-wide
+        // Plugin.registerView patch may have written entries directly into
+        // settings.lazyOnViews while this apply was running with its own
+        // working copy, and those must not be clobbered.
         const settings = this.ctx.getSettings();
-        settings.lazyOnViews = lazyOnViews;
+        const merged: Record<string, string[]> = { ...(settings.lazyOnViews ?? {}) };
+        for (const [pluginId, viewTypes] of Object.entries(lazyOnViews)) {
+            merged[pluginId] = Array.from(new Set([...(merged[pluginId] ?? []), ...viewTypes]));
+        }
+        settings.lazyOnViews = merged;
         await this.ctx.saveSettings();
-        saveLocalStorage(this.ctx.app, "lazyOnViews", lazyOnViews);
+        saveLocalStorage(this.ctx.app, "lazyOnViews", merged);
 
         // Compute the desired enabled set (always-enabled + self)
         const desiredEnabled = new Set<string>(

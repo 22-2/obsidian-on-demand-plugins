@@ -11,6 +11,7 @@ import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
+import { patchPluginRegisterView } from "src/patches/view-registry";
 import { patchSetViewState } from "src/patches/view-state";
 import type { CoreContainer } from "src/services/core-container";
 
@@ -47,6 +48,9 @@ export class LazyEngineFeature implements AppFeature {
             onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
         });
         patchRibbonReorder(ctx);
+        // Session-wide: attribute registerView calls to their plugin even when
+        // they happen after an await in onload (loadingPluginId is gone by then).
+        ctx.register(patchPluginRegisterView(ctx));
 
         this.viewLoader.registerActiveLeafReload();
         this.fileLoader.register();

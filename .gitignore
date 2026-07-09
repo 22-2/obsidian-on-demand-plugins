@@ -22,6 +22,8 @@ myfiles/*
 
 !myfiles/my-commands-plugin/
 !myfiles/my-commands-plugin/main.js
+!myfiles/graph-analysis/
+!myfiles/graph-analysis/**
 data copy.json
 repomix-output.md
 .obsidian-e2e-toolkit/
