@@ -54,6 +54,37 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
         await app.plugins.enablePlugin(id);
     }, pluginUnderTestId);
 
+    // The old handle points at the unloaded plugin instance; re-acquire it.
+    const reloadedHandle = await obsidian.plugin(pluginUnderTestId);
+
+    // Introspects the lazy engine so CI failures show which stage broke:
+    // stale detection (staleIds/cacheValid) vs the background refresh (targetLoaded).
+    const captureDebugState = () =>
+        reloadedHandle.evaluate((plugin, pluginId) => {
+            const features = (plugin.features as unknown as { features: Array<Record<string, unknown>> }).features;
+            const lazyEngine = features.find((feature) => "commandCache" in feature) as
+                | {
+                      commandCache?: {
+                          isCommandCacheValid(id: string): boolean;
+                          getStaleCachedPluginIds(): string[];
+                      };
+                  }
+                | undefined;
+            const cache = lazyEngine?.commandCache;
+            const loadedPlugins = app.plugins.plugins as Record<string, { _loaded?: boolean } | undefined>;
+            return {
+                layoutReady: app.workspace.layoutReady,
+                manifestCount: (plugin.manifests as unknown[]).length,
+                mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
+                cacheValid: cache?.isCommandCacheValid(pluginId) ?? null,
+                staleIds: cache?.getStaleCachedPluginIds() ?? null,
+                targetEnabled: app.plugins.enabledPlugins.has(pluginId),
+                targetLoaded: Boolean(loadedPlugins[pluginId]?._loaded),
+            };
+        }, targetPluginId);
+
+    console.log("[stale-cache-debug] after reload:", JSON.stringify(await captureDebugState()));
+
     // 4. The stale wrapper must not be registered at startup.
     expect(await findCommandByExactId(obsidian, fakeCommandId)).toBeNull();
 
@@ -62,11 +93,16 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
     const manifestVersion = await obsidian.page.evaluate((id) => app.plugins.manifests?.[id]?.version ?? null, targetPluginId);
     expect(manifestVersion).toBeTruthy();
 
-    await expect
-        .poll(async () => readOnDemandStorageValue(obsidian, "commandCacheVersions", targetPluginId), {
-            timeout: 15_000,
-        })
-        .toBe(manifestVersion);
+    // Manual poll instead of expect.poll so the debug state can be dumped on timeout.
+    const deadline = Date.now() + 15_000;
+    let cachedVersion: unknown = null;
+    while (Date.now() < deadline) {
+        cachedVersion = await readOnDemandStorageValue(obsidian, "commandCacheVersions", targetPluginId);
+        if (cachedVersion === manifestVersion) break;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    console.log("[stale-cache-debug] after wait:", JSON.stringify(await captureDebugState()), "cachedVersion:", JSON.stringify(cachedVersion));
+    expect(cachedVersion).toBe(manifestVersion);
 
     // 6. The fake ID stays gone, fresh wrappers exist for the real commands, and the
     //    plugin is back to disabled so lazy loading is preserved.
