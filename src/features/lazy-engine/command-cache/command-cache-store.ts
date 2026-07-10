@@ -100,6 +100,19 @@ export class CommandCacheStore {
         return cachedVersion === (manifest.version ?? "");
     }
 
+    // Bumps the stored version for a single plugin without rewriting the command
+    // snapshot. Used when a stale-cache refresh could not capture commands (e.g.
+    // the target plugin failed to load in CI) so the cache is preserved and
+    // future startups do not retry indefinitely.
+    markVersionCurrent(pluginId: string): void {
+        const manifest = this.ctx.getManifests().find((p) => p.id === pluginId);
+        if (!manifest) return;
+
+        const versions = loadLocalStorage<Record<string, string>>(this.ctx.app, "commandCacheVersions") ?? {};
+        versions[pluginId] = manifest.version ?? "";
+        saveLocalStorage(this.ctx.app, "commandCacheVersions", versions);
+    }
+
     clear(): void {
         this.commandCache.clear();
         this.pluginCommandIndex.clear();

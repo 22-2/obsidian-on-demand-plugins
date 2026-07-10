@@ -141,24 +141,37 @@ export class CommandCacheService {
      * Rebuild the command cache for a plugin whose cache is stale, then register
      * fresh wrappers. Snapshotting requires actually loading the plugin, so restore
      * the disabled state afterwards to keep lazy loading intact.
+     *
+     * When the plugin fails to load (e.g. CI environment), the existing cache is
+     * preserved and its version is bumped so future startups do not retry
+     * indefinitely against a broken environment.
      */
     async refreshStaleCacheForPlugin(pluginId: string): Promise<void> {
         const wasEnabled = this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
+        let changed = false;
         try {
-            const changed = await this.refreshCommandsForPlugin(pluginId);
+            changed = await this.refreshCommandsForPlugin(pluginId);
             if (changed) {
                 // persist() also rewrites commandCacheVersions from the current manifests,
                 // which is what marks this cache valid again for future startups.
                 this.store.persist();
+            } else {
+                // No commands captured (plugin likely failed to load). Preserve the
+                // existing cache entries and bump the version so this stale cache
+                // does not trigger infinite retries on subsequent startups.
+                this.store.markVersionCurrent(pluginId);
             }
         } finally {
             if (!wasEnabled && isPluginLoaded(this.ctx.app, pluginId)) {
                 await this.ctx.obsidianPlugins.disablePlugin(pluginId);
             }
         }
-        // Register wrappers even if the refresh captured nothing new: stale wrappers
-        // are still a better entry point than the plugin having no commands at all.
-        this.registerCachedCommandsForPlugin(pluginId);
+        // Only register wrappers when the refresh actually captured fresh commands.
+        // Registering from a stale cache (changed=false) would resurrect command IDs
+        // that no longer exist in the current plugin version (issue #6).
+        if (changed) {
+            this.registerCachedCommandsForPlugin(pluginId);
+        }
     }
 
     registerCachedCommandsForPlugin(pluginId: string): void {

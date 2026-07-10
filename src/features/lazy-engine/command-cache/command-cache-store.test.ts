@@ -136,4 +136,47 @@ describe("CommandCacheStore", () => {
             expect(store.get("cmd1")).toBeUndefined();
         });
     });
+
+    describe("markVersionCurrent", () => {
+        it("should update only the version for the given plugin without touching commands", () => {
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((_app, key) => {
+                if (key === "commandCacheVersions") return { "test-plugin": "0.9.0" };
+                return null;
+            });
+
+            store.markVersionCurrent("test-plugin");
+
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(
+                mockCtx.app,
+                "commandCacheVersions",
+                { "test-plugin": "1.0.0" },
+            );
+            expect(storageMs.saveLocalStorage).not.toHaveBeenCalledWith(
+                mockCtx.app,
+                "commandCache",
+                expect.anything(),
+            );
+        });
+
+        it("should preserve other plugin versions when updating", () => {
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((_app, key) => {
+                if (key === "commandCacheVersions") return { "other-plugin": "2.0.0", "test-plugin": "0.9.0" };
+                return null;
+            });
+
+            store.markVersionCurrent("test-plugin");
+
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(
+                mockCtx.app,
+                "commandCacheVersions",
+                { "other-plugin": "2.0.0", "test-plugin": "1.0.0" },
+            );
+        });
+
+        it("should do nothing if the plugin has no manifest", () => {
+            store.markVersionCurrent("nonexistent-plugin");
+
+            expect(storageMs.saveLocalStorage).not.toHaveBeenCalled();
+        });
+    });
 });
