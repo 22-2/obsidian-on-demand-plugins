@@ -1,10 +1,5 @@
 import type { Commands, Plugins, ViewRegistry } from "obsidian-typings";
 
-declare global {
-    var activeDocument: Document;
-    var activeWindow: Window & typeof globalThis;
-}
-
 declare module "obsidian" {
     interface App {
         appId: string;

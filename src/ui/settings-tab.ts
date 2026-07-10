@@ -365,7 +365,7 @@ export class SettingsTab extends PluginSettingTab {
         if (this.isPluginListOpen) {
             this.pluginSectionContainer.classList.remove("lazy-plugin-section-collapsed");
             if (!this.pluginListBuilt) {
-                setTimeout(() => {
+                window.setTimeout(() => {
                     if (this.isPluginListOpen && !this.pluginListBuilt) {
                         this.buildPluginList();
                     }
