@@ -56,11 +56,15 @@ export class LazyEngineFeature implements AppFeature {
         this.fileLoader.register();
 
         this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });
-        this.registerLayoutReadyLoader();
 
-        // 4. Initialize cache
+        // 4. Initialize cache BEFORE hooking onLayoutReady: when the plugin is
+        // (re)loaded after the workspace is already ready, onLayoutReady fires the
+        // callback synchronously, and the stale-cache refresh would then run against
+        // an empty store and find nothing to rebuild.
         this.commandCache.loadFromData();
         this.commandCache.registerCachedCommands();
+
+        this.registerLayoutReadyLoader();
     }
 
     onunload() {
