@@ -2,3 +2,5 @@ allowBuilds:
   electron: true
   esbuild: true
   obsidian-typings: true
+minimumReleaseAgeExclude:
+  - prettier@3.9.5
