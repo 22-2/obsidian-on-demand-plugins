@@ -1,4 +1,4 @@
-import type { Commands, Plugins, ViewRegistry } from "obsidian-typings";
+import type { Commands, Plugins, ViewRegistry } from "@obsidian-typings/obsidian-public-latest";
 
 declare module "obsidian" {
     interface App {
