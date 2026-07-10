@@ -120,11 +120,15 @@ describe("LazyCommandRunner", () => {
     });
 
     describe("runLazyCommand", () => {
-        it("should do nothing if command is not cached", async () => {
+        it("should show notice on cache miss", async () => {
             mockRegistry.getCachedCommand.mockReturnValue(undefined);
 
             await runner.runLazyCommand("unknown");
 
+            const notice = Notice as unknown as { messages: string[] };
+            expect(notice.messages.length).toBe(1);
+            expect(notice.messages[0]).toContain("unknown");
+            expect(notice.messages[0]).toContain("Open tools");
             expect(mockCtx.obsidianPlugins.enablePlugin).not.toHaveBeenCalled();
         });
 

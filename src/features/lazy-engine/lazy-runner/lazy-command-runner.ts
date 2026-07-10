@@ -48,7 +48,10 @@ export class LazyCommandRunner implements PluginLoader {
 
     async runLazyCommand(commandId: string) {
         const cached = this.commandRegistry.getCachedCommand(commandId);
-        if (!cached) return;
+        if (!cached) {
+            new Notice(`Command cache miss for "${commandId}". Please try rebuilding the cache from the Open tools button in settings.`);
+            return;
+        }
 
         const success = await this.ensurePluginLoaded(cached.pluginId);
         if (!success) return;
