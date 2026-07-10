@@ -358,26 +358,47 @@ describe("CommandCacheService", () => {
             expect(mockCtx.obsidianPlugins.disablePlugin).not.toHaveBeenCalled();
         });
 
-        it("refreshStaleCacheForPlugin preserves old cache and bumps version when plugin fails to load", async () => {
+        it("refreshStaleCacheForPlugin does NOT bump version when plugin fails to load", async () => {
             seedStorage("0.9.0");
             service.loadFromData();
 
             // 1st: isPluginReadyForCommandSnapshot → true (skip waitForPluginLoaded).
-            // 2nd: second isPluginReadyForCommandSnapshot check → true.
-            // 3rd: finally block → false (plugin not actually loaded).
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValueOnce(true).mockReturnValueOnce(true).mockReturnValueOnce(false);
+            // 2nd: pluginLoaded check → false (plugin not actually loaded).
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValueOnce(true).mockReturnValueOnce(false);
             mockCtx.getCommandPluginId.mockReturnValue("other");
 
             await service.refreshStaleCacheForPlugin("test-plugin");
 
+            // Version must NOT be bumped when plugin fails to load, so the next
+            // startup will retry the refresh (issue #6).
+            expect(storageMs.saveLocalStorage).not.toHaveBeenCalledWith(
+                mockCtx.app,
+                "commandCacheVersions",
+                expect.anything(),
+            );
+            expect(service.getCachedCommand("old-cmd")).toBeDefined();
+            // Stale wrappers must not be registered: the cached command IDs may
+            // no longer exist in the current plugin version (issue #6).
+            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
+        });
+
+        it("refreshStaleCacheForPlugin bumps version when plugin loads but has no commands", async () => {
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            // Plugin loads successfully but registers no commands.
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            mockCtx.getCommandPluginId.mockReturnValue("other");
+
+            await service.refreshStaleCacheForPlugin("test-plugin");
+
+            // Version SHOULD be bumped when plugin loads but has no commands,
+            // so we do not retry on every startup.
             expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(
                 mockCtx.app,
                 "commandCacheVersions",
                 { "test-plugin": "1.0.0" },
             );
-            expect(service.getCachedCommand("old-cmd")).toBeDefined();
-            // Stale wrappers must not be registered: the cached command IDs may
-            // no longer exist in the current plugin version (issue #6).
             expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
         });
     });

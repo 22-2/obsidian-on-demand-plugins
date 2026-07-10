@@ -142,27 +142,31 @@ export class CommandCacheService {
      * fresh wrappers. Snapshotting requires actually loading the plugin, so restore
      * the disabled state afterwards to keep lazy loading intact.
      *
-     * When the plugin fails to load (e.g. CI environment), the existing cache is
-     * preserved and its version is bumped so future startups do not retry
-     * indefinitely against a broken environment.
+     * When the plugin fails to load (e.g. flaky CI environment), the existing cache
+     * is preserved but the version is NOT bumped so future startups retry the
+     * refresh. Bumping the version on load failure would cause stale command IDs to
+     * be registered as wrappers on the next startup (issue #6).
      */
     async refreshStaleCacheForPlugin(pluginId: string): Promise<void> {
         const wasEnabled = this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
         let changed = false;
+        let pluginLoaded = false;
         try {
             changed = await this.refreshCommandsForPlugin(pluginId);
+            pluginLoaded = isPluginLoaded(this.ctx.app, pluginId);
             if (changed) {
                 // persist() also rewrites commandCacheVersions from the current manifests,
                 // which is what marks this cache valid again for future startups.
                 this.store.persist();
-            } else {
-                // No commands captured (plugin likely failed to load). Preserve the
-                // existing cache entries and bump the version so this stale cache
-                // does not trigger infinite retries on subsequent startups.
+            } else if (pluginLoaded) {
+                // Plugin loaded successfully but has no commands. Bump the version
+                // so we do not retry on every startup.
                 this.store.markVersionCurrent(pluginId);
             }
+            // If plugin did not load, do NOT bump the version. The stale cache
+            // will trigger another refresh attempt on the next startup.
         } finally {
-            if (!wasEnabled && isPluginLoaded(this.ctx.app, pluginId)) {
+            if (!wasEnabled && pluginLoaded) {
                 await this.ctx.obsidianPlugins.disablePlugin(pluginId);
             }
         }

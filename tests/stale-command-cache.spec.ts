@@ -116,7 +116,6 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
         await new Promise((resolve) => setTimeout(resolve, 500));
     }
     console.log("[stale-cache-debug] after wait:", JSON.stringify(await captureDebugState()), "cachedVersion:", JSON.stringify(cachedVersion));
-    expect(cachedVersion).toBe(manifestVersion);
 
     // 6. The fake ID stays gone, fresh wrappers exist for the real commands, and the
     //    plugin is back to disabled so lazy loading is preserved.
@@ -124,10 +123,14 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
 
     // The remaining assertions require the target plugin to have loaded during the
     // background refresh. When it could not load (e.g. flaky CI environment), the
-    // version bump and fake-command removal above already prove the stale-cache path.
+    // version is intentionally NOT bumped so future startups retry the refresh (issue #6).
     const debugAfterWait = await captureDebugState();
     if (debugAfterWait.targetLoaded) {
+        expect(cachedVersion).toBe(manifestVersion);
         expect(await findCommandByPrefix(obsidian, `${targetPluginId}:`)).not.toBeNull();
         expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
+    } else {
+        // Plugin did not load; version must NOT be bumped to allow retry on next startup.
+        expect(cachedVersion).toBe("0.0.0-stale");
     }
 });
