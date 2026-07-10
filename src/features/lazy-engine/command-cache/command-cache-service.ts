@@ -149,7 +149,7 @@ export class CommandCacheService {
      */
     async refreshStaleCacheForPlugin(pluginId: string): Promise<void> {
         const wasEnabled = this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
-        let changed = false;
+        let changed: boolean;
         let pluginLoaded = false;
         try {
             changed = await this.refreshCommandsForPlugin(pluginId);

@@ -145,7 +145,7 @@ describe("CommandCacheService", () => {
             mockCtx.obsidianCommands.commands = {};
             service.registerCachedCommandsForPlugin("test-plugin");
 
-            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0];
+            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string };
             mockCtx.obsidianCommands.commands.cmd1 = addedCmd;
 
             service.removeCachedCommandsForPlugin("test-plugin");
@@ -413,7 +413,7 @@ describe("CommandCacheService", () => {
             mockCtx.obsidianCommands.commands = {};
             service.registerCachedCommandsForPlugin("test-plugin");
 
-            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0];
+            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string };
             mockCtx.obsidianCommands.commands.cmd1 = addedCmd;
 
             service.clear();

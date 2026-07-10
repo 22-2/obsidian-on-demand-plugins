@@ -177,8 +177,8 @@ export class SettingsTab extends PluginSettingTab {
         const pluginToggleRow = this.pluginSectionContainer.createDiv("lazy-plugin-toggle-row");
         const toggleButton = pluginToggleRow.createEl("button", {
             cls: "mod-cta lazy-plugin-toggle-button",
-            text: "0 Plugins",
-        }) as HTMLButtonElement;
+            text: "0 plugins",
+        });
         toggleButton.type = "button";
         toggleButton.addEventListener("click", () => {
             this.isPluginListOpen = !this.isPluginListOpen;
