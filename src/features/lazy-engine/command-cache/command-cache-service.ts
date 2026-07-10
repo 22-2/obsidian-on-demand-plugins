@@ -120,9 +120,61 @@ export class CommandCacheService {
 
     registerCachedCommands(): void {
         for (const plugin of this.ctx.getManifests()) {
-            if (this.isLazyMode(plugin.id)) {
-                this.registerCachedCommandsForPlugin(plugin.id);
+            if (!this.isLazyMode(plugin.id)) continue;
+            // A cache built for a different plugin version may contain command IDs that
+            // no longer exist; registering those wrappers makes the first invocation fail
+            // silently (issue #6). Skip them here — the startup flow refreshes stale
+            // caches in the background after layout ready and registers fresh wrappers.
+            if (this.store.has(plugin.id) && !this.store.isValid(plugin.id)) continue;
+            this.registerCachedCommandsForPlugin(plugin.id);
+        }
+    }
+
+    /** Lazy plugins whose cached commands were built for a different plugin version. */
+    getStaleCachedPluginIds(): string[] {
+        return this.getLazyManifests()
+            .filter((p) => this.store.has(p.id) && !this.store.isValid(p.id))
+            .map((p) => p.id);
+    }
+
+    /**
+     * Rebuild the command cache for a plugin whose cache is stale, then register
+     * fresh wrappers. Snapshotting requires actually loading the plugin, so restore
+     * the disabled state afterwards to keep lazy loading intact.
+     *
+     * When the plugin fails to load (e.g. flaky CI environment), the existing cache
+     * is preserved but the version is NOT bumped so future startups retry the
+     * refresh. Bumping the version on load failure would cause stale command IDs to
+     * be registered as wrappers on the next startup (issue #6).
+     */
+    async refreshStaleCacheForPlugin(pluginId: string): Promise<void> {
+        const wasEnabled = this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
+        let changed: boolean;
+        let pluginLoaded = false;
+        try {
+            changed = await this.refreshCommandsForPlugin(pluginId);
+            pluginLoaded = isPluginLoaded(this.ctx.app, pluginId);
+            if (changed) {
+                // persist() also rewrites commandCacheVersions from the current manifests,
+                // which is what marks this cache valid again for future startups.
+                this.store.persist();
+            } else if (pluginLoaded) {
+                // Plugin loaded successfully but has no commands. Bump the version
+                // so we do not retry on every startup.
+                this.store.markVersionCurrent(pluginId);
             }
+            // If plugin did not load, do NOT bump the version. The stale cache
+            // will trigger another refresh attempt on the next startup.
+        } finally {
+            if (!wasEnabled && pluginLoaded) {
+                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+            }
+        }
+        // Only register wrappers when the refresh actually captured fresh commands.
+        // Registering from a stale cache (changed=false) would resurrect command IDs
+        // that no longer exist in the current plugin version (issue #6).
+        if (changed) {
+            this.registerCachedCommandsForPlugin(pluginId);
         }
     }
 

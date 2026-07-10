@@ -56,11 +56,15 @@ export class LazyEngineFeature implements AppFeature {
         this.fileLoader.register();
 
         this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });
-        this.registerLayoutReadyLoader();
 
-        // 4. Initialize cache
+        // 4. Initialize cache BEFORE hooking onLayoutReady: when the plugin is
+        // (re)loaded after the workspace is already ready, onLayoutReady fires the
+        // callback synchronously, and the stale-cache refresh would then run against
+        // an empty store and find nothing to rebuild.
         this.commandCache.loadFromData();
         this.commandCache.registerCachedCommands();
+
+        this.registerLayoutReadyLoader();
     }
 
     onunload() {
@@ -80,12 +84,26 @@ export class LazyEngineFeature implements AppFeature {
 
         const toLoad = manifests.filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
 
-        if (toLoad.length === 0) return;
+        if (toLoad.length > 0) {
+            const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
 
-        const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
+            await Promise.all(tasks);
+            this.commandCache.registerCachedCommands();
+        }
 
+        // Stale caches (built for an older plugin version) were skipped at startup to
+        // avoid registering wrappers for command IDs that may no longer exist (issue #6).
+        // Rebuild them here, after layout-ready plugins are loaded, so the wasEnabled
+        // check inside refreshStaleCacheForPlugin sees the final enabled state.
+        await this.refreshStaleCommandCaches();
+    }
+
+    private async refreshStaleCommandCaches() {
+        const staleIds = this.commandCache.getStaleCachedPluginIds();
+        if (staleIds.length === 0) return;
+
+        const tasks = staleIds.map((pluginId) => this.layoutReadyQueue.add(() => this.commandCache.refreshStaleCacheForPlugin(pluginId).catch((err) => console.error("Failed refreshing stale command cache", pluginId, err))));
         await Promise.all(tasks);
-        this.commandCache.registerCachedCommands();
     }
 
     /**
