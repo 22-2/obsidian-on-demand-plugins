@@ -18,6 +18,12 @@ export class CommandCacheStore {
     }
 
     set(pluginId: string, commands: CachedCommand[]): void {
+        // Drop the previous snapshot first: a plugin update can remove or rename
+        // command IDs, and leaving the old entries in commandCache would resurrect
+        // stale wrappers through persist()/loadFromData() (issue #6).
+        const previous = this.pluginCommandIndex.get(pluginId);
+        previous?.forEach((id) => this.commandCache.delete(id));
+
         const ids = new Set<string>();
         for (const command of commands) {
             this.commandCache.set(command.id, command);
