@@ -12,6 +12,10 @@ function hasProfilesRecord(value: unknown): value is { profiles: Record<string, 
     return typeof value === "object" && value !== null && "profiles" in value && typeof value.profiles === "object" && value.profiles !== null;
 }
 
+function hasExternalProfileStorage(value: unknown): value is { profileStorageVersion: number } {
+    return typeof value === "object" && value !== null && "profileStorageVersion" in value && value.profileStorageVersion === 1;
+}
+
 export class BackupFeature implements AppFeature {
     private backupDir!: string;
     private ctx!: PluginContext;
@@ -56,6 +60,7 @@ export class BackupFeature implements AppFeature {
 
         const dataBackupPath = normalizePath(`${initialBackupDir}/data.json`);
         const communityBackupPath = normalizePath(`${initialBackupDir}/community-plugins.json`);
+        const profileBackupPath = normalizePath(`${initialBackupDir}/profiles.json`);
 
         // Reason: this snapshot represents the post-install baseline and must remain immutable,
         // so once both files exist we never overwrite them on later loads.
@@ -66,15 +71,12 @@ export class BackupFeature implements AppFeature {
         await this.createBackup({
             dataBackupPath,
             communityBackupPath,
+            profileBackupPath,
             rotate: false,
         });
     }
 
-    async createBackup(options?: {
-        dataBackupPath?: string;
-        communityBackupPath?: string;
-        rotate?: boolean;
-    }) {
+    async createBackup(options?: { dataBackupPath?: string; communityBackupPath?: string; profileBackupPath?: string; rotate?: boolean }) {
         if (!this.ctx) return;
 
         await this.ensureBackupFolder();
@@ -86,6 +88,7 @@ export class BackupFeature implements AppFeature {
 
         let dataContent: string;
         let communityContent: string;
+        let profilesContent: string | undefined;
 
         try {
             dataContent = await adapter.read(dataPath);
@@ -98,13 +101,19 @@ export class BackupFeature implements AppFeature {
         // 2. Validate json
         try {
             const dataParsed: unknown = JSON.parse(dataContent);
-            if (!hasProfilesRecord(dataParsed)) {
+            if (!hasProfilesRecord(dataParsed) && !hasExternalProfileStorage(dataParsed)) {
                 logger.warn("Invalid data.json for backup, skipping validation failed.");
                 return;
             }
         } catch (e) {
             logger.warn("Failed to parse data.json for backup", e);
             return;
+        }
+
+        try {
+            profilesContent = await this.readProfilesSnapshot();
+        } catch (e) {
+            logger.warn("Failed to read external profiles for backup", e);
         }
 
         try {
@@ -122,11 +131,13 @@ export class BackupFeature implements AppFeature {
         const timestamp = window.moment().format("YYYYMMDD-HHmmss");
         const dataBackupPath = options?.dataBackupPath ?? normalizePath(`${this.backupDir}/data_${timestamp}.json`);
         const communityBackupPath = options?.communityBackupPath ?? normalizePath(`${this.backupDir}/community-plugins_${timestamp}.json`);
+        const profileBackupPath = options?.profileBackupPath ?? normalizePath(`${this.backupDir}/profiles_${timestamp}.json`);
 
         try {
-            // Write both data and community backups. Data backup must be saved as well.
+            // Write the metadata, community plugin list, and external profiles.
             await adapter.write(dataBackupPath, dataContent);
             await adapter.write(communityBackupPath, communityContent);
+            if (profilesContent) await adapter.write(profileBackupPath, profilesContent);
             logger.info(`Created backups at ${timestamp}`);
         } catch (e) {
             logger.error("Failed to write backup files", e);
@@ -151,6 +162,7 @@ export class BackupFeature implements AppFeature {
 
         const dataBackups = result.files.filter((f) => f.includes("data_") && f.endsWith(".json")).sort();
         const communityBackups = result.files.filter((f) => f.includes("community-plugins_") && f.endsWith(".json")).sort();
+        const profileBackups = result.files.filter((f) => f.includes("profiles_") && f.endsWith(".json")).sort();
 
         while (dataBackups.length > 3) {
             const oldest = dataBackups.shift();
@@ -189,5 +201,39 @@ export class BackupFeature implements AppFeature {
                 }
             }
         }
+
+        while (profileBackups.length > 3) {
+            const oldest = profileBackups.shift();
+            if (!oldest) continue;
+
+            try {
+                if (await adapter.exists(oldest)) {
+                    await adapter.remove(oldest);
+                }
+            } catch (e) {
+                const err = e as { code?: string } | undefined;
+                if (err?.code === "ENOENT") {
+                    logger.warn(`Profile backup already removed, skipping: ${oldest}`);
+                } else {
+                    logger.error(`Failed to remove profile backup ${oldest}`, e);
+                }
+            }
+        }
+    }
+
+    private async readProfilesSnapshot(): Promise<string | undefined> {
+        const adapter = this.ctx.app.vault.adapter;
+        const profilesDir = normalizePath(`${this.ctx._plugin.manifest.dir}/profiles`);
+        if (!(await adapter.exists(profilesDir))) return undefined;
+
+        const { files } = await adapter.list(profilesDir);
+        const profileFiles = files.filter((path) => path.endsWith(".json") && !path.endsWith(".json.bak"));
+        if (profileFiles.length === 0) return undefined;
+
+        const contents: Record<string, string> = {};
+        for (const path of profileFiles) {
+            contents[path.slice(`${profilesDir}/`.length)] = await adapter.read(path);
+        }
+        return JSON.stringify({ version: 1, files: contents });
     }
 }
