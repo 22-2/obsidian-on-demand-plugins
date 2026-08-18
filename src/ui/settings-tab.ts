@@ -117,16 +117,29 @@ class ProfileManagementPage extends SettingPage {
             .onClick(() => {
                 const menu = new Menu();
                 if (!isCurrent) {
-                    menu.addItem((item) => item.setTitle("Use this profile").onClick(() => void this.switchProfile(id)));
+                    menu.addItem((item) =>
+                        item
+                            .setTitle("Use this profile")
+                            .setIcon("check")
+                            .onClick(() => void this.switchProfile(id)),
+                    );
                     menu.addSeparator();
                 }
-                menu.addItem((item) => item.setTitle("Rename").onClick(() => this.openNameModal(id, profile.name)));
                 menu.addItem((item) =>
-                    item.setTitle("Duplicate").onClick(async () => {
-                        service.createProfile(`${profile.name} (Copy)`, id);
-                        await service.save();
-                        this.display();
-                    }),
+                    item
+                        .setTitle("Rename")
+                        .setIcon("pencil")
+                        .onClick(() => this.openNameModal(id, profile.name)),
+                );
+                menu.addItem((item) =>
+                    item
+                        .setTitle("Duplicate")
+                        .setIcon("copy")
+                        .onClick(async () => {
+                            service.createProfile(`${profile.name} (Copy)`, id);
+                            await service.save();
+                            this.display();
+                        }),
                 );
                 menu.addSeparator();
                 menu.addItem((item) =>
@@ -137,7 +150,13 @@ class ProfileManagementPage extends SettingPage {
                 );
                 if (profileIdsFor(service).length > 1 && !isCurrent) {
                     menu.addSeparator();
-                    menu.addItem((item) => item.setTitle("Delete").onClick(() => void this.deleteProfile(id, profile.name)));
+                    menu.addItem((item) =>
+                        item
+                            .setTitle("Delete")
+                            .setIcon("trash-2")
+                            .setWarning(true)
+                            .onClick(() => void this.deleteProfile(id, profile.name)),
+                    );
                 }
                 menu.showAtPosition({ x: actions.getBoundingClientRect().left, y: actions.getBoundingClientRect().bottom });
             });
