@@ -68,6 +68,7 @@ export interface Profile {
 export interface LazySettings {
     showConsoleLog: boolean;
     lastLazyPluginVersion?: string;
+    profileStorageVersion?: number;
 
     // Profile Management
     profiles: Record<string, Profile>;
