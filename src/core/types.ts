@@ -44,7 +44,6 @@ export interface DeviceSettings {
     // When true, settings/cache entries for plugin IDs no longer present in the
     // installed manifests are pruned during the manifest reconcile pass.
     pruneUninstalledEntries: boolean;
-    showDescriptions: boolean;
     plugins: { [pluginId: string]: PluginSettings };
     lazyOnViews: { [pluginId: string]: string[] };
     lazyOnFiles: { [pluginId: string]: FileActivationCriteria };
@@ -53,7 +52,6 @@ export interface DeviceSettings {
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
     defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
     pruneUninstalledEntries: false,
-    showDescriptions: true,
     plugins: {},
     lazyOnViews: {},
     lazyOnFiles: {},
@@ -70,9 +68,6 @@ export interface Profile {
 export interface LazySettings {
     showConsoleLog: boolean;
     lastLazyPluginVersion?: string;
-
-    // Global settings for the plugin
-    suppressPluginManagementNotice: boolean;
 
     // Profile Management
     profiles: Record<string, Profile>;
@@ -94,7 +89,6 @@ export const DEFAULT_PROFILE_ID = "Default";
 
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
-    suppressPluginManagementNotice: false,
     profiles: {
         [DEFAULT_PROFILE_ID]: {
             id: DEFAULT_PROFILE_ID,
