@@ -62,10 +62,6 @@ class ProfileManagementPage extends SettingPage {
         const list = this.containerEl.createDiv({ cls: "lazy-profile-list" });
         profileIds.forEach((id) => this.renderProfileCard(list, id));
 
-        new Setting(this.containerEl).setName("Device defaults").setHeading().setDesc("Choose the profile loaded by default on each device type.");
-        this.renderDeviceDefault("Desktop", "desktop", service.data.desktopProfileId);
-        this.renderDeviceDefault("Mobile", "mobile", service.data.mobileProfileId);
-
         new Setting(this.containerEl).setName("Create profile").setHeading();
         let createButton: ButtonComponent | undefined;
         new Setting(this.containerEl)
@@ -88,6 +84,10 @@ class ProfileManagementPage extends SettingPage {
                     .setDisabled(!this.createName.trim())
                     .onClick(() => void this.createProfile());
             });
+
+        new Setting(this.containerEl).setName("Device defaults").setHeading().setDesc("Choose the profile loaded by default on each device type.");
+        this.renderDeviceDefault("Desktop", "desktop", service.data.desktopProfileId);
+        this.renderDeviceDefault("Mobile", "mobile", service.data.mobileProfileId);
     }
 
     private renderProfileCard(list: HTMLElement, id: string) {
