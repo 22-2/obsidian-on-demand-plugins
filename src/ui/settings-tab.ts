@@ -174,13 +174,19 @@ class PluginPage extends SettingPage {
                     .setButtonText(this.tab.hasPendingChanges ? `Save & apply (${this.tab.pendingPluginIds.size})` : "Save changes")
                     .setCta()
                     .setDisabled(!this.tab.hasPendingChanges)
-                    .onClick(() => void this.tab.saveChanges()),
+                    .onClick(async () => {
+                        await this.tab.saveChanges();
+                        this.display();
+                    }),
             )
             .addButton((b) =>
                 b
                     .setButtonText("Discard")
                     .setDisabled(!this.tab.hasPendingChanges)
-                    .onClick(() => void this.tab.discardChanges()),
+                    .onClick(async () => {
+                        await this.tab.discardChanges();
+                        this.display();
+                    }),
             );
         this.containerEl.prepend(setting.settingEl);
     }
