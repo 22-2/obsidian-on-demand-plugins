@@ -128,15 +128,13 @@ class ProfileManagementPage extends SettingPage {
                         this.display();
                     }),
                 );
-                if (id === "initial-backup") {
-                    menu.addSeparator();
-                    menu.addItem((item) =>
-                        item
-                            .setTitle("Open backup folder")
-                            .setIcon("folder-open")
-                            .onClick(() => void openBackupDirectory(this.plugin)),
-                    );
-                }
+                menu.addSeparator();
+                menu.addItem((item) =>
+                    item
+                        .setTitle("Open backup folder")
+                        .setIcon("folder-open")
+                        .onClick(() => void openBackupDirectory(this.plugin)),
+                );
                 if (profileIdsFor(service).length > 1 && !isCurrent) {
                     menu.addSeparator();
                     menu.addItem((item) => item.setTitle("Delete").onClick(() => void this.deleteProfile(id, profile.name)));
