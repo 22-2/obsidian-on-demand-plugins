@@ -217,7 +217,7 @@ class PluginPage extends SettingPage {
         plugins.slice(start, end).forEach((manifest) => {
             if (!manifest) return;
             const setting = new Setting(listEl).setName(manifest.name);
-            if (this.plugin.settings.showDescriptions) setting.setDesc(manifest.description);
+            setting.setDesc(manifest.description);
             new ExtraButtonComponent(setting.controlEl)
                 .setIcon("gear")
                 .setTooltip("Advanced lazy options")
@@ -350,12 +350,10 @@ export class SettingsTab extends PluginSettingTab {
         return this.dirty || this.pendingPluginIds.size > 0;
     }
     getControlValue(key: string) {
-        if (key === "suppressPluginManagementNotice") return this.plugin.data.suppressPluginManagementNotice;
         return (this.plugin.settings as unknown as Record<string, unknown>)[key];
     }
     setControlValue(key: string, value: unknown) {
-        if (key === "suppressPluginManagementNotice") this.plugin.data.suppressPluginManagementNotice = Boolean(value);
-        else (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+        (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
         void this.plugin.saveSettings();
     }
     getSettingDefinitions(): SettingDefinitionItem[] {
@@ -370,7 +368,6 @@ export class SettingsTab extends PluginSettingTab {
                 desc: "Configure default loading behaviour.",
                 items: [
                     { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
-                    { name: "Show plugin descriptions", control: { type: "toggle", key: "showDescriptions" } },
                     {
                         name: "Auto-remove uninstalled entries",
                         desc: "Prune settings for plugins that are no longer installed.",
@@ -384,7 +381,6 @@ export class SettingsTab extends PluginSettingTab {
                             );
                         },
                     },
-                    { name: "Suppress plugin management notice", control: { type: "toggle", key: "suppressPluginManagementNotice" } },
                 ],
             },
             { type: "page", name: "Maintenance & batch", desc: "Rebuild caches and apply batch operations.", page: () => new MaintenancePage(this.plugin, this) },
