@@ -4,7 +4,12 @@
 }
 
 .lazy-plugin-results-count {
-    margin-right: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: var(--size-4-8);
+    margin: 0;
+    padding: 0 var(--size-4-2);
     color: var(--text-muted);
     font-size: 0.8em;
 }
