@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, no-useless-escape -- Declarative settings callbacks intentionally bridge Obsidian's void handlers and plugin async persistence. */
 import type { App, ButtonComponent, DropdownComponent, SettingDefinitionItem } from "obsidian";
-import { ExtraButtonComponent, Modal, Notice, PluginSettingTab, Setting, SettingPage } from "obsidian";
+import { ExtraButtonComponent, Menu, Modal, Notice, PluginSettingTab, Setting, SettingPage } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
 import type { PLUGIN_MODE } from "src/core/types";
@@ -83,18 +83,30 @@ class ProfileManagementPage extends SettingPage {
         const actions = row.createDiv({ cls: "lazy-profile-actions" });
         if (isCurrent) {
             actions.createSpan({ cls: "lazy-profile-current-label", text: "Current profile" });
-        } else {
-            this.createActionButton(actions, "Use this profile", "mod-cta", () => void this.switchProfile(id));
         }
-        this.createActionButton(actions, "Rename", "", () => this.openNameModal(id, profile.name));
-        this.createActionButton(actions, "Duplicate", "", async () => {
-            service.createProfile(`${profile.name} (Copy)`, id);
-            await service.save();
-            this.display();
-        });
-        if (profileIdsFor(service).length > 1 && !isCurrent) {
-            this.createActionButton(actions, "Delete", "mod-warning", () => void this.deleteProfile(id, profile.name));
-        }
+        new ExtraButtonComponent(actions)
+            .setIcon("ellipsis-vertical")
+            .setTooltip("Profile actions")
+            .onClick(() => {
+                const menu = new Menu();
+                if (!isCurrent) {
+                    menu.addItem((item) => item.setTitle("Use this profile").onClick(() => void this.switchProfile(id)));
+                    menu.addSeparator();
+                }
+                menu.addItem((item) => item.setTitle("Rename").onClick(() => this.openNameModal(id, profile.name)));
+                menu.addItem((item) =>
+                    item.setTitle("Duplicate").onClick(async () => {
+                        service.createProfile(`${profile.name} (Copy)`, id);
+                        await service.save();
+                        this.display();
+                    }),
+                );
+                if (profileIdsFor(service).length > 1 && !isCurrent) {
+                    menu.addSeparator();
+                    menu.addItem((item) => item.setTitle("Delete").onClick(() => void this.deleteProfile(id, profile.name)));
+                }
+                menu.showAtPosition({ x: actions.getBoundingClientRect().left, y: actions.getBoundingClientRect().bottom });
+            });
     }
 
     private renderDeviceDefault(label: string, type: "desktop" | "mobile", currentId: string) {
@@ -107,12 +119,6 @@ class ProfileManagementPage extends SettingPage {
                 this.display();
             });
         });
-    }
-
-    private createActionButton(container: HTMLElement, text: string, cls: string, onClick: () => void) {
-        const button = container.createEl("button", { text, cls: cls ? ["lazy-profile-action", cls] : "lazy-profile-action" });
-        button.type = "button";
-        button.addEventListener("click", onClick);
     }
 
     private async switchProfile(id: string) {
