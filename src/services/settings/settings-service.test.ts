@@ -28,7 +28,6 @@ function createService(loadedData: unknown): { service: SettingsService; plugin:
 function migratedDataWith(extra: Record<string, unknown>) {
     return {
         showConsoleLog: false,
-        suppressPluginManagementNotice: false,
         profiles: {
             Default: { id: "Default", name: "Default", settings: { ...DEFAULT_DEVICE_SETTINGS } },
         },
@@ -66,5 +65,86 @@ describe("SettingsService legacy command-cache cleanup", () => {
 
         expect(service.data.commandCache).toBeUndefined();
         expect(service.data.commandCacheVersions).toBeUndefined();
+    });
+});
+
+describe("SettingsService load normalization", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+    });
+
+    it("normalizes invalid profile map fields to empty objects", async () => {
+        const { service } = createService(
+            migratedDataWith({
+                profiles: {
+                    Default: {
+                        id: "Default",
+                        name: "Default",
+                        settings: {
+                            defaultMode: "lazy",
+                            pruneUninstalledEntries: true,
+                            plugins: null,
+                            lazyOnViews: null,
+                            lazyOnFiles: null,
+                        },
+                    },
+                },
+            }),
+        );
+
+        await service.load();
+
+        expect(service.data.profiles.Default.settings.plugins).toEqual({});
+        expect(service.data.profiles.Default.settings.lazyOnViews).toEqual({});
+        expect(service.data.profiles.Default.settings.lazyOnFiles).toEqual({});
+    });
+
+    it("falls back to a default profile when top-level profile shape is invalid", async () => {
+        const plugin: MockPlugin = {
+            loadData: vi.fn().mockResolvedValue({
+                profiles: null,
+                desktopProfileId: null,
+                mobileProfileId: null,
+            }),
+            saveData: vi.fn().mockResolvedValue(undefined),
+            app: {},
+        };
+        const service = new SettingsService(plugin as unknown as OnDemandPlugin);
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default"]);
+        expect(service.data.desktopProfileId).toBe("Default");
+        expect(service.data.mobileProfileId).toBe("Default");
+        expect(service.currentProfileId).toBe("Default");
+    });
+
+    it("seeds a default profile when the profiles map is an empty record", async () => {
+        // `{}` is a valid record but has no profile to activate; without seeding,
+        // load() would throw at `profiles[currentProfileId].settings`.
+        const { service } = createService(migratedDataWith({ profiles: {} }));
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default"]);
+        expect(service.currentProfileId).toBe("Default");
+        expect(service.settings).toEqual(DEFAULT_DEVICE_SETTINGS);
+    });
+
+    it("drops corrupt (null) profile entries and still activates a valid profile", async () => {
+        const { service } = createService(
+            migratedDataWith({
+                profiles: {
+                    Broken: null,
+                    Default: { id: "Default", name: "Default", settings: { ...DEFAULT_DEVICE_SETTINGS } },
+                },
+            }),
+        );
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default"]);
+        expect(service.currentProfileId).toBe("Default");
+        expect(service.settings.plugins).toEqual({});
     });
 });

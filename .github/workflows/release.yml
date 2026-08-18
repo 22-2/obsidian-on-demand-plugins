@@ -3,6 +3,8 @@ name: "Release"
 on: workflow_dispatch
 permissions:
     contents: write
+    id-token: write
+    attestations: write
 
 jobs:
     release:
@@ -17,6 +19,11 @@ jobs:
                   version: 10
             - run: pnpm install --frozen-lockfile
             - run: pnpm run build
+            - uses: actions/attest-build-provenance@v2
+              with:
+                  subject-path: |
+                      main.js
+                      styles.css
             - run: >
                   pnpm dlx
                   --package=semantic-release@24.1.2

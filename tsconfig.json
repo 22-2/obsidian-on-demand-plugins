@@ -19,7 +19,7 @@
         "erasableSyntaxOnly": true,
 
         // Type definitions
-        "types": ["obsidian-typings"],
+        "types": ["@obsidian-typings/obsidian-public-latest"],
         "lib": ["DOM", "ESNext"]
     },
     "include": ["**/*.ts"],

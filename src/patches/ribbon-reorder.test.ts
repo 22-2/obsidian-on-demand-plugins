@@ -1,5 +1,5 @@
 import log from "loglevel";
-import { Plugin } from "obsidian";
+import { Plugin, type PluginManifest } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,9 +36,9 @@ describe("patchRibbonReorder", () => {
         } as unknown as PluginContext;
     }
 
-    function createPluginInstance() {
-        const plugin = Object.create(Plugin.prototype);
-        plugin.manifest = { id: "test-plugin" };
+    function createPluginInstance(): Plugin {
+        const plugin = Object.create(Plugin.prototype) as Plugin;
+        plugin.manifest = { id: "test-plugin" } as PluginManifest;
         return plugin;
     }
 

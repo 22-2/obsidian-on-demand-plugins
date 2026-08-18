@@ -24,6 +24,7 @@ type MockCtx = {
     obsidianPlugins: {
         enabledPlugins: Set<string>;
         enablePlugin: ReturnType<typeof vi.fn>;
+        disablePlugin: ReturnType<typeof vi.fn>;
     };
 };
 
@@ -55,6 +56,7 @@ describe("CommandCacheService", () => {
             obsidianPlugins: {
                 enabledPlugins: new Set(),
                 enablePlugin: vi.fn(),
+                disablePlugin: vi.fn(),
             },
         };
 
@@ -143,7 +145,7 @@ describe("CommandCacheService", () => {
             mockCtx.obsidianCommands.commands = {};
             service.registerCachedCommandsForPlugin("test-plugin");
 
-            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0];
+            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string };
             mockCtx.obsidianCommands.commands.cmd1 = addedCmd;
 
             service.removeCachedCommandsForPlugin("test-plugin");
@@ -265,6 +267,142 @@ describe("CommandCacheService", () => {
         });
     });
 
+    describe("stale command cache (plugin version changed)", () => {
+        // Simulates a cache built while test-plugin was 0.9.0; the manifest now reports 1.0.0.
+        const seedStorage = (cachedVersion: string) => {
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((_app, key) => {
+                if (key === "commandCache") return { "test-plugin": [{ id: "old-cmd", name: "Old Cmd" }] };
+                if (key === "commandCacheVersions") return { "test-plugin": cachedVersion };
+                return null;
+            });
+        };
+
+        beforeEach(() => {
+            vi.mocked(utilsMs.isLazyMode).mockReturnValue(true);
+            mockCtx.getPluginMode.mockReturnValue("lazy");
+        });
+
+        it("registerCachedCommands skips wrappers when the cached version mismatches", () => {
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            service.registerCachedCommands();
+
+            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
+        });
+
+        it("registerCachedCommands registers wrappers when the cached version matches", () => {
+            seedStorage("1.0.0");
+            service.loadFromData();
+
+            service.registerCachedCommands();
+
+            expect(mockCtx.obsidianCommands.addCommand).toHaveBeenCalledTimes(1);
+            expect((mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string }).id).toBe("old-cmd");
+        });
+
+        it("getStaleCachedPluginIds lists plugins whose cached version mismatches", () => {
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            expect(service.getStaleCachedPluginIds()).toEqual(["test-plugin"]);
+        });
+
+        it("getStaleCachedPluginIds is empty when versions match", () => {
+            seedStorage("1.0.0");
+            service.loadFromData();
+
+            expect(service.getStaleCachedPluginIds()).toEqual([]);
+        });
+
+        it("refreshStaleCacheForPlugin re-snapshots renamed command IDs and restores the disabled state", async () => {
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            mockCtx.getCommandPluginId.mockImplementation((id: string) => (id === "new-cmd" ? "test-plugin" : "other"));
+            // The plugin update renamed old-cmd → new-cmd; enabling registers only the new ID.
+            mockCtx.obsidianPlugins.enablePlugin.mockImplementation(() => {
+                mockCtx.obsidianCommands.commands = { "new-cmd": { id: "new-cmd", name: "New Cmd" } };
+            });
+            mockCtx.obsidianPlugins.disablePlugin.mockImplementation(() => {
+                mockCtx.obsidianCommands.commands = {};
+            });
+
+            await service.refreshStaleCacheForPlugin("test-plugin");
+
+            expect(mockCtx.obsidianPlugins.enablePlugin).toHaveBeenCalledWith("test-plugin");
+            // The plugin was disabled before the snapshot, so lazy loading must be restored.
+            expect(mockCtx.obsidianPlugins.disablePlugin).toHaveBeenCalledWith("test-plugin");
+            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
+
+            // The removed ID must not survive the refresh, or its wrapper would come back
+            // on the next startup via persist()/loadFromData().
+            expect(service.getCachedCommand("old-cmd")).toBeUndefined();
+
+            const addedIds = mockCtx.obsidianCommands.addCommand.mock.calls.map((call) => (call[0] as { id: string }).id);
+            expect(addedIds).toEqual(["new-cmd"]);
+        });
+
+        it("refreshStaleCacheForPlugin keeps the plugin enabled if it was enabled beforehand", async () => {
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            mockCtx.obsidianPlugins.enabledPlugins.add("test-plugin");
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            mockCtx.obsidianCommands.commands = { "new-cmd": { id: "new-cmd", name: "New Cmd" } };
+            mockCtx.getCommandPluginId.mockImplementation((id: string) => (id === "new-cmd" ? "test-plugin" : "other"));
+
+            await service.refreshStaleCacheForPlugin("test-plugin");
+
+            expect(mockCtx.obsidianPlugins.disablePlugin).not.toHaveBeenCalled();
+        });
+
+        it("refreshStaleCacheForPlugin does NOT bump version when plugin fails to load", async () => {
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            // 1st: isPluginReadyForCommandSnapshot → true (skip waitForPluginLoaded).
+            // 2nd: pluginLoaded check → false (plugin not actually loaded).
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValueOnce(true).mockReturnValueOnce(false);
+            mockCtx.getCommandPluginId.mockReturnValue("other");
+
+            await service.refreshStaleCacheForPlugin("test-plugin");
+
+            // Version must NOT be bumped when plugin fails to load, so the next
+            // startup will retry the refresh (issue #6).
+            expect(storageMs.saveLocalStorage).not.toHaveBeenCalledWith(
+                mockCtx.app,
+                "commandCacheVersions",
+                expect.anything(),
+            );
+            expect(service.getCachedCommand("old-cmd")).toBeDefined();
+            // Stale wrappers must not be registered: the cached command IDs may
+            // no longer exist in the current plugin version (issue #6).
+            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
+        });
+
+        it("refreshStaleCacheForPlugin bumps version when plugin loads but has no commands", async () => {
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            // Plugin loads successfully but registers no commands.
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            mockCtx.getCommandPluginId.mockReturnValue("other");
+
+            await service.refreshStaleCacheForPlugin("test-plugin");
+
+            // Version SHOULD be bumped when plugin loads but has no commands,
+            // so we do not retry on every startup.
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(
+                mockCtx.app,
+                "commandCacheVersions",
+                { "test-plugin": "1.0.0" },
+            );
+            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
+        });
+    });
+
     describe("clear", () => {
         it("should remove all wrappers and clear store", async () => {
             mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1" } };
@@ -275,7 +413,7 @@ describe("CommandCacheService", () => {
             mockCtx.obsidianCommands.commands = {};
             service.registerCachedCommandsForPlugin("test-plugin");
 
-            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0];
+            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string };
             mockCtx.obsidianCommands.commands.cmd1 = addedCmd;
 
             service.clear();

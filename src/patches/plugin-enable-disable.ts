@@ -1,6 +1,6 @@
 import log from "loglevel";
 import { around } from "monkey-around";
-import type { Plugins } from "obsidian-typings";
+import type { Plugins } from "@obsidian-typings/obsidian-public-latest";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";

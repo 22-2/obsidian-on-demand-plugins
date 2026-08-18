@@ -15,7 +15,6 @@ describe("resolvePluginForViewType", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.LAZY,
             pruneUninstalledEntries: false,
-            showDescriptions: true,
             plugins: {
                 "plugin-a": {
                     mode: PLUGIN_MODE.LAZY,
@@ -42,7 +41,6 @@ describe("resolvePluginForViewType", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.LAZY,
             pruneUninstalledEntries: false,
-            showDescriptions: true,
             plugins: {},
             lazyOnViews: {
                 "plugin-b": ["kanban"],
@@ -63,7 +61,6 @@ describe("resolvePluginForViewType", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
             pruneUninstalledEntries: false,
-            showDescriptions: true,
             plugins: {
                 "plugin-c": {
                     mode: PLUGIN_MODE.ALWAYS_ENABLED,

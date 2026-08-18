@@ -18,6 +18,12 @@ export class CommandCacheStore {
     }
 
     set(pluginId: string, commands: CachedCommand[]): void {
+        // Drop the previous snapshot first: a plugin update can remove or rename
+        // command IDs, and leaving the old entries in commandCache would resurrect
+        // stale wrappers through persist()/loadFromData() (issue #6).
+        const previous = this.pluginCommandIndex.get(pluginId);
+        previous?.forEach((id) => this.commandCache.delete(id));
+
         const ids = new Set<string>();
         for (const command of commands) {
             this.commandCache.set(command.id, command);
@@ -92,6 +98,19 @@ export class CommandCacheStore {
         if (!cachedVersion) return false;
 
         return cachedVersion === (manifest.version ?? "");
+    }
+
+    // Bumps the stored version for a single plugin without rewriting the command
+    // snapshot. Used when a stale-cache refresh could not capture commands (e.g.
+    // the target plugin failed to load in CI) so the cache is preserved and
+    // future startups do not retry indefinitely.
+    markVersionCurrent(pluginId: string): void {
+        const manifest = this.ctx.getManifests().find((p) => p.id === pluginId);
+        if (!manifest) return;
+
+        const versions = loadLocalStorage<Record<string, string>>(this.ctx.app, "commandCacheVersions") ?? {};
+        versions[pluginId] = manifest.version ?? "";
+        saveLocalStorage(this.ctx.app, "commandCacheVersions", versions);
     }
 
     clear(): void {

@@ -36,9 +36,38 @@ export class SettingsService {
         const loaded = isRecord(rawLoaded) ? (rawLoaded as Partial<LazySettings>) : {};
         this.isFirstLoad = Object.keys(loaded).length === 0;
 
-        // 2. Merge with defaults (shallow merge at top level)
-        // We need to be careful not to overwrite existing profiles if they exist
-        this.data = Object.assign({}, DEFAULT_SETTINGS, loaded);
+        // 2. Merge with defaults (deep clone defaults first so we don't mutate
+        // the shared DEFAULT_SETTINGS object during runtime edits).
+        this.data = Object.assign(structuredClone(DEFAULT_SETTINGS), loaded);
+
+        // 2b. Ensure top-level profile references are valid before migration.
+        // First drop any corrupt (null/non-object) profile entries so a later
+        // `profiles[id].settings` read can't throw. An empty object is a valid
+        // record but has no profiles to activate, so treat "no usable profiles"
+        // (missing map, or all entries pruned) the same as a fresh install and
+        // seed the Default profile.
+        if (isRecord(this.data.profiles)) {
+            for (const [id, profile] of Object.entries(this.data.profiles)) {
+                if (!isRecord(profile)) {
+                    delete this.data.profiles[id];
+                }
+            }
+        }
+        if (!isRecord(this.data.profiles) || Object.keys(this.data.profiles).length === 0) {
+            this.data.profiles = {
+                [DEFAULT_PROFILE_ID]: {
+                    id: DEFAULT_PROFILE_ID,
+                    name: DEFAULT_PROFILE_ID,
+                    settings: structuredClone(DEFAULT_DEVICE_SETTINGS),
+                },
+            };
+        }
+        if (typeof this.data.desktopProfileId !== "string") {
+            this.data.desktopProfileId = DEFAULT_PROFILE_ID;
+        }
+        if (typeof this.data.mobileProfileId !== "string") {
+            this.data.mobileProfileId = DEFAULT_PROFILE_ID;
+        }
 
         // 3. Migration: Convert legacy format if needed
         this.migrateLegacySettings();
@@ -55,14 +84,9 @@ export class SettingsService {
             this.currentProfileId = defaultId;
         }
 
-        // 5. Ensure all profiles have all required settings (like defaultMode)
+        // 5. Ensure all profiles have all required settings and nested maps
         Object.values(this.data.profiles).forEach((profile) => {
-            if (profile.settings.defaultMode === undefined) {
-                profile.settings.defaultMode = DEFAULT_DEVICE_SETTINGS.defaultMode;
-            }
-            if (profile.settings.pruneUninstalledEntries === undefined) {
-                profile.settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;
-            }
+            this.normalizeProfileSettings(profile);
         });
 
         // 5b. Drop dead command-cache fields. These were persisted in data.json by
@@ -72,6 +96,7 @@ export class SettingsService {
         // already-migrated installs get cleaned too.
         delete this.data.commandCache;
         delete this.data.commandCacheVersions;
+        delete (this.data as unknown as Record<string, unknown>).suppressPluginManagementNotice;
 
         // 6. Set the active settings reference
         this.settings = this.data.profiles[this.currentProfileId].settings;
@@ -141,6 +166,31 @@ export class SettingsService {
         delete this.data.desktop;
         delete this.data.mobile;
         delete this.data.dualConfigs;
+    }
+
+    private normalizeProfileSettings(profile: Profile) {
+        if (!profile.settings || typeof profile.settings !== "object") {
+            profile.settings = structuredClone(DEFAULT_DEVICE_SETTINGS);
+            return;
+        }
+
+        if (profile.settings.defaultMode === undefined) {
+            profile.settings.defaultMode = DEFAULT_DEVICE_SETTINGS.defaultMode;
+        }
+        if (profile.settings.pruneUninstalledEntries === undefined) {
+            profile.settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;
+        }
+        // This setting was removed; discard it from profiles created by older versions.
+        delete (profile.settings as unknown as Record<string, unknown>).showDescriptions;
+        if (!isRecord(profile.settings.plugins)) {
+            profile.settings.plugins = {};
+        }
+        if (!isRecord(profile.settings.lazyOnViews)) {
+            profile.settings.lazyOnViews = {};
+        }
+        if (!isRecord(profile.settings.lazyOnFiles)) {
+            profile.settings.lazyOnFiles = {};
+        }
     }
 
     async save() {

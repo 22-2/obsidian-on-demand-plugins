@@ -21,7 +21,7 @@ export default class OnDemandPlugin extends Plugin {
     // Assigned during onload via loadSettings().
     data!: LazySettings;
     // Assigned during onload via loadSettings().
-    settings!: DeviceSettings;
+    declare settings: DeviceSettings;
     device = "desktop/global";
     manifests: PluginManifest[] = [];
 
