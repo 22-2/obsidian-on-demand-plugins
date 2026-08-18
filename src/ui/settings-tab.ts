@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, no-useless-escape -- Declarative settings callbacks intentionally bridge Obsidian's void handlers and plugin async persistence. */
 import type { App, ButtonComponent, DropdownComponent, SettingDefinitionItem } from "obsidian";
-import { ExtraButtonComponent, Menu, Modal, Notice, PluginSettingTab, Setting, SettingPage } from "obsidian";
+import { ExtraButtonComponent, FileSystemAdapter, Menu, Modal, Notice, Platform, PluginSettingTab, Setting, SettingPage, normalizePath } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
 import type { PLUGIN_MODE } from "src/core/types";
@@ -10,6 +10,24 @@ import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/main
 import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
+
+async function openBackupDirectory(plugin: OnDemandPlugin) {
+    if (!Platform.isDesktopApp || !(plugin.app.vault.adapter instanceof FileSystemAdapter)) {
+        new Notice("Opening the backup folder is available on desktop only.");
+        return;
+    }
+
+    const adapter = plugin.app.vault.adapter;
+    const backupPath = normalizePath(`${plugin.manifest.dir}/backups`);
+    try {
+        if (!(await adapter.exists(backupPath))) await adapter.mkdir(backupPath);
+        const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as { shell?: { openPath: (path: string) => Promise<string> } } | undefined;
+        const error = await electron?.shell?.openPath(`${adapter.getBasePath()}/${backupPath}`);
+        if (error) new Notice(`Could not open the backup folder: ${error}`);
+    } catch (error) {
+        new Notice(`Could not open the backup folder: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
 
 class ProfileManagementPage extends SettingPage {
     private app: App;
@@ -30,7 +48,16 @@ class ProfileManagementPage extends SettingPage {
         const service = this.plugin.core.settingsService;
         const profileIds = Object.keys(service.data.profiles);
 
-        new Setting(this.containerEl).setName("Profiles").setHeading().setDesc("Choose which profile is active. Device defaults are managed separately below.");
+        new Setting(this.containerEl)
+            .setName("Profiles")
+            .setHeading()
+            .setDesc("Choose which profile is active. Device defaults are managed separately below.")
+            .addExtraButton((button) =>
+                button
+                    .setIcon("folder-open")
+                    .setTooltip("Open backup folder")
+                    .onClick(() => void openBackupDirectory(this.plugin)),
+            );
 
         const list = this.containerEl.createDiv({ cls: "lazy-profile-list" });
         profileIds.forEach((id) => this.renderProfileCard(list, id));
@@ -101,6 +128,15 @@ class ProfileManagementPage extends SettingPage {
                         this.display();
                     }),
                 );
+                if (id === "initial-backup") {
+                    menu.addSeparator();
+                    menu.addItem((item) =>
+                        item
+                            .setTitle("Open backup folder")
+                            .setIcon("folder-open")
+                            .onClick(() => void openBackupDirectory(this.plugin)),
+                    );
+                }
                 if (profileIdsFor(service).length > 1 && !isCurrent) {
                     menu.addSeparator();
                     menu.addItem((item) => item.setTitle("Delete").onClick(() => void this.deleteProfile(id, profile.name)));
