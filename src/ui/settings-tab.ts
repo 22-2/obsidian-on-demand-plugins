@@ -5,9 +5,8 @@ import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
 import type { PLUGIN_MODE } from "src/core/types";
 import { PluginModes } from "src/core/types";
-import type { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
+import type { MaintenanceFeature, SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/maintenance/maintenance-feature";
-import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 

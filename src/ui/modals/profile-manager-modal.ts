@@ -24,7 +24,7 @@ export class ProfileManagerModal extends Modal {
         const profileIds = Object.keys(profiles);
 
         // List existing profiles
-        const listContainer = contentEl.createEl("div", { cls: "lazy-profile-list" });
+        const listContainer = contentEl.createDiv({ cls: "lazy-profile-list" });
 
         profileIds.forEach((id) => {
             const profile = profiles[id];
@@ -32,14 +32,14 @@ export class ProfileManagerModal extends Modal {
             const isDesktopDefault = id === this.settingsService.data.desktopProfileId;
             const isMobileDefault = id === this.settingsService.data.mobileProfileId;
 
-            const row = listContainer.createEl("div", { cls: "lazy-profile-row" });
+            const row = listContainer.createDiv({ cls: "lazy-profile-row" });
 
             // Profile Name & Status
-            const infoDiv = row.createEl("div", { cls: "lazy-profile-info" });
+            const infoDiv = row.createDiv({ cls: "lazy-profile-info" });
 
-            infoDiv.createEl("div", { cls: "lazy-profile-name", text: profile.name });
+            infoDiv.createDiv({ cls: "lazy-profile-name", text: profile.name });
 
-            const metaEl = infoDiv.createEl("div", { cls: "lazy-profile-meta", text: "" });
+            const metaEl = infoDiv.createDiv({ cls: "lazy-profile-meta", text: "" });
 
             const tags = [];
             if (isCurrent) tags.push("Active");
@@ -52,7 +52,7 @@ export class ProfileManagerModal extends Modal {
             }
 
             // Actions
-            const actionsDiv = row.createEl("div", { cls: "lazy-profile-actions" });
+            const actionsDiv = row.createDiv({ cls: "lazy-profile-actions" });
 
             const btn = new ExtraButtonComponent(actionsDiv).setIcon("ellipsis-vertical").setTooltip("More options");
 

@@ -1,7 +1,7 @@
+import type { ViewRegistry } from "@obsidian-typings/obsidian-public-latest";
 import { Mutex } from "async-mutex";
 import log from "loglevel";
 import { Notice } from "obsidian";
-import type { ViewRegistry } from "@obsidian-typings/obsidian-public-latest";
 import { pEvent } from "p-event";
 import pTimeout from "p-timeout";
 import pWaitFor from "p-wait-for";

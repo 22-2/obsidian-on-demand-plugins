@@ -146,16 +146,8 @@ describe("CommandCacheStore", () => {
 
             store.markVersionCurrent("test-plugin");
 
-            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(
-                mockCtx.app,
-                "commandCacheVersions",
-                { "test-plugin": "1.0.0" },
-            );
-            expect(storageMs.saveLocalStorage).not.toHaveBeenCalledWith(
-                mockCtx.app,
-                "commandCache",
-                expect.anything(),
-            );
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCacheVersions", { "test-plugin": "1.0.0" });
+            expect(storageMs.saveLocalStorage).not.toHaveBeenCalledWith(mockCtx.app, "commandCache", expect.anything());
         });
 
         it("should preserve other plugin versions when updating", () => {
@@ -166,11 +158,7 @@ describe("CommandCacheStore", () => {
 
             store.markVersionCurrent("test-plugin");
 
-            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(
-                mockCtx.app,
-                "commandCacheVersions",
-                { "other-plugin": "2.0.0", "test-plugin": "1.0.0" },
-            );
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCacheVersions", { "other-plugin": "2.0.0", "test-plugin": "1.0.0" });
         });
 
         it("should do nothing if the plugin has no manifest", () => {
