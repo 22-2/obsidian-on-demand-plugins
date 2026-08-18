@@ -96,6 +96,7 @@ export class SettingsService {
         // already-migrated installs get cleaned too.
         delete this.data.commandCache;
         delete this.data.commandCacheVersions;
+        delete (this.data as unknown as Record<string, unknown>).suppressPluginManagementNotice;
 
         // 6. Set the active settings reference
         this.settings = this.data.profiles[this.currentProfileId].settings;
@@ -179,9 +180,8 @@ export class SettingsService {
         if (profile.settings.pruneUninstalledEntries === undefined) {
             profile.settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;
         }
-        if (profile.settings.showDescriptions === undefined) {
-            profile.settings.showDescriptions = DEFAULT_DEVICE_SETTINGS.showDescriptions;
-        }
+        // This setting was removed; discard it from profiles created by older versions.
+        delete (profile.settings as unknown as Record<string, unknown>).showDescriptions;
         if (!isRecord(profile.settings.plugins)) {
             profile.settings.plugins = {};
         }
