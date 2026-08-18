@@ -13,6 +13,25 @@
     width: 100%;
 }
 
+.lazy-plugin-save-controls {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--background-primary);
+}
+
+.lazy-plugin-infinite-sentinel {
+    height: 1px;
+}
+
+.lazy-maintenance-page .setting-item-heading {
+    margin-top: var(--size-4-4);
+}
+
+.lazy-maintenance-page .setting-item-control {
+    flex-wrap: wrap;
+}
+
 .lazy-plugin-gear-left {
     padding: 0;
     margin-right: 8px;
@@ -182,6 +201,12 @@
 }
 
 @keyframes lazy-fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
