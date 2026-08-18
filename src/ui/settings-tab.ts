@@ -244,9 +244,24 @@ class PluginPage extends SettingPage {
     }
     display() {
         this.disconnectInfiniteScroll();
+        // Plugin installations can happen while the settings modal is open.
+        // Refresh the registry whenever this page is entered so the count and
+        // list reflect the current Obsidian plugin manifests.
+        this.plugin.updateManifests();
         this.containerEl.empty();
         this.renderSaveControls();
-        new Setting(this.containerEl).setName("Plugins").setHeading();
+        new Setting(this.containerEl)
+            .setName("Plugins")
+            .setHeading()
+            .addExtraButton((button) =>
+                button
+                    .setIcon("refresh-cw")
+                    .setTooltip("Refresh plugin list")
+                    .onClick(() => {
+                        this.plugin.updateManifests();
+                        this.tab.update();
+                    }),
+            );
         new Setting(this.containerEl)
             .setName("Filter")
             .addText((t) =>
