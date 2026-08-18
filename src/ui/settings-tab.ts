@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, no-useless-escape -- Declarative settings callbacks intentionally bridge Obsidian's void handlers and plugin async persistence. */
-import type { App, DropdownComponent, SettingDefinitionItem } from "obsidian";
-import { ExtraButtonComponent, Menu, Notice, PluginSettingTab, Setting, SettingPage } from "obsidian";
+import type { App, ButtonComponent, DropdownComponent, SettingDefinitionItem } from "obsidian";
+import { ExtraButtonComponent, Modal, Notice, PluginSettingTab, Setting, SettingPage } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
 import type { PLUGIN_MODE } from "src/core/types";
@@ -11,109 +11,162 @@ import type { SyncDirection } from "src/features/maintenance/maintenance-feature
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 
-class ProfilePage extends SettingPage {
+class ProfileManagementPage extends SettingPage {
     private app: App;
     private plugin: OnDemandPlugin;
     private tab: SettingsTab;
+    private createName = "";
+
     constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.app = app;
         this.plugin = plugin;
         this.tab = tab;
     }
+
     display() {
         this.containerEl.empty();
-        const s = this.plugin.core.settingsService;
-        new Setting(this.containerEl).setName("Active profile").addDropdown((d) => {
-            Object.values(s.data.profiles).forEach((p) => d.addOption(p.id, p.name));
-            d.setValue(s.currentProfileId).onChange((id) => void this.switchProfile(id, d));
-        });
+        this.containerEl.addClass("lazy-profile-page");
+        const service = this.plugin.core.settingsService;
+        const profileIds = Object.keys(service.data.profiles);
+
+        new Setting(this.containerEl).setName("Profiles").setHeading().setDesc("Choose which profile is active. Device defaults are managed separately below.");
+
         const list = this.containerEl.createDiv({ cls: "lazy-profile-list" });
-        const ids = Object.keys(s.data.profiles);
-        ids.forEach((id) => {
-            const p = s.data.profiles[id];
-            const row = list.createDiv({ cls: "lazy-profile-row" });
-            const info = row.createDiv({ cls: "lazy-profile-info" });
-            info.createDiv({ cls: "lazy-profile-name", text: p.name });
-            const tags = [id === s.currentProfileId ? "Active" : "", id === s.data.desktopProfileId ? "Desktop default" : "", id === s.data.mobileProfileId ? "Mobile default" : "", id === "initial-backup" ? "Initial Backup" : ""].filter(Boolean);
-            info.createDiv({ cls: "lazy-profile-meta", text: tags.join(" • ") });
-            const actions = row.createDiv({ cls: "lazy-profile-actions" });
-            new ExtraButtonComponent(actions)
-                .setIcon("ellipsis-vertical")
-                .setTooltip("More options")
-                .onClick(() => {
-                    const menu = new Menu();
-                    menu.addItem((i) => i.setTitle("Rename").onClick(() => this.editName(id, p.name)));
-                    menu.addItem((i) =>
-                        i.setTitle("Duplicate").onClick(async () => {
-                            s.createProfile(`${p.name} (Copy)`, id);
-                            await s.save();
-                            this.display();
-                        }),
-                    );
-                    menu.addSeparator();
-                    menu.addItem((i) =>
-                        i
-                            .setTitle("Set as desktop default")
-                            .setDisabled(id === s.data.desktopProfileId)
-                            .onClick(async () => {
-                                s.setDeviceDefault(id, "desktop");
-                                await s.save();
-                                this.display();
-                            }),
-                    );
-                    menu.addItem((i) =>
-                        i
-                            .setTitle("Set as mobile default")
-                            .setDisabled(id === s.data.mobileProfileId)
-                            .onClick(async () => {
-                                s.setDeviceDefault(id, "mobile");
-                                await s.save();
-                                this.display();
-                            }),
-                    );
-                    if (ids.length > 1 && id !== s.currentProfileId) menu.addItem((i) => i.setTitle("Delete").onClick(() => void this.remove(id, p.name)));
-                    menu.showAtPosition({ x: actions.getBoundingClientRect().left, y: actions.getBoundingClientRect().bottom });
-                });
-        });
-        new Setting(this.containerEl).setName("Create new profile").addButton((b) =>
-            b
-                .setButtonText("Create")
-                .setCta()
-                .onClick(() => this.editName()),
-        );
+        profileIds.forEach((id) => this.renderProfileCard(list, id));
+
+        new Setting(this.containerEl).setName("Device defaults").setHeading().setDesc("Choose the profile loaded by default on each device type.");
+        this.renderDeviceDefault("Desktop", "desktop", service.data.desktopProfileId);
+        this.renderDeviceDefault("Mobile", "mobile", service.data.mobileProfileId);
+
+        new Setting(this.containerEl).setName("Create profile").setHeading();
+        let createButton: ButtonComponent | undefined;
+        new Setting(this.containerEl)
+            .setName("Profile name")
+            .setDesc("New profiles start with the default settings.")
+            .addText((text) =>
+                text
+                    .setPlaceholder("E.g. Writing")
+                    .setValue(this.createName)
+                    .onChange((value) => {
+                        this.createName = value;
+                        createButton?.setDisabled(!value.trim());
+                    }),
+            )
+            .addButton((button) => {
+                createButton = button;
+                button
+                    .setButtonText("Create")
+                    .setCta()
+                    .setDisabled(!this.createName.trim())
+                    .onClick(() => void this.createProfile());
+            });
     }
-    private async switchProfile(id: string, d: DropdownComponent) {
-        const s = this.plugin.core.settingsService;
-        if (id === s.currentProfileId) return;
-        if (this.tab.hasPendingChanges && !(await showConfirmModal(this.app, { message: "You have unsaved changes. Switch profile anyway?" }))) return void d.setValue(s.currentProfileId);
+
+    private renderProfileCard(list: HTMLElement, id: string) {
+        const service = this.plugin.core.settingsService;
+        const profile = service.data.profiles[id];
+        const isCurrent = id === service.currentProfileId;
+        const isDesktopDefault = id === service.data.desktopProfileId;
+        const isMobileDefault = id === service.data.mobileProfileId;
+        const row = list.createDiv({ cls: ["lazy-profile-card", isCurrent ? "is-current" : ""] });
+        row.setAttr("role", "group");
+
+        const info = row.createDiv({ cls: "lazy-profile-info" });
+        info.createDiv({ cls: "lazy-profile-name", text: profile.name });
+        const badges = info.createDiv({ cls: "lazy-profile-badges" });
+        if (isCurrent) badges.createSpan({ cls: "lazy-profile-badge is-active", text: "Active" });
+        if (isDesktopDefault) badges.createSpan({ cls: "lazy-profile-badge", text: "Desktop default" });
+        if (isMobileDefault) badges.createSpan({ cls: "lazy-profile-badge", text: "Mobile default" });
+        if (id === "initial-backup") badges.createSpan({ cls: "lazy-profile-badge", text: "Initial backup" });
+
+        const actions = row.createDiv({ cls: "lazy-profile-actions" });
+        if (isCurrent) {
+            actions.createSpan({ cls: "lazy-profile-current-label", text: "Current profile" });
+        } else {
+            this.createActionButton(actions, "Use this profile", "mod-cta", () => void this.switchProfile(id));
+        }
+        this.createActionButton(actions, "Rename", "", () => this.openNameModal(id, profile.name));
+        this.createActionButton(actions, "Duplicate", "", async () => {
+            service.createProfile(`${profile.name} (Copy)`, id);
+            await service.save();
+            this.display();
+        });
+        if (profileIdsFor(service).length > 1 && !isCurrent) {
+            this.createActionButton(actions, "Delete", "mod-warning", () => void this.deleteProfile(id, profile.name));
+        }
+    }
+
+    private renderDeviceDefault(label: string, type: "desktop" | "mobile", currentId: string) {
+        const service = this.plugin.core.settingsService;
+        new Setting(this.containerEl).setName(label).addDropdown((dropdown) => {
+            Object.values(service.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
+            dropdown.setValue(currentId).onChange(async (profileId) => {
+                service.setDeviceDefault(profileId, type);
+                await service.save();
+                this.display();
+            });
+        });
+    }
+
+    private createActionButton(container: HTMLElement, text: string, cls: string, onClick: () => void) {
+        const button = container.createEl("button", { text, cls: cls ? ["lazy-profile-action", cls] : "lazy-profile-action" });
+        button.type = "button";
+        button.addEventListener("click", onClick);
+    }
+
+    private async switchProfile(id: string) {
+        if (this.tab.hasPendingChanges && !(await showConfirmModal(this.app, { message: "You have unsaved changes. Switch profile anyway?" }))) return;
         await this.plugin.switchProfile(id);
         this.tab.resetPending();
         this.display();
     }
-    private editName(id?: string, current = "") {
-        const input = this.containerEl.createEl("input", { type: "text", value: current, placeholder: "Profile name" });
-        const b = this.containerEl.createEl("button", { text: id ? "Save" : "Create" });
-        b.onclick = async () => {
-            if (!input.value.trim()) return;
-            const s = this.plugin.core.settingsService;
-            if (id) s.renameProfile(id, input.value.trim());
-            else s.createProfile(input.value.trim());
-            await s.save();
-            input.remove();
-            b.remove();
-            this.display();
-        };
+
+    private openNameModal(id: string, currentName: string) {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText("Rename profile");
+        let name = currentName;
+        new Setting(modal.contentEl).setName("Profile name").addText((text) => text.setValue(currentName).onChange((value) => (name = value)));
+        new Setting(modal.contentEl).addButton((button) =>
+            button
+                .setButtonText("Save")
+                .setCta()
+                .onClick(async () => {
+                    if (!name.trim()) return;
+                    const service = this.plugin.core.settingsService;
+                    service.renameProfile(id, name.trim());
+                    await service.save();
+                    modal.close();
+                    this.display();
+                }),
+        );
+        modal.open();
     }
-    private async remove(id: string, name: string) {
-        const s = this.plugin.core.settingsService;
-        if (id === s.data.desktopProfileId || id === s.data.mobileProfileId) return void new Notice("Assign another default profile first.");
-        if (await showConfirmModal(this.app, { message: `Delete profile \"${name}\"?` })) {
-            s.deleteProfile(id);
-            await s.save();
-            this.display();
+
+    private async createProfile() {
+        const name = this.createName.trim();
+        if (!name) return;
+        this.plugin.core.settingsService.createProfile(name);
+        await this.plugin.core.settingsService.save();
+        this.createName = "";
+        this.display();
+    }
+
+    private async deleteProfile(id: string, name: string) {
+        const service = this.plugin.core.settingsService;
+        if (id === service.data.desktopProfileId || id === service.data.mobileProfileId) {
+            new Notice("Assign another device default before deleting this profile.");
+            return;
         }
+        if (!(await showConfirmModal(this.app, { message: `Delete profile \"${name}\"?` }))) return;
+        service.deleteProfile(id);
+        await service.save();
+        this.display();
     }
+}
+
+function profileIdsFor(service: OnDemandPlugin["core"]["settingsService"]) {
+    return Object.keys(service.data.profiles);
 }
 
 class PluginPage extends SettingPage {
@@ -366,7 +419,7 @@ export class SettingsTab extends PluginSettingTab {
         this.plugin.updateManifests();
         const modes = Object.fromEntries(Object.keys(PluginModes).map((key) => [key, PluginModes[key as PLUGIN_MODE]]));
         return [
-            { type: "page", name: "Profile management", desc: "Manage profiles and device defaults.", page: () => new ProfilePage(this.app, this.plugin, this) },
+            { type: "page", name: "Profile management", desc: "Manage profiles and device defaults.", page: () => new ProfileManagementPage(this.app, this.plugin, this) },
             { type: "page", name: "Plugin management", desc: "Configure plugin loading modes.", displayValue: () => `${this.plugin.manifests.length} plugins`, page: () => new PluginPage(this.app, this.plugin, this) },
             {
                 type: "page",
