@@ -1,8 +1,8 @@
+import type { ViewRegistry } from "@obsidian-typings/obsidian-public-latest";
 import log from "loglevel";
 import { around } from "monkey-around";
 import type { ViewCreator } from "obsidian";
 import { Plugin } from "obsidian";
-import type { ViewRegistry } from "@obsidian-typings/obsidian-public-latest";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
 

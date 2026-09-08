@@ -1,5 +1,5 @@
-import pWaitFor from "p-wait-for";
 import { Notice } from "obsidian";
+import pWaitFor from "p-wait-for";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as utilsMs from "src/core/utils";
@@ -100,7 +100,7 @@ describe("LazyCommandRunner", () => {
             // Second call (serialized by mutex) should see it's already loaded and skip enablePlugin.
             mockCtx.obsidianPlugins.enablePlugin.mockReturnValue(
                 new Promise<void>((resolve) =>
-                    setTimeout(() => {
+                    window.setTimeout(() => {
                         vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
                         vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);
                         resolve();

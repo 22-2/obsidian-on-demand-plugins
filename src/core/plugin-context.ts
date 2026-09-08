@@ -5,8 +5,8 @@
  * callbacks, they all receive a single PluginContext that provides unified
  * access to the Obsidian runtime and Lazy Plugin settings.
  */
-import type { App, EventRef, PluginManifest } from "obsidian";
 import type { Commands, Plugins } from "@obsidian-typings/obsidian-public-latest";
+import type { App, EventRef, PluginManifest } from "obsidian";
 import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 

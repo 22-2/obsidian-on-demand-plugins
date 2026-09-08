@@ -28,7 +28,6 @@ function createService(loadedData: unknown): { service: SettingsService; plugin:
 function migratedDataWith(extra: Record<string, unknown>) {
     return {
         showConsoleLog: false,
-        suppressPluginManagementNotice: false,
         profiles: {
             Default: { id: "Default", name: "Default", settings: { ...DEFAULT_DEVICE_SETTINGS } },
         },
@@ -84,7 +83,6 @@ describe("SettingsService load normalization", () => {
                         settings: {
                             defaultMode: "lazy",
                             pruneUninstalledEntries: true,
-                            showDescriptions: false,
                             plugins: null,
                             lazyOnViews: null,
                             lazyOnFiles: null,

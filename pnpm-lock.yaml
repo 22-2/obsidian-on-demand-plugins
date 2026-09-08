@@ -69,6 +69,9 @@ importers:
       conventional-changelog-conventionalcommits:
         specifier: ^10.2.1
         version: 10.2.1
+      electron:
+        specifier: 41.0.3
+        version: 41.0.3
       esbuild:
         specifier: 0.28.1
         version: 0.28.1
@@ -91,8 +94,8 @@ importers:
         specifier: ^1.13.1
         version: 1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)
       obsidian-e2e-toolkit:
-        specifier: github:22-2/obsidian-e2e-toolkit#1.0.5
-        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/a1d66ad85ed42a4ba3930c532e287b3e0ff6b171(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1)
+        specifier: github:22-2/obsidian-e2e-toolkit#1.1.0
+        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1)
       playwright:
         specifier: ^1.59.1
         version: 1.59.1
@@ -2260,10 +2263,6 @@ packages:
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
 
-  lru-cache@11.3.0:
-    resolution: {integrity: sha512-sr8xPKE25m6vJVcrdn6NxtC0fVfuPowbscLypegRgOm0yXSqr5JNHCAY3hnusdJ7HRBW04j6Ip4khvHU778DuQ==}
-    engines: {node: 20 || >=22}
-
   lru-cache@11.5.2:
     resolution: {integrity: sha512-4pfM1Ff0x50o0tQwb5ucw/RzNyD0/YJME6IVcStalZuMWxdt3sR3huStTtxz4PUmvZfRguvDejasvQ2kifR11g==}
     engines: {node: 20 || >=22}
@@ -2527,9 +2526,9 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/a1d66ad85ed42a4ba3930c532e287b3e0ff6b171:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/a1d66ad85ed42a4ba3930c532e287b3e0ff6b171}
-    version: 1.0.5
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f:
+    resolution: {gitHosted: true, integrity: sha512-BJtSzYYQKK45DZCbIBiG5Ni5teFrIsmouViAtAADgk8jJ/whENVfJAbqkkFdU+D8I0OX/ldEvoaq3J89SahCwg==, tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f}
+    version: 1.1.0
     engines: {node: '>=23.0.0'}
     peerDependencies:
       '@playwright/test': ^1.56.0
@@ -5867,8 +5866,6 @@ snapshots:
 
   lru-cache@10.4.3: {}
 
-  lru-cache@11.3.0: {}
-
   lru-cache@11.5.2: {}
 
   magic-string@0.30.21:
@@ -6057,7 +6054,7 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.2
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/a1d66ad85ed42a4ba3930c532e287b3e0ff6b171(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1):
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1):
     dependencies:
       '@electron/asar': 4.2.0
       '@playwright/test': 1.59.1
@@ -6213,7 +6210,7 @@ snapshots:
 
   path-scurry@2.0.2:
     dependencies:
-      lru-cache: 11.3.0
+      lru-cache: 11.5.2
       minipass: 7.1.3
 
   path-type@4.0.0: {}

@@ -371,11 +371,7 @@ describe("CommandCacheService", () => {
 
             // Version must NOT be bumped when plugin fails to load, so the next
             // startup will retry the refresh (issue #6).
-            expect(storageMs.saveLocalStorage).not.toHaveBeenCalledWith(
-                mockCtx.app,
-                "commandCacheVersions",
-                expect.anything(),
-            );
+            expect(storageMs.saveLocalStorage).not.toHaveBeenCalledWith(mockCtx.app, "commandCacheVersions", expect.anything());
             expect(service.getCachedCommand("old-cmd")).toBeDefined();
             // Stale wrappers must not be registered: the cached command IDs may
             // no longer exist in the current plugin version (issue #6).
@@ -394,11 +390,7 @@ describe("CommandCacheService", () => {
 
             // Version SHOULD be bumped when plugin loads but has no commands,
             // so we do not retry on every startup.
-            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(
-                mockCtx.app,
-                "commandCacheVersions",
-                { "test-plugin": "1.0.0" },
-            );
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCacheVersions", { "test-plugin": "1.0.0" });
             expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
         });
     });

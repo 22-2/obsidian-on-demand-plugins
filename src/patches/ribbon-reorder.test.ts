@@ -50,7 +50,9 @@ describe("patchRibbonReorder", () => {
         const plugin = createPluginInstance();
         plugin.addRibbonIcon("dice", "Test", vi.fn());
 
-        expect(ctx.app.updateRibbonDisplay).toHaveBeenCalled();
+        const app = ctx.app as unknown as { updateRibbonDisplay: ReturnType<typeof vi.fn> };
+        const updateRibbonDisplay = app.updateRibbonDisplay;
+        expect(updateRibbonDisplay).toHaveBeenCalled();
     });
 
     it("preserves original addRibbonIcon return value", () => {

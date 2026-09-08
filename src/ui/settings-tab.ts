@@ -1,445 +1,610 @@
-import type { App, ButtonComponent, DropdownComponent } from "obsidian";
-import { ExtraButtonComponent, Notice, PluginSettingTab, Setting } from "obsidian";
+/* eslint-disable @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, no-useless-escape -- Declarative settings callbacks intentionally bridge Obsidian's void handlers and plugin async persistence. */
+import type { App, ButtonComponent, DropdownComponent, SettingDefinitionItem } from "obsidian";
+import { ExtraButtonComponent, FileSystemAdapter, Menu, Modal, Notice, Platform, PluginSettingTab, Setting, SettingPage, normalizePath } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
-import type { PluginSettings, PLUGIN_MODE } from "src/core/types";
+import type { PLUGIN_MODE } from "src/core/types";
 import { PluginModes } from "src/core/types";
-import { isLazyMode } from "src/core/utils";
+import type { MaintenanceFeature, SyncDirection } from "src/features/maintenance/maintenance-feature";
+import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/maintenance/maintenance-feature";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
-import { ProfileManagerModal } from "src/ui/modals/profile-manager-modal";
-import { ToolsModal } from "src/ui/modals/tools-modal";
 
-export class SettingsTab extends PluginSettingTab {
-    app: App;
-    plugin: OnDemandPlugin;
-    dropdowns: DropdownComponent[] = [];
-    filterMethod: PLUGIN_MODE | undefined;
-    filterString: string | undefined;
-    // Created in buildDom() before buildPluginList() runs.
-    pluginSectionContainer!: HTMLElement;
-    pluginSectionContent!: HTMLElement;
-    pluginListContainer!: HTMLElement;
-    pluginToggleButton?: HTMLButtonElement;
-    isPluginListOpen = false;
-    pluginSettings: { [pluginId: string]: PluginSettings } = {};
-    private pluginListBuilt = false;
-    pendingPluginIds = new Set<string>();
-    isDirty = false;
-    applyButton?: ButtonComponent;
-    discardButton?: ButtonComponent;
-    resultsCountEl?: HTMLElement;
-
-    constructor(app: App, plugin: OnDemandPlugin) {
-        super(app, plugin);
-        this.app = app;
-        this.plugin = plugin;
-        this.pluginSettings = this.plugin.settings.plugins;
+async function openBackupDirectory(plugin: OnDemandPlugin) {
+    if (!Platform.isDesktopApp || !(plugin.app.vault.adapter instanceof FileSystemAdapter)) {
+        new Notice("Opening the backup folder is available on desktop only.");
+        return;
     }
 
-    display(): void {
-        const { containerEl } = this;
-        this.containerEl = containerEl;
-
-        // Update the list of installed plugins and render immediately.
-        // Settings are already loaded during plugin startup, so avoid blocking
-        // the settings UI on disk I/O when the tab is opened.
-        this.plugin.updateManifests();
-        this.pluginSettings = this.plugin.settings.plugins;
-        this.pendingPluginIds.clear();
-
-        this.buildDom();
-    }
-
-    /**
-     * Build the Settings modal DOM elements
-     */
-    buildDom() {
-        this.containerEl.empty();
-        this.dropdowns = [];
-
-        // --- Profile Management Section ---
-        const profileContainer = this.containerEl.createDiv("lazy-settings-profile-container");
-
-        new Setting(profileContainer)
-            .setName("Active profile")
-            .setDesc("Select the active profile. Switching profiles will immediately apply the new configuration.")
-            .addDropdown((dropdown) => {
-                const profiles = this.plugin.data.profiles;
-                Object.values(profiles).forEach((p) => {
-                    dropdown.addOption(p.id, p.name);
-                });
-                dropdown.setValue(this.plugin.core.settingsService.currentProfileId);
-                dropdown.onChange((newProfileId) => {
-                    void this.handleProfileChange(newProfileId, dropdown);
-                });
-            })
-            .addExtraButton((btn) => {
-                btn.setIcon("settings")
-                    .setTooltip("Manage profiles")
-                    .onClick(() => {
-                        new ProfileManagerModal(
-                            this.app,
-                            this.plugin.core.settingsService, // Access via core to get the instance
-                            // Callback on change
-                            () => {
-                                void this.plugin.saveSettings();
-                                this.buildDom(); // Refresh dropdown
-                            },
-                        ).open();
-                    });
-            });
-
-        // Show which profile is default for current device
-        const currentId = this.plugin.core.settingsService.currentProfileId;
-        const isDesktopDefault = this.plugin.data.desktopProfileId === currentId;
-        const isMobileDefault = this.plugin.data.mobileProfileId === currentId;
-
-        if (isDesktopDefault || isMobileDefault) {
-            const badges = [];
-            if (isDesktopDefault) badges.push("Desktop default");
-            if (isMobileDefault) badges.push("Mobile default");
-
-            const infoEl = profileContainer.createEl("div", { cls: "lazy-profile-badges" });
-            infoEl.setText(`Current profile is set as: ${badges.join(", ")}`);
-        }
-
-        // --- Standard Settings ---
-
-        new Setting(this.containerEl).setName("Plugin behavior").setHeading();
-
-        new Setting(this.containerEl)
-            .setName("Default mode")
-            .setDesc("Specify the default mode for newly discovered plugins or those not yet configured.")
-            .addDropdown((dropdown) => {
-                this.addModeOptions(dropdown);
-                dropdown.setValue(this.plugin.settings.defaultMode).onChange((value: string) => {
-                    this.plugin.settings.defaultMode = value as PLUGIN_MODE;
-                    this.isDirty = true;
-                    this.updateApplyButton();
-                });
-            });
-
-        new Setting(this.containerEl)
-            .setName("Auto-remove uninstalled entries")
-            .setDesc("Prune the current profile's saved settings and command cache for plugins that are no longer installed. Cleanup runs at plugin startup and immediately when enabled.")
-            .addToggle((toggle) => {
-                toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange((value) => {
-                    this.plugin.settings.pruneUninstalledEntries = value;
-                    // Prune immediately (backing up first) so the effect is visible at
-                    // once; the deferred save flow persists it, avoiding an early save
-                    // of other pending edits.
-                    if (value) {
-                        void this.plugin.backupAndPruneUninstalledEntries();
-                    }
-                    this.isDirty = true;
-                    this.updateApplyButton();
-                });
-            });
-
-        new Setting(this.containerEl)
-            .setName("Maintenance and batch operations")
-            .setDesc("Rebuild command cache, sync with Obsidian settings, or batch-update plugin modes.")
-            .addButton((button) => {
-                button.setButtonText("Open tools");
-                button.onClick(() => {
-                    new ToolsModal(this.app, this.plugin, () => {
-                        this.buildDom();
-                    }).open();
-                });
-            });
-
-        new Setting(this.containerEl)
-            .setName("Profile changes")
-            .setDesc("Settings and plugin mode changes are queued until you save them.")
-            .addButton((button) => {
-                this.applyButton = button;
-                button.setButtonText("Save changes");
-                button.setCta();
-                button.onClick(() => {
-                    void this.handleSaveChanges();
-                });
-            })
-            .addButton((button) => {
-                this.discardButton = button;
-                button.setButtonText("Discard");
-                button.setTooltip("Discard unsaved changes");
-                button.onClick(() => {
-                    void this.handleDiscardChanges();
-                });
-            });
-
-        this.updateApplyButton();
-
-        // Plugin list wrapper: heading, search, filter, and the list itself.
-        this.pluginSectionContainer = this.containerEl.createDiv("lazy-plugin-section");
-
-        const pluginToggleRow = this.pluginSectionContainer.createDiv("lazy-plugin-toggle-row");
-        const toggleButton = pluginToggleRow.createEl("button", {
-            cls: "mod-cta lazy-plugin-toggle-button",
-            text: "0 plugins",
-        });
-        toggleButton.type = "button";
-        toggleButton.addEventListener("click", () => {
-            this.isPluginListOpen = !this.isPluginListOpen;
-            this.updatePluginSectionVisibility();
-        });
-        this.pluginToggleButton = toggleButton;
-
-        this.pluginSectionContent = this.pluginSectionContainer.createDiv("lazy-plugin-section-content");
-
-        if (!this.isPluginListOpen) {
-            this.pluginSectionContainer.classList.add("lazy-plugin-section-collapsed");
-        }
-
-        new Setting(this.pluginSectionContent)
-            .setName("Plugins")
-            .setHeading()
-            .setDesc("Filter by: ")
-            .then((setting) => {
-                this.resultsCountEl = setting.controlEl.createEl("span", {
-                    cls: "lazy-plugin-results-count",
-                });
-            })
-            // Add a free-text filter first, then the dropdown appears to its right
-            .addText((text) =>
-                text.setPlaceholder("Type to filter list").onChange((value) => {
-                    this.filterString = value;
-                    this.buildPluginList();
-                }),
-            )
-            .addDropdown((dropdown) => {
-                // Empty key represents the "All" option
-                dropdown.addOption("", "All");
-                Object.keys(PluginModes).forEach((key) => {
-                    dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]);
-                });
-                dropdown.setValue(this.filterMethod ?? "");
-                dropdown.onChange((value: string) => {
-                    this.filterMethod = value === "" ? undefined : (value as PLUGIN_MODE);
-                    this.buildPluginList();
-                });
-            });
-
-        // Add an element to contain the plugin list
-        this.pluginListContainer = this.pluginSectionContent.createEl("div", {
-            cls: "lazy-plugin-list-body",
-        });
-
-        if (this.isPluginListOpen) {
-            this.buildPluginList();
-        } else {
-            this.updatePluginToggleButton(this.plugin.manifests.length);
-        }
-    }
-
-    private async handleProfileChange(newProfileId: string, dropdown: DropdownComponent): Promise<void> {
-        const profiles = this.plugin.data.profiles;
-        const currentId = this.plugin.core.settingsService.currentProfileId;
-        if (newProfileId === currentId) return;
-
-        // If dirty, ask for confirmation
-        if (this.isDirty || this.pendingPluginIds.size > 0) {
-            const confirm = await showConfirmModal(this.app, {
-                message: "You have unsaved changes in the current profile. If you switch now, these changes will be lost. Switch anyway?",
-            });
-            if (confirm !== true) {
-                dropdown.setValue(currentId);
-                return;
-            }
-        }
-
-        // Use the managed switchProfile method which updates references and saves
-        this.isDirty = false;
-        this.pendingPluginIds.clear();
-        new Notice(`Switched to profile: ${profiles[newProfileId].name}`);
-        await this.plugin.switchProfile(newProfileId);
-        this.display(); // Rebuild everything for the new profile
-    }
-
-    private async handleSaveChanges(): Promise<void> {
-        const count = this.pendingPluginIds.size;
-        this.normalizeLazyOnViews();
-        await this.plugin.saveSettings();
-        this.plugin.configureLogger(); // Apply log level immediately
-
-        if (count > 0) {
-            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds: Array.from(this.pendingPluginIds) });
-        } else {
-            new Notice("Settings saved");
-        }
-
-        this.isDirty = false;
-        this.pendingPluginIds.clear();
-        this.updateApplyButton();
-    }
-
-    private async handleDiscardChanges(): Promise<void> {
-        if (await showConfirmModal(this.app, { message: "Are you sure you want to discard all unsaved changes?" })) {
-            await this.plugin.loadSettings();
-            this.isDirty = false;
-            this.pendingPluginIds.clear();
-            this.display();
-            new Notice("Changes discarded");
-        }
-    }
-
-    buildPluginList() {
-        this.pluginListBuilt = true;
-        this.pluginListContainer.textContent = "";
-        let count = 0;
-        // Add the delay settings for each installed plugin
-        this.plugin.manifests.forEach((plugin) => {
-            const currentValue = this.plugin.getPluginMode(plugin.id);
-
-            // Filter the list of plugins if there is a filter specified
-            if (this.filterMethod && currentValue !== this.filterMethod) return;
-            if (this.filterString && !plugin.name.toLowerCase().includes(this.filterString.toLowerCase())) return;
-
-            count++;
-            const setting = new Setting(this.pluginListContainer).setName(plugin.name);
-
-            // Add gear button first (will appear on the left)
-            const gearBtn = new ExtraButtonComponent(setting.controlEl)
-                .setIcon("gear")
-                .setTooltip("Advanced lazy options")
-                .onClick(() => {
-                    new LazyOptionsModal(this.app, this.plugin, plugin.id, () => {
-                        this.pendingPluginIds.add(plugin.id);
-                        this.updateApplyButton();
-                        this.buildPluginList();
-                    }).open();
-                });
-
-            // Only show for lazy modes
-            const isLazy = isLazyMode(currentValue);
-            gearBtn.extraSettingsEl.addClass("lazy-plugin-gear-left");
-            if (isLazy) {
-                gearBtn.extraSettingsEl.addClass("lazy-plugin-gear-visible");
-            } else {
-                gearBtn.extraSettingsEl.removeClass("lazy-plugin-gear-visible");
-            }
-
-            // Then add dropdown (will appear to the right of gear)
-            setting.addDropdown((dropdown) => {
-                this.dropdowns.push(dropdown);
-                this.addModeOptions(dropdown);
-                dropdown.setValue(currentValue).onChange((value: string) => {
-                    // Update the config, and defer apply until user confirms
-                    const mode = value as PLUGIN_MODE;
-                    this.pluginSettings[plugin.id] = {
-                        mode,
-                        userConfigured: true,
-                    };
-                    this.ensureLazyViewEntry(plugin.id, mode);
-                    this.pendingPluginIds.add(plugin.id);
-                    this.isDirty = true;
-                    this.updateApplyButton();
-                    this.buildPluginList(); // Rebuild to show/hide view types input
-                });
-            });
-
-            setting.then((setting) => {
-                if (this.plugin.settings.showDescriptions) {
-                    // Show or hide the plugin description depending on the user's choice
-                    setting.setDesc(plugin.description);
-                }
-            });
-        });
-
-        if (this.resultsCountEl) {
-            this.resultsCountEl.setText(`${count} plugins`);
-        }
-
-        this.updatePluginToggleButton(this.plugin.manifests.length);
-        this.updatePluginSectionVisibility();
-    }
-
-    private updatePluginToggleButton(count: number): void {
-        if (!this.pluginToggleButton) return;
-        this.pluginToggleButton.textContent = `${count} Plugins`;
-    }
-
-    private updatePluginSectionVisibility(): void {
-        if (!this.pluginSectionContainer) return;
-        if (this.isPluginListOpen) {
-            this.pluginSectionContainer.classList.remove("lazy-plugin-section-collapsed");
-            if (!this.pluginListBuilt) {
-                window.setTimeout(() => {
-                    if (this.isPluginListOpen && !this.pluginListBuilt) {
-                        this.buildPluginList();
-                    }
-                }, 0);
-            }
-        } else {
-            this.pluginSectionContainer.classList.add("lazy-plugin-section-collapsed");
-        }
-    }
-
-    private ensureLazyViewEntry(pluginId: string, mode: PLUGIN_MODE) {
-        if (!this.plugin.settings.lazyOnViews) {
-            this.plugin.settings.lazyOnViews = {};
-        }
-        if (isLazyMode(mode)) {
-            if (!this.plugin.settings.lazyOnViews[pluginId]) {
-                this.plugin.settings.lazyOnViews[pluginId] = [];
-            }
-            return;
-        }
-
-        if (this.plugin.settings.lazyOnViews[pluginId]) {
-            delete this.plugin.settings.lazyOnViews[pluginId];
-        }
-    }
-
-    private normalizeLazyOnViews() {
-        if (!this.plugin.settings.lazyOnViews) {
-            this.plugin.settings.lazyOnViews = {};
-        }
-
-        const lazyOnViews = this.plugin.settings.lazyOnViews;
-        this.plugin.manifests.forEach((plugin) => {
-            const mode = this.plugin.getPluginMode(plugin.id);
-            if (isLazyMode(mode)) {
-                if (!lazyOnViews[plugin.id]) {
-                    lazyOnViews[plugin.id] = [];
-                }
-                return;
-            }
-
-            if (lazyOnViews[plugin.id]) {
-                delete lazyOnViews[plugin.id];
-            }
-        });
-    }
-
-    /**
-     * Add the dropdown select options for each delay type
-     */
-    addModeOptions(el: DropdownComponent) {
-        Object.keys(PluginModes).forEach((key) => {
-            el.addOption(key, PluginModes[key as PLUGIN_MODE]);
-        });
-    }
-
-    /**
-     * Add a filter button in the header of the plugin list
-     */
-
-    updateApplyButton() {
-        if (!this.applyButton || !this.discardButton) return;
-        const count = this.pendingPluginIds.size;
-        const hasChanges = this.isDirty || count > 0;
-
-        this.applyButton.setDisabled(!hasChanges);
-        this.discardButton.setDisabled(!hasChanges);
-
-        if (count > 0) {
-            this.applyButton.setButtonText(`Save & apply (${count}) & restart obsidian`);
-            this.applyButton.setWarning();
-        } else {
-            this.applyButton.setButtonText("Save changes");
-            this.applyButton.buttonEl.removeClass("mod-warning");
-        }
+    const adapter = plugin.app.vault.adapter;
+    const backupPath = normalizePath(`${plugin.manifest.dir}/backups`);
+    try {
+        if (!(await adapter.exists(backupPath))) await adapter.mkdir(backupPath);
+        const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as { shell?: { openPath: (path: string) => Promise<string> } } | undefined;
+        const error = await electron?.shell?.openPath(`${adapter.getBasePath()}/${backupPath}`);
+        if (error) new Notice(`Could not open the backup folder: ${error}`);
+    } catch (error) {
+        new Notice(`Could not open the backup folder: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
+
+class ProfileManagementPage extends SettingPage {
+    private app: App;
+    private plugin: OnDemandPlugin;
+    private tab: SettingsTab;
+    private createName = "";
+
+    constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
+        super();
+        this.app = app;
+        this.plugin = plugin;
+        this.tab = tab;
+    }
+
+    display() {
+        this.containerEl.empty();
+        this.containerEl.addClass("lazy-profile-page");
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
+        const service = this.plugin.core.settingsService;
+        const profileIds = Object.keys(service.data.profiles);
+
+        new Setting(this.containerEl)
+            .setName("Profiles")
+            .setHeading()
+            .setDesc("Choose which profile is active. Device defaults are managed separately below.")
+            .addExtraButton((button) =>
+                button
+                    .setIcon("folder-open")
+                    .setTooltip("Open backup folder")
+                    .onClick(() => void openBackupDirectory(this.plugin)),
+            );
+
+        const list = this.containerEl.createDiv({ cls: "lazy-profile-list" });
+        profileIds.forEach((id) => this.renderProfileCard(list, id));
+
+        new Setting(this.containerEl).setName("Create profile").setHeading();
+        let createButton: ButtonComponent | undefined;
+        new Setting(this.containerEl)
+            .setName("Profile name")
+            .setDesc("New profiles start with the default settings.")
+            .addText((text) =>
+                text
+                    .setPlaceholder("E.g. Writing")
+                    .setValue(this.createName)
+                    .onChange((value) => {
+                        this.createName = value;
+                        createButton?.setDisabled(!value.trim());
+                    }),
+            )
+            .addButton((button) => {
+                createButton = button;
+                button
+                    .setButtonText("Create")
+                    .setCta()
+                    .setDisabled(!this.createName.trim())
+                    .onClick(() => void this.createProfile());
+            });
+
+        new Setting(this.containerEl).setName("Device defaults").setHeading().setDesc("Choose the profile loaded by default on each device type.");
+        this.renderDeviceDefault("Desktop", "desktop", service.data.desktopProfileId);
+        this.renderDeviceDefault("Mobile", "mobile", service.data.mobileProfileId);
+    }
+
+    private renderProfileCard(list: HTMLElement, id: string) {
+        const service = this.plugin.core.settingsService;
+        const profile = service.data.profiles[id];
+        const isCurrent = id === service.currentProfileId;
+        const isDesktopDefault = id === service.data.desktopProfileId;
+        const isMobileDefault = id === service.data.mobileProfileId;
+        const row = list.createDiv({ cls: ["lazy-profile-card", isCurrent ? "is-current" : ""] });
+        row.setAttr("role", "group");
+
+        const info = row.createDiv({ cls: "lazy-profile-info" });
+        info.createDiv({ cls: "lazy-profile-name", text: profile.name });
+        const badges = info.createDiv({ cls: "lazy-profile-badges" });
+        if (isCurrent) badges.createSpan({ cls: "lazy-profile-badge is-active", text: "Active" });
+        if (isDesktopDefault) badges.createSpan({ cls: "lazy-profile-badge", text: "Desktop default" });
+        if (isMobileDefault) badges.createSpan({ cls: "lazy-profile-badge", text: "Mobile default" });
+        if (id === "initial-backup") badges.createSpan({ cls: "lazy-profile-badge", text: "Initial backup" });
+
+        const actions = row.createDiv({ cls: "lazy-profile-actions" });
+        if (isCurrent) {
+            actions.createSpan({ cls: "lazy-profile-current-label", text: "Current profile" });
+        }
+        new ExtraButtonComponent(actions)
+            .setIcon("ellipsis-vertical")
+            .setTooltip("Profile actions")
+            .onClick(() => {
+                const menu = new Menu();
+                if (!isCurrent) {
+                    menu.addItem((item) =>
+                        item
+                            .setTitle("Use this profile")
+                            .setIcon("check")
+                            .onClick(() => void this.switchProfile(id)),
+                    );
+                    menu.addSeparator();
+                }
+                menu.addItem((item) =>
+                    item
+                        .setTitle("Rename")
+                        .setIcon("pencil")
+                        .onClick(() => this.openNameModal(id, profile.name)),
+                );
+                menu.addItem((item) =>
+                    item
+                        .setTitle("Duplicate")
+                        .setIcon("copy")
+                        .onClick(async () => {
+                            service.createProfile(`${profile.name} (Copy)`, id);
+                            this.tab.markDirty();
+                            this.display();
+                        }),
+                );
+                menu.addSeparator();
+                menu.addItem((item) =>
+                    item
+                        .setTitle("Open backup folder")
+                        .setIcon("folder-open")
+                        .onClick(() => void openBackupDirectory(this.plugin)),
+                );
+                if (profileIdsFor(service).length > 1 && !isCurrent) {
+                    menu.addSeparator();
+                    menu.addItem((item) =>
+                        item
+                            .setTitle("Delete")
+                            .setIcon("trash-2")
+                            .setWarning(true)
+                            .onClick(() => void this.deleteProfile(id, profile.name)),
+                    );
+                }
+                menu.showAtPosition({ x: actions.getBoundingClientRect().left, y: actions.getBoundingClientRect().bottom });
+            });
+    }
+
+    private renderDeviceDefault(label: string, type: "desktop" | "mobile", currentId: string) {
+        const service = this.plugin.core.settingsService;
+        new Setting(this.containerEl).setName(label).addDropdown((dropdown) => {
+            Object.values(service.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
+            dropdown.setValue(currentId).onChange(async (profileId) => {
+                service.setDeviceDefault(profileId, type);
+                this.tab.markDirty();
+                this.display();
+            });
+        });
+    }
+
+    private async switchProfile(id: string) {
+        if (this.tab.hasPendingChanges) {
+            if (!(await showConfirmModal(this.app, { message: "You have unsaved changes. Switch profile anyway?" }))) return;
+            // Reload first so switchProfile cannot persist the discarded draft while
+            // it saves the newly selected profile and device default.
+            await this.tab.discardPendingChanges(false);
+        }
+        await this.plugin.switchProfile(id);
+        this.tab.resetPending();
+        this.display();
+    }
+
+    private openNameModal(id: string, currentName: string) {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText("Rename profile");
+        let name = currentName;
+        new Setting(modal.contentEl).setName("Profile name").addText((text) => text.setValue(currentName).onChange((value) => (name = value)));
+        new Setting(modal.contentEl).addButton((button) =>
+            button
+                .setButtonText("Save")
+                .setCta()
+                .onClick(async () => {
+                    if (!name.trim()) return;
+                    const service = this.plugin.core.settingsService;
+                    service.renameProfile(id, name.trim());
+                    this.tab.markDirty();
+                    modal.close();
+                    this.display();
+                }),
+        );
+        modal.open();
+    }
+
+    private async createProfile() {
+        const name = this.createName.trim();
+        if (!name) return;
+        this.plugin.core.settingsService.createProfile(name);
+        this.tab.markDirty();
+        this.createName = "";
+        this.display();
+    }
+
+    private async deleteProfile(id: string, name: string) {
+        const service = this.plugin.core.settingsService;
+        if (id === service.data.desktopProfileId || id === service.data.mobileProfileId) {
+            new Notice("Assign another device default before deleting this profile.");
+            return;
+        }
+        // Keep the install-time recovery profile behind an explicit warning so a
+        // destructive click does not silently remove the user's fallback copy.
+        const message = id === "initial-backup" ? `WARNING: \"${name}\" is your failsafe initial backup. It is highly recommended to keep it. Are you absolutely sure you want to delete it?` : `Delete profile \"${name}\"?`;
+        if (!(await showConfirmModal(this.app, { message }))) return;
+        service.deleteProfile(id);
+        this.tab.markDirty();
+        this.display();
+    }
+}
+
+function profileIdsFor(service: OnDemandPlugin["core"]["settingsService"]) {
+    return Object.keys(service.data.profiles);
+}
+
+class PluginPage extends SettingPage {
+    private static readonly PAGE_SIZE = 24;
+    private filter = "";
+    private mode?: PLUGIN_MODE;
+    private app: App;
+    private plugin: OnDemandPlugin;
+    private tab: SettingsTab;
+    private infiniteScrollObserver?: IntersectionObserver;
+    private loadedCount = 0;
+    constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
+        super();
+        this.app = app;
+        this.plugin = plugin;
+        this.tab = tab;
+    }
+    display() {
+        this.disconnectInfiniteScroll();
+        // Plugin installations can happen while the settings modal is open.
+        // Refresh the registry whenever this page is entered so the count and
+        // list reflect the current Obsidian plugin manifests.
+        this.plugin.updateManifests();
+        this.containerEl.empty();
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
+        new Setting(this.containerEl)
+            .setName("Plugins")
+            .setHeading()
+            .addExtraButton((button) =>
+                button
+                    .setIcon("refresh-cw")
+                    .setTooltip("Refresh plugin list")
+                    .onClick(() => {
+                        this.plugin.updateManifests();
+                        this.tab.update();
+                    }),
+            );
+        new Setting(this.containerEl)
+            .setName("Filter")
+            .addText((t) =>
+                t
+                    .setPlaceholder("Plugin name")
+                    .setValue(this.filter)
+                    .onChange((v) => {
+                        this.filter = v;
+                        this.renderInfiniteList();
+                    }),
+            )
+            .addDropdown((d) => {
+                d.addOption("", "All");
+                Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PLUGIN_MODE]));
+                d.setValue(this.mode ?? "").onChange((v) => {
+                    this.mode = v ? (v as PLUGIN_MODE) : undefined;
+                    this.renderInfiniteList();
+                });
+            });
+        this.containerEl.createDiv({ cls: "lazy-plugin-infinite-host" });
+        this.renderInfiniteList();
+    }
+    hide() {
+        this.disconnectInfiniteScroll();
+        super.hide();
+    }
+    private renderInfiniteList() {
+        this.disconnectInfiniteScroll();
+        const host = this.containerEl.querySelector<HTMLElement>(".lazy-plugin-infinite-host");
+        if (!host) return;
+        host.empty();
+        const plugins = this.plugin.manifests.filter((manifest) => (!this.filter || manifest.name.toLowerCase().includes(this.filter.toLowerCase())) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
+        host.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
+        const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
+        this.loadedCount = Math.min(PluginPage.PAGE_SIZE, plugins.length);
+        this.appendPluginRows(listEl, plugins, 0, this.loadedCount);
+        if (this.loadedCount >= plugins.length) return;
+        const sentinel = host.createDiv({ cls: "lazy-plugin-infinite-sentinel", attr: { "aria-hidden": "true" } });
+        const activeWindow = host.ownerDocument.defaultView;
+        if (!activeWindow) return;
+        this.infiniteScrollObserver = new activeWindow.IntersectionObserver(
+            (entries) => {
+                if (!entries.some((entry) => entry.isIntersecting)) return;
+                const previousCount = this.loadedCount;
+                this.loadedCount = Math.min(this.loadedCount + PluginPage.PAGE_SIZE, plugins.length);
+                this.appendPluginRows(listEl, plugins, previousCount, this.loadedCount);
+                if (this.loadedCount >= plugins.length) {
+                    this.disconnectInfiniteScroll();
+                    sentinel.remove();
+                }
+            },
+            { rootMargin: "300px 0px" },
+        );
+        this.infiniteScrollObserver.observe(sentinel);
+    }
+    private appendPluginRows(listEl: HTMLElement, plugins: OnDemandPlugin["manifests"], start: number, end: number) {
+        plugins.slice(start, end).forEach((manifest) => {
+            if (!manifest) return;
+            const setting = new Setting(listEl).setName(manifest.name);
+            setting.setDesc(manifest.description);
+            new ExtraButtonComponent(setting.controlEl)
+                .setIcon("gear")
+                .setTooltip("Advanced lazy options")
+                .onClick(() =>
+                    new LazyOptionsModal(this.app, this.plugin, manifest.id, () => {
+                        this.tab.pendingPluginIds.add(manifest.id);
+                        this.tab.markDirty();
+                        this.tab.renderPendingControls(this.containerEl, () => this.display());
+                    }).open(),
+                );
+            setting.addDropdown((dropdown) => {
+                Object.keys(PluginModes).forEach((key) => dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]));
+                dropdown.setValue(this.plugin.getPluginMode(manifest.id)).onChange((value) => {
+                    // Changing the mode should preserve advanced lazy options so
+                    // users can temporarily disable a plugin without reconfiguring it.
+                    this.plugin.settings.plugins[manifest.id] = {
+                        ...(this.plugin.settings.plugins[manifest.id] ?? {}),
+                        mode: value as PLUGIN_MODE,
+                        userConfigured: true,
+                    };
+                    this.tab.pendingPluginIds.add(manifest.id);
+                    this.tab.markDirty();
+                    // Re-apply an active filter after a mode change so rows and the
+                    // result count do not show plugins that no longer match it.
+                    this.renderInfiniteList();
+                    this.tab.renderPendingControls(this.containerEl, () => this.display());
+                });
+            });
+        });
+    }
+    private disconnectInfiniteScroll() {
+        this.infiniteScrollObserver?.disconnect();
+        this.infiniteScrollObserver = undefined;
+    }
+}
+
+class MaintenancePage extends SettingPage {
+    private plugin: OnDemandPlugin;
+    private tab: SettingsTab;
+    private from = "alwaysDisabled" as PLUGIN_MODE;
+    private to = "lazy" as PLUGIN_MODE;
+    private syncDirection: SyncDirection = "lazyToCore";
+    constructor(plugin: OnDemandPlugin, tab: SettingsTab) {
+        super();
+        this.plugin = plugin;
+        this.tab = tab;
+    }
+    display() {
+        this.containerEl.empty();
+        this.containerEl.addClass("lazy-maintenance-page");
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
+        const f = this.plugin.features.get(MaintenanceFeatureClass) as MaintenanceFeature | undefined;
+        new Setting(this.containerEl).setName("Cache maintenance").setHeading();
+        new Setting(this.containerEl).setName("Force rebuild command cache").addButton((b) =>
+            b
+                .setButtonText("Rebuild cache")
+                .setWarning()
+                .onClick(async () => {
+                    if (!f) return;
+                    b.setDisabled(true);
+                    try {
+                        await f.rebuildAndApplyCommandCache({ force: true });
+                        new Notice("Command cache rebuilt successfully");
+                    } finally {
+                        b.setDisabled(false);
+                    }
+                }),
+        );
+        new Setting(this.containerEl).setName("Sync settings").setHeading();
+        new Setting(this.containerEl)
+            .setName("Sync direction")
+            .addDropdown((d) =>
+                d
+                    .addOption("lazyToCore", "Plugin data -> Obsidian config")
+                    .addOption("coreToLazy", "Obsidian config -> plugin data")
+                    .setValue(this.syncDirection)
+                    .onChange((v) => (this.syncDirection = v as SyncDirection)),
+            )
+            .addButton((b) =>
+                b
+                    .setButtonText("Sync now")
+                    .setCta()
+                    .onClick(async () => {
+                        if (!f) return;
+                        if (this.syncDirection === "lazyToCore" && this.tab.hasPendingChanges) {
+                            // This direction writes Obsidian's config immediately, so
+                            // do not let it persist a draft that Discard could undo only
+                            // on the plugin-data side.
+                            new Notice("Save or discard pending settings before syncing to Obsidian config.");
+                            return;
+                        }
+                        const result = await f.executeSync(this.syncDirection);
+                        new Notice(result.message);
+                        if (result.changed > 0) {
+                            if (this.syncDirection === "coreToLazy") {
+                                // coreToLazy stages plugin data in memory; retain the
+                                // exact IDs so Save applies only the affected policies.
+                                result.pluginIds?.forEach((pluginId) => this.tab.pendingPluginIds.add(pluginId));
+                                this.tab.markDirty();
+                            }
+                            this.display();
+                        }
+                    }),
+            );
+        new Setting(this.containerEl).setName("Batch operations").setHeading();
+        new Setting(this.containerEl).setName("From mode").addDropdown((d) =>
+            this.modes(d)
+                .setValue(this.from)
+                .onChange((v) => (this.from = v as PLUGIN_MODE)),
+        );
+        new Setting(this.containerEl)
+            .setName("To mode")
+            .addButton((b) =>
+                b
+                    .setButtonText("Replace all")
+                    .setWarning()
+                    .onClick(() => {
+                        if (!f || this.from === this.to) return;
+                        this.plugin.updateManifests();
+                        const pluginIds = this.plugin.manifests.filter((manifest) => this.plugin.getPluginMode(manifest.id) === this.from).map((manifest) => manifest.id);
+                        const n = f.applyBatchModeReplace(this.from, this.to);
+                        if (n) {
+                            pluginIds.forEach((pluginId) => this.tab.pendingPluginIds.add(pluginId));
+                            this.tab.markDirty();
+                            new Notice(`Staged ${n} plugin changes. Save to apply them.`);
+                            this.display();
+                        }
+                    }),
+            )
+            .addDropdown((d) =>
+                this.modes(d)
+                    .setValue(this.to)
+                    .onChange((v) => (this.to = v as PLUGIN_MODE)),
+            );
+        new Setting(this.containerEl).setName("Debug options").setHeading();
+        new Setting(this.containerEl).setName("Debug log output").addToggle((t) =>
+            t.setValue(this.plugin.data.showConsoleLog).onChange(async (v) => {
+                this.plugin.data.showConsoleLog = v;
+                this.plugin.configureLogger();
+                this.tab.markDirty();
+                this.display();
+            }),
+        );
+    }
+    private modes(d: DropdownComponent) {
+        Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PLUGIN_MODE]));
+        return d;
+    }
+}
+
+export class SettingsTab extends PluginSettingTab {
+    pendingPluginIds = new Set<string>();
+    private dirty = false;
+    public plugin: OnDemandPlugin;
+    constructor(app: App, plugin: OnDemandPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+    get hasPendingChanges() {
+        return this.dirty || this.pendingPluginIds.size > 0;
+    }
+    getControlValue(key: string) {
+        return (this.plugin.settings as unknown as Record<string, unknown>)[key];
+    }
+    setControlValue(key: string, value: unknown) {
+        (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+        // Keep declarative controls on the same draft lifecycle as plugin modes;
+        // otherwise Save/Discard cannot provide an atomic, predictable result.
+        this.markDirty();
+        this.update();
+    }
+    getSettingDefinitions(): SettingDefinitionItem[] {
+        this.plugin.updateManifests();
+        const modes = Object.fromEntries(Object.keys(PluginModes).map((key) => [key, PluginModes[key as PLUGIN_MODE]]));
+        return [
+            { type: "page", name: "Profile management", desc: "Manage profiles and device defaults.", page: () => new ProfileManagementPage(this.app, this.plugin, this) },
+            { type: "page", name: "Plugin management", desc: "Configure plugin loading modes.", displayValue: () => `${this.plugin.manifests.length} plugins`, page: () => new PluginPage(this.app, this.plugin, this) },
+            {
+                type: "page",
+                name: "Behaviour",
+                desc: "Configure default loading behaviour.",
+                items: [
+                    {
+                        name: "Changes",
+                        desc: "Settings changes are staged until you save them.",
+                        render: (setting) => this.configurePendingControls(setting),
+                    },
+                    { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
+                    {
+                        name: "Auto-remove uninstalled entries",
+                        desc: "Prune settings for plugins that are no longer installed.",
+                        render: (setting) => {
+                            setting.addToggle((toggle) =>
+                                toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange(async (value) => {
+                                    this.plugin.settings.pruneUninstalledEntries = value;
+                                    this.markDirty();
+                                    try {
+                                        // Back up before pruning so enabling cleanup never loses
+                                        // the stale entries before the user can save the draft.
+                                        if (value) await this.plugin.backupAndPruneUninstalledEntries();
+                                    } finally {
+                                        this.update();
+                                    }
+                                }),
+                            );
+                        },
+                    },
+                ],
+            },
+            { type: "page", name: "Maintenance & batch", desc: "Rebuild caches and apply batch operations.", page: () => new MaintenancePage(this.plugin, this) },
+        ];
+    }
+    markDirty() {
+        this.dirty = true;
+    }
+    configurePendingControls(setting: Setting, onRefresh?: () => void) {
+        setting
+            .setClass("lazy-plugin-save-controls")
+            .setName("Changes")
+            .setDesc("Settings changes are staged until you save them. Plugin mode changes are applied when saved.")
+            .addButton((button) =>
+                button
+                    .setButtonText(this.pendingPluginIds.size > 0 ? `Save & apply (${this.pendingPluginIds.size})` : "Save changes")
+                    .setCta()
+                    .setDisabled(!this.hasPendingChanges)
+                    .onClick(async () => {
+                        await this.saveChanges();
+                        onRefresh?.();
+                    }),
+            )
+            .addButton((button) =>
+                button
+                    .setButtonText("Discard")
+                    .setDisabled(!this.hasPendingChanges)
+                    .onClick(async () => {
+                        if (await this.discardChanges()) onRefresh?.();
+                    }),
+            );
+    }
+    renderPendingControls(container: HTMLElement, onRefresh?: () => void) {
+        container.querySelector(".lazy-plugin-save-controls")?.remove();
+        const setting = new Setting(container);
+        this.configurePendingControls(setting, onRefresh);
+        container.prepend(setting.settingEl);
+    }
+    resetPending() {
+        this.dirty = false;
+        this.pendingPluginIds.clear();
+    }
+    async saveChanges() {
+        if (!this.hasPendingChanges) return;
+        const pluginIds = Array.from(this.pendingPluginIds);
+        await this.plugin.saveSettings();
+        if (pluginIds.length > 0) {
+            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds });
+        }
+        this.resetPending();
+        new Notice(pluginIds.length > 0 ? "Settings saved and applied" : "Settings saved");
+        this.update();
+    }
+    async discardPendingChanges(refresh = true) {
+        await this.plugin.loadSettings();
+        // Debug logging is applied at runtime, so restore it after reloading the
+        // persisted draft when the user discards changes.
+        this.plugin.configureLogger();
+        this.resetPending();
+        if (refresh) this.update();
+    }
+    async discardChanges(): Promise<boolean> {
+        if (!(await showConfirmModal(this.app, { message: "Discard all unsaved changes?" }))) return false;
+        await this.discardPendingChanges();
+        new Notice("Changes discarded");
+        return true;
+    }
+}
+
+/* eslint-enable @typescript-eslint/no-misused-promises, @typescript-eslint/no-unnecessary-type-assertion, no-useless-escape -- End of the intentionally compact declarative settings implementation. */

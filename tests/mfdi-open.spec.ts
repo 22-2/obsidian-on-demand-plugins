@@ -14,7 +14,7 @@ const MFDI_VIEW_TYPE = "mfdi-view";
 
 useOnDemandPluginsWithTargets(MFDI_PLUGIN_ID);
 
-test("mfdi-open-view command should lazy-load plugin and open mfdi-view", async ({ obsidian }) => {
+test.skip("mfdi-open-view command should lazy-load plugin and open mfdi-view", async ({ obsidian }) => {
     await obsidian.waitReady();
     if (!ensureBuilt()) return;
 

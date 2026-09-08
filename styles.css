@@ -4,13 +4,37 @@
 }
 
 .lazy-plugin-results-count {
-    margin-right: 1em;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: var(--size-4-8);
+    margin: 0;
+    padding: 0 var(--size-4-2);
     color: var(--text-muted);
     font-size: 0.8em;
 }
 
 .lazy-plugin-progress-bar {
     width: 100%;
+}
+
+.lazy-plugin-save-controls {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--background-primary);
+}
+
+.lazy-plugin-infinite-sentinel {
+    height: 1px;
+}
+
+.lazy-maintenance-page .setting-item-heading {
+    margin-top: var(--size-4-4);
+}
+
+.lazy-maintenance-page .setting-item-control {
+    flex-wrap: wrap;
 }
 
 .lazy-plugin-gear-left {
@@ -29,12 +53,6 @@
     border-bottom: 1px solid var(--background-modifier-border);
     padding-bottom: 18px;
     margin-bottom: 18px;
-}
-
-.lazy-profile-badges {
-    font-size: 0.8em;
-    color: var(--text-muted);
-    margin-top: 0.5em;
 }
 
 .lazy-plugin-section {
@@ -64,14 +82,6 @@
     gap: 10px;
 }
 
-.lazy-profile-row {
-    display: flex;
-    align-items: center;
-    padding: 10px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-}
-
 .lazy-profile-info {
     flex: 1;
 }
@@ -80,14 +90,83 @@
     font-weight: bold;
 }
 
-.lazy-profile-meta {
-    font-size: 0.8em;
-    color: var(--text-muted);
-}
-
 .lazy-profile-actions {
     display: flex;
     gap: 8px;
+}
+
+.lazy-profile-page .lazy-profile-list {
+    gap: 8px;
+}
+
+.lazy-profile-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-secondary);
+}
+
+.lazy-profile-card.is-current {
+    border-color: var(--interactive-accent);
+}
+
+.lazy-profile-card .lazy-profile-info {
+    min-width: 0;
+}
+
+.lazy-profile-card .lazy-profile-name {
+    font-weight: var(--font-medium);
+}
+
+.lazy-profile-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+}
+
+.lazy-profile-badge {
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-profile-badge.is-active {
+    color: var(--text-accent);
+    font-weight: var(--font-medium);
+}
+
+.lazy-profile-card .lazy-profile-actions {
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.lazy-profile-action {
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+.lazy-profile-current-label {
+    color: var(--text-accent);
+    font-size: var(--font-ui-small);
+    white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+    .lazy-profile-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .lazy-profile-card .lazy-profile-actions {
+        width: 100%;
+        justify-content: flex-start;
+        margin-left: 0;
+    }
 }
 
 .lazy-sync-preview {
@@ -182,6 +261,12 @@
 }
 
 @keyframes lazy-fade-in {
-    from { opacity: 0; transform: translateY(4px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

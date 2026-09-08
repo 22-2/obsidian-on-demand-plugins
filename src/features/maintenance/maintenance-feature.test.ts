@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 describe("MaintenanceFeature", () => {
     let feature: MaintenanceFeature;
     let settingsState: {
-        plugins: Record<string, { mode: string }>;
+        plugins: Record<string, { mode: string; lazyOptions?: unknown }>;
     };
     let mockCtx: {
         getData: () => { showConsoleLog: boolean };
@@ -24,7 +24,15 @@ describe("MaintenanceFeature", () => {
     beforeEach(() => {
         settingsState = {
             plugins: {
-                "plugin-1": { mode: PLUGIN_MODE.ALWAYS_DISABLED },
+                "plugin-1": {
+                    mode: PLUGIN_MODE.ALWAYS_DISABLED,
+                    lazyOptions: {
+                        useView: true,
+                        viewTypes: ["example"],
+                        useFile: false,
+                        fileCriteria: {},
+                    },
+                },
                 "plugin-2": { mode: PLUGIN_MODE.ALWAYS_ENABLED },
             },
         };
@@ -58,6 +66,12 @@ describe("MaintenanceFeature", () => {
 
             expect(changed).toBe(1);
             expect(mockCtx.getSettings().plugins["plugin-1"].mode).toBe(PLUGIN_MODE.LAZY);
+            expect(mockCtx.getSettings().plugins["plugin-1"].lazyOptions).toEqual({
+                useView: true,
+                viewTypes: ["example"],
+                useFile: false,
+                fileCriteria: {},
+            });
             expect(mockCtx.getSettings().plugins["plugin-2"].mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
         });
 
@@ -76,7 +90,14 @@ describe("MaintenanceFeature", () => {
             const result = await feature.executeSync("coreToLazy");
 
             expect(result.changed).toBe(2);
+            expect(result.pluginIds).toEqual(["plugin-1", "plugin-2"]);
             expect(mockCtx.getSettings().plugins["plugin-1"].mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
+            expect(mockCtx.getSettings().plugins["plugin-1"].lazyOptions).toEqual({
+                useView: true,
+                viewTypes: ["example"],
+                useFile: false,
+                fileCriteria: {},
+            });
             expect(mockCtx.getSettings().plugins["plugin-2"].mode).toBe(PLUGIN_MODE.ALWAYS_DISABLED);
         });
     });

@@ -220,4 +220,4 @@ export async function readOnDemandStorageValue(
     return record?.[key] ?? null;
 }
 
-export { pluginUnderTestId, targetPluginId, excalidrawPluginId };
+export { excalidrawPluginId, pluginUnderTestId, targetPluginId };

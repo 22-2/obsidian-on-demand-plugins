@@ -1,11 +1,11 @@
+import log from "loglevel";
 import type { PluginManifest } from "obsidian";
+import pTimeout from "p-timeout";
+import pWaitFor from "p-wait-for";
 import type { CachedCommand, PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { isLazyMode, isPluginLoaded } from "src/core/utils";
 import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
-import pTimeout from "p-timeout";
-import pWaitFor from "p-wait-for";
-import log from "loglevel";
 
 const logger = log.getLogger("OnDemandPlugin/CommandCacheService");
 

@@ -14,9 +14,11 @@ interface SyncPreviewResult {
     summary: string;
 }
 
-interface SyncResult {
+export interface SyncResult {
     changed: number;
     message: string;
+    /** Plugin IDs whose settings were staged and still need policy application. */
+    pluginIds?: string[];
 }
 
 export class MaintenanceFeature implements AppFeature {
@@ -78,6 +80,7 @@ export class MaintenanceFeature implements AppFeature {
     private syncCoreToLazy(): SyncResult {
         const onDisk = this.registry.enabledPluginsFromDisk;
         let changed = 0;
+        const pluginIds: string[] = [];
         const manifests = this.ctx.getManifests();
         const settings = this.ctx.getSettings();
 
@@ -89,15 +92,19 @@ export class MaintenanceFeature implements AppFeature {
 
             if (targetMode) {
                 settings.plugins[manifest.id] = {
+                    ...(settings.plugins[manifest.id] ?? {}),
                     mode: targetMode,
                     userConfigured: true,
                 };
+                // This direction only changes in-memory plugin data; return the IDs so
+                // the settings UI can keep the changes staged until the user saves.
+                pluginIds.push(manifest.id);
                 changed++;
             }
         }
 
         if (changed > 0) {
-            return { changed, message: `Staged ${changed} plugin changes from Obsidian config. Click "Save" to apply.` };
+            return { changed, pluginIds, message: `Staged ${changed} plugin changes from Obsidian config. Click "Save" to apply.` };
         }
         return { changed: 0, message: "On-Demand Plugins is already in sync with Obsidian config" };
     }
@@ -129,6 +136,7 @@ export class MaintenanceFeature implements AppFeature {
         for (const manifest of manifests) {
             if (this.ctx.getPluginMode(manifest.id) === fromMode) {
                 settings.plugins[manifest.id] = {
+                    ...(settings.plugins[manifest.id] ?? {}),
                     mode: toMode,
                     userConfigured: true,
                 };

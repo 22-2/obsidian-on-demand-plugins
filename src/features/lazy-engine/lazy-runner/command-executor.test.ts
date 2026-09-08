@@ -16,7 +16,7 @@ describe("CommandExecutor", () => {
     beforeEach(() => {
         vi.resetAllMocks();
 
-        globalThis.document = {
+        window.document = {
             activeElement: {
                 closest: vi.fn().mockReturnValue(null),
                 contains: vi.fn().mockReturnValue(false),
@@ -25,7 +25,7 @@ describe("CommandExecutor", () => {
 
         // The executor reads `activeDocument` (Obsidian's global for the active window)
         // rather than `document`, so the mock must be exposed under that name too.
-        (globalThis as unknown as { activeDocument: Document }).activeDocument = globalThis.document;
+        (window as unknown as { activeDocument: Document }).activeDocument = window.document;
 
         mockCtx = {
             app: {

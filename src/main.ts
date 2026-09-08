@@ -21,7 +21,7 @@ export default class OnDemandPlugin extends Plugin {
     // Assigned during onload via loadSettings().
     data!: LazySettings;
     // Assigned during onload via loadSettings().
-    settings!: DeviceSettings;
+    declare settings: DeviceSettings;
     device = "desktop/global";
     manifests: PluginManifest[] = [];
 
@@ -215,7 +215,13 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     async updatePluginSettings(pluginId: string, mode: PLUGIN_MODE) {
-        this.settings.plugins[pluginId] = { mode, userConfigured: true };
+        // Mode changes must not erase the plugin's advanced lazy rules; those
+        // rules are independent of whether the plugin is currently enabled.
+        this.settings.plugins[pluginId] = {
+            ...(this.settings.plugins[pluginId] ?? {}),
+            mode,
+            userConfigured: true,
+        };
         await this.saveSettings();
         const lazyEngine = this.features.get(LazyEngineFeature);
         await lazyEngine!.applyPluginState(pluginId);

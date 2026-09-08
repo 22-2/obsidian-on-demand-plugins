@@ -145,7 +145,7 @@ describe("BackupFeature", () => {
         mockAdapter.list.mockResolvedValue({ folders: [], files: [] });
 
         const backupFeature = new BackupFeature();
-    await backupFeature.onload(mockCtx as never);
+        await backupFeature.onload(mockCtx as never);
         await backupFeature.createBackup();
 
         expect(mockAdapter.write).toHaveBeenCalledTimes(2);
@@ -158,6 +158,29 @@ describe("BackupFeature", () => {
 
         expect(dataWriteCall![1]).toBe(validData);
         expect(communityWriteCall![1]).toBe(validCommunity);
+    });
+
+    it("should include external profile files in the backup", async () => {
+        mockAdapter.exists.mockResolvedValue(true);
+        const validData = '{"profileStorageVersion":1}';
+        const validCommunity = "[]";
+        const profileContent = '{"id":"Default","name":"Default","settings":{}}';
+
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return validData;
+            if (path.includes("community-plugins.json")) return validCommunity;
+            return profileContent;
+        });
+        mockAdapter.list.mockResolvedValueOnce({ folders: [], files: ["mock/plugin/dir/profiles/Default.json"] }).mockResolvedValueOnce({ folders: [], files: [] });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        const profileWriteCall = mockAdapter.write.mock.calls.find((call: unknown[]) => String(call[0]).includes("profiles_"));
+        expect(profileWriteCall).toBeDefined();
+        expect(profileWriteCall![1]).toContain('"Default.json"');
+        expect(profileWriteCall![1]).toContain(JSON.stringify(profileContent));
     });
 
     it("should create immutable initial-install backup whenever it is missing", async () => {
@@ -219,7 +242,7 @@ describe("BackupFeature", () => {
         });
 
         const backupFeature = new BackupFeature();
-    await backupFeature.onload(mockCtx as never);
+        await backupFeature.onload(mockCtx as never);
         await (backupFeature as unknown as { rotateBackups: () => Promise<void> }).rotateBackups();
 
         // Length starts at 5, we keep 3, so we remove 2 data and 2 community = 4 removes

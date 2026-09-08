@@ -13,6 +13,7 @@ export class LazyOptionsModal extends Modal {
     private pluginId: string;
     private onSave?: () => void;
     private options: LazyOptions;
+    private initialOptionsSnapshot: string;
 
     constructor(app: App, plugin: OnDemandPlugin, pluginId: string, onSave?: () => void) {
         super(app);
@@ -41,6 +42,8 @@ export class LazyOptionsModal extends Modal {
                 frontmatterKeys: ["excalidraw-plugin"],
             };
         }
+
+        this.initialOptionsSnapshot = JSON.stringify(this.options);
     }
 
     onOpen() {
@@ -165,19 +168,27 @@ export class LazyOptionsModal extends Modal {
                     .setButtonText("Save")
                     .setCta()
                     .onClick(() => {
-                        const pluginSettings = this.plugin.settings.plugins[this.pluginId];
-                        if (pluginSettings) {
+                        const hasChanges = JSON.stringify(this.options) !== this.initialOptionsSnapshot;
+                        if (hasChanges) {
+                            // Plugin settings are sparse until a mode is explicitly
+                            // configured, but advanced options must still be saveable.
+                            const pluginSettings = (this.plugin.settings.plugins[this.pluginId] ??= {
+                                mode: this.plugin.getPluginMode(this.pluginId),
+                                userConfigured: false,
+                            });
                             pluginSettings.lazyOptions = this.options;
                             // For backward compatibility during transition, also update the global maps
                             this.plugin.settings.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
                             this.plugin.settings.lazyOnFiles[this.pluginId] = this.options.useFile ? this.options.fileCriteria : {};
                         }
                         // Notify caller (SettingsTab) so it can mark this plugin as pending
-                        try {
-                            this.onSave?.();
-                        } catch (e) {
-                            new Notice("Error in onSave callback: " + (String(e) || "Unknown error"));
-                            logger.error("Error in LazyOptionsModal onSave callback", e);
+                        if (hasChanges) {
+                            try {
+                                this.onSave?.();
+                            } catch (e) {
+                                new Notice("Error in onSave callback: " + (String(e) || "Unknown error"));
+                                logger.error("Error in LazyOptionsModal onSave callback", e);
+                            }
                         }
                         this.close();
                     }),

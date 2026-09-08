@@ -4,6 +4,7 @@ import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, LazySettings, Profile } from "src/core/types";
 import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS } from "src/core/types";
 import type OnDemandPlugin from "src/main";
+import { ProfileStorage } from "src/services/settings/profile-storage";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsService");
 
@@ -14,6 +15,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export class SettingsService {
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
     private plugin: OnDemandPlugin;
+    private profileStorage: ProfileStorage;
+    private profileStorageEnabled = false;
 
     // Populated in load().
     data!: LazySettings;
@@ -28,6 +31,7 @@ export class SettingsService {
 
     constructor(plugin: OnDemandPlugin) {
         this.plugin = plugin;
+        this.profileStorage = new ProfileStorage(plugin);
     }
 
     async load() {
@@ -39,6 +43,24 @@ export class SettingsService {
         // 2. Merge with defaults (deep clone defaults first so we don't mutate
         // the shared DEFAULT_SETTINGS object during runtime edits).
         this.data = Object.assign(structuredClone(DEFAULT_SETTINGS), loaded);
+
+        const storedProfiles = await this.profileStorage.load();
+        this.profileStorageEnabled = storedProfiles.available;
+        const hasExternalStorageMarker = loaded.profileStorageVersion === 1;
+        const legacyProfiles = isRecord(this.data.profiles) ? this.data.profiles : {};
+        let shouldMigrateProfiles = storedProfiles.available && !hasExternalStorageMarker;
+
+        if (Object.keys(storedProfiles.profiles).length > 0) {
+            this.data.profiles = hasExternalStorageMarker ? storedProfiles.profiles : { ...legacyProfiles, ...storedProfiles.profiles };
+        } else if (hasExternalStorageMarker && storedProfiles.filesFound) {
+            // Keep the normalizer below from treating the default template as a
+            // valid external profile when every stored profile is corrupt.
+            this.data.profiles = {};
+        }
+
+        if (storedProfiles.corruptPaths.length > 0) {
+            logger.warn("Some external profile files could not be read", storedProfiles.corruptPaths);
+        }
 
         // 2b. Ensure top-level profile references are valid before migration.
         // First drop any corrupt (null/non-object) profile entries so a later
@@ -96,6 +118,7 @@ export class SettingsService {
         // already-migrated installs get cleaned too.
         delete this.data.commandCache;
         delete this.data.commandCacheVersions;
+        delete (this.data as unknown as Record<string, unknown>).suppressPluginManagementNotice;
 
         // 6. Set the active settings reference
         this.settings = this.data.profiles[this.currentProfileId].settings;
@@ -112,6 +135,14 @@ export class SettingsService {
                 ...(this.settings.lazyOnViews ?? {}),
                 ...(storedViews as { [k: string]: string[] }),
             };
+        }
+
+        if (shouldMigrateProfiles) {
+            try {
+                await this.save();
+            } catch (error) {
+                logger.warn("Failed to migrate profiles to external storage; keeping data.json fallback", error);
+            }
         }
     }
 
@@ -179,9 +210,8 @@ export class SettingsService {
         if (profile.settings.pruneUninstalledEntries === undefined) {
             profile.settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;
         }
-        if (profile.settings.showDescriptions === undefined) {
-            profile.settings.showDescriptions = DEFAULT_DEVICE_SETTINGS.showDescriptions;
-        }
+        // This setting was removed; discard it from profiles created by older versions.
+        delete (profile.settings as unknown as Record<string, unknown>).showDescriptions;
         if (!isRecord(profile.settings.plugins)) {
             profile.settings.plugins = {};
         }
@@ -199,7 +229,25 @@ export class SettingsService {
         if (this.data.profiles[this.currentProfileId]) {
             this.data.profiles[this.currentProfileId].settings = this.settings;
         }
-        await this.plugin.saveData(this.data);
+        if (!this.profileStorageEnabled) {
+            await this.plugin.saveData(this.data);
+            return;
+        }
+
+        try {
+            await this.profileStorage.save(this.data.profiles);
+            const persisted = { ...this.data } as Partial<LazySettings>;
+            delete persisted.profiles;
+            persisted.profileStorageVersion = 1;
+            await this.plugin.saveData(persisted);
+        } catch (error) {
+            // Keep a complete data.json fallback if external storage is not
+            // writable. The next load can retry migration without losing data.
+            logger.warn("Failed to save external profiles; writing data.json fallback", error);
+            const fallback = { ...this.data } as Partial<LazySettings>;
+            delete fallback.profileStorageVersion;
+            await this.plugin.saveData(fallback);
+        }
     }
 
     /**
