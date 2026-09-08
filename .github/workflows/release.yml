@@ -24,12 +24,15 @@ jobs:
                   subject-path: |
                       main.js
                       styles.css
+            # Keep the changelog preset compatible with the writer bundled by
+            # release-notes-generator@14 so a future latest-major update cannot
+            # break release notes generation.
             - run: >
                   pnpm dlx
                   --package=semantic-release@24.1.2
-                  --package=conventional-changelog-conventionalcommits
+                  --package=conventional-changelog-conventionalcommits@8.0.0
                   --package=@semantic-release/commit-analyzer
-                  --package=@semantic-release/release-notes-generator
+                  --package=@semantic-release/release-notes-generator@14.1.1
                   --package=@semantic-release/github
                   --package=@semantic-release/git
                   --package=@semantic-release/exec
