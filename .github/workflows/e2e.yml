@@ -84,6 +84,11 @@ jobs:
                   git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
                   pnpm install --no-frozen-lockfile
 
+            - name: Verify Electron installation
+              # The toolkit declares Electron as a peer dependency, so keep it
+              # direct in this project and fail before Playwright if its binary is missing.
+              run: pnpm exec electron --version
+
             - name: Install Playwright chromium
               # macOS runner では cdn.playwright.dev からの DL が 100% 表示後に
               # スタールすることがある。Playwright 側に全体タイムアウトが無いため、
