@@ -91,8 +91,8 @@ importers:
         specifier: ^1.13.1
         version: 1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)
       obsidian-e2e-toolkit:
-        specifier: github:22-2/obsidian-e2e-toolkit#1.0.6
-        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/62abeb098f453114b3943ae5267a46577f0b9d66(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1)
+        specifier: github:22-2/obsidian-e2e-toolkit#1.1.0
+        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1)
       playwright:
         specifier: ^1.59.1
         version: 1.59.1
@@ -2523,9 +2523,9 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/62abeb098f453114b3943ae5267a46577f0b9d66:
-    resolution: {gitHosted: true, integrity: sha512-kufabdYO44d90epLc8A4ZEsV6AltVqlzna0DRJ9DSKiuM099sihvC4yFfXa8agPqo/iFF1an/SbKd1E6ZTHkRQ==, tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/62abeb098f453114b3943ae5267a46577f0b9d66}
-    version: 1.0.6
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f:
+    resolution: {gitHosted: true, integrity: sha512-BJtSzYYQKK45DZCbIBiG5Ni5teFrIsmouViAtAADgk8jJ/whENVfJAbqkkFdU+D8I0OX/ldEvoaq3J89SahCwg==, tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f}
+    version: 1.1.0
     engines: {node: '>=23.0.0'}
     peerDependencies:
       '@playwright/test': ^1.56.0
@@ -6051,7 +6051,7 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.2
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/62abeb098f453114b3943ae5267a46577f0b9d66(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1):
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f(@playwright/test@1.59.1)(electron@41.0.3)(playwright@1.59.1):
     dependencies:
       '@electron/asar': 4.2.0
       '@playwright/test': 1.59.1
