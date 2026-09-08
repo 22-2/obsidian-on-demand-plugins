@@ -44,6 +44,7 @@ class ProfileManagementPage extends SettingPage {
     display() {
         this.containerEl.empty();
         this.containerEl.addClass("lazy-profile-page");
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
         const service = this.plugin.core.settingsService;
         const profileIds = Object.keys(service.data.profiles);
 
@@ -136,7 +137,7 @@ class ProfileManagementPage extends SettingPage {
                         .setIcon("copy")
                         .onClick(async () => {
                             service.createProfile(`${profile.name} (Copy)`, id);
-                            await service.save();
+                            this.tab.markDirty();
                             this.display();
                         }),
                 );
@@ -167,14 +168,19 @@ class ProfileManagementPage extends SettingPage {
             Object.values(service.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
             dropdown.setValue(currentId).onChange(async (profileId) => {
                 service.setDeviceDefault(profileId, type);
-                await service.save();
+                this.tab.markDirty();
                 this.display();
             });
         });
     }
 
     private async switchProfile(id: string) {
-        if (this.tab.hasPendingChanges && !(await showConfirmModal(this.app, { message: "You have unsaved changes. Switch profile anyway?" }))) return;
+        if (this.tab.hasPendingChanges) {
+            if (!(await showConfirmModal(this.app, { message: "You have unsaved changes. Switch profile anyway?" }))) return;
+            // Reload first so switchProfile cannot persist the discarded draft while
+            // it saves the newly selected profile and device default.
+            await this.tab.discardPendingChanges(false);
+        }
         await this.plugin.switchProfile(id);
         this.tab.resetPending();
         this.display();
@@ -193,7 +199,7 @@ class ProfileManagementPage extends SettingPage {
                     if (!name.trim()) return;
                     const service = this.plugin.core.settingsService;
                     service.renameProfile(id, name.trim());
-                    await service.save();
+                    this.tab.markDirty();
                     modal.close();
                     this.display();
                 }),
@@ -205,7 +211,7 @@ class ProfileManagementPage extends SettingPage {
         const name = this.createName.trim();
         if (!name) return;
         this.plugin.core.settingsService.createProfile(name);
-        await this.plugin.core.settingsService.save();
+        this.tab.markDirty();
         this.createName = "";
         this.display();
     }
@@ -216,9 +222,12 @@ class ProfileManagementPage extends SettingPage {
             new Notice("Assign another device default before deleting this profile.");
             return;
         }
-        if (!(await showConfirmModal(this.app, { message: `Delete profile \"${name}\"?` }))) return;
+        // Keep the install-time recovery profile behind an explicit warning so a
+        // destructive click does not silently remove the user's fallback copy.
+        const message = id === "initial-backup" ? `WARNING: \"${name}\" is your failsafe initial backup. It is highly recommended to keep it. Are you absolutely sure you want to delete it?` : `Delete profile \"${name}\"?`;
+        if (!(await showConfirmModal(this.app, { message }))) return;
         service.deleteProfile(id);
-        await service.save();
+        this.tab.markDirty();
         this.display();
     }
 }
@@ -249,7 +258,7 @@ class PluginPage extends SettingPage {
         // list reflect the current Obsidian plugin manifests.
         this.plugin.updateManifests();
         this.containerEl.empty();
-        this.renderSaveControls();
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
         new Setting(this.containerEl)
             .setName("Plugins")
             .setHeading()
@@ -287,34 +296,6 @@ class PluginPage extends SettingPage {
     hide() {
         this.disconnectInfiniteScroll();
         super.hide();
-    }
-    private renderSaveControls() {
-        const existing = this.containerEl.querySelector(".lazy-plugin-save-controls");
-        existing?.remove();
-        const setting = new Setting(this.containerEl)
-            .setClass("lazy-plugin-save-controls")
-            .setName("Changes")
-            .setDesc("Plugin mode changes are staged until you save and apply them.")
-            .addButton((b) =>
-                b
-                    .setButtonText(this.tab.hasPendingChanges ? `Save & apply (${this.tab.pendingPluginIds.size})` : "Save changes")
-                    .setCta()
-                    .setDisabled(!this.tab.hasPendingChanges)
-                    .onClick(async () => {
-                        await this.tab.saveChanges();
-                        this.display();
-                    }),
-            )
-            .addButton((b) =>
-                b
-                    .setButtonText("Discard")
-                    .setDisabled(!this.tab.hasPendingChanges)
-                    .onClick(async () => {
-                        await this.tab.discardChanges();
-                        this.display();
-                    }),
-            );
-        this.containerEl.prepend(setting.settingEl);
     }
     private renderInfiniteList() {
         this.disconnectInfiniteScroll();
@@ -357,16 +338,25 @@ class PluginPage extends SettingPage {
                     new LazyOptionsModal(this.app, this.plugin, manifest.id, () => {
                         this.tab.pendingPluginIds.add(manifest.id);
                         this.tab.markDirty();
-                        this.renderSaveControls();
+                        this.tab.renderPendingControls(this.containerEl, () => this.display());
                     }).open(),
                 );
             setting.addDropdown((dropdown) => {
                 Object.keys(PluginModes).forEach((key) => dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]));
                 dropdown.setValue(this.plugin.getPluginMode(manifest.id)).onChange((value) => {
-                    this.plugin.settings.plugins[manifest.id] = { mode: value as PLUGIN_MODE, userConfigured: true };
+                    // Changing the mode should preserve advanced lazy options so
+                    // users can temporarily disable a plugin without reconfiguring it.
+                    this.plugin.settings.plugins[manifest.id] = {
+                        ...(this.plugin.settings.plugins[manifest.id] ?? {}),
+                        mode: value as PLUGIN_MODE,
+                        userConfigured: true,
+                    };
                     this.tab.pendingPluginIds.add(manifest.id);
                     this.tab.markDirty();
-                    this.renderSaveControls();
+                    // Re-apply an active filter after a mode change so rows and the
+                    // result count do not show plugins that no longer match it.
+                    this.renderInfiniteList();
+                    this.tab.renderPendingControls(this.containerEl, () => this.display());
                 });
             });
         });
@@ -391,6 +381,7 @@ class MaintenancePage extends SettingPage {
     display() {
         this.containerEl.empty();
         this.containerEl.addClass("lazy-maintenance-page");
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
         const f = this.plugin.features.get(MaintenanceFeatureClass) as MaintenanceFeature | undefined;
         new Setting(this.containerEl).setName("Cache maintenance").setHeading();
         new Setting(this.containerEl).setName("Force rebuild command cache").addButton((b) =>
@@ -424,9 +415,24 @@ class MaintenancePage extends SettingPage {
                     .setCta()
                     .onClick(async () => {
                         if (!f) return;
+                        if (this.syncDirection === "lazyToCore" && this.tab.hasPendingChanges) {
+                            // This direction writes Obsidian's config immediately, so
+                            // do not let it persist a draft that Discard could undo only
+                            // on the plugin-data side.
+                            new Notice("Save or discard pending settings before syncing to Obsidian config.");
+                            return;
+                        }
                         const result = await f.executeSync(this.syncDirection);
                         new Notice(result.message);
-                        if (result.changed > 0) this.tab.update();
+                        if (result.changed > 0) {
+                            if (this.syncDirection === "coreToLazy") {
+                                // coreToLazy stages plugin data in memory; retain the
+                                // exact IDs so Save applies only the affected policies.
+                                result.pluginIds?.forEach((pluginId) => this.tab.pendingPluginIds.add(pluginId));
+                                this.tab.markDirty();
+                            }
+                            this.display();
+                        }
                     }),
             );
         new Setting(this.containerEl).setName("Batch operations").setHeading();
@@ -443,10 +449,14 @@ class MaintenancePage extends SettingPage {
                     .setWarning()
                     .onClick(() => {
                         if (!f || this.from === this.to) return;
+                        this.plugin.updateManifests();
+                        const pluginIds = this.plugin.manifests.filter((manifest) => this.plugin.getPluginMode(manifest.id) === this.from).map((manifest) => manifest.id);
                         const n = f.applyBatchModeReplace(this.from, this.to);
                         if (n) {
+                            pluginIds.forEach((pluginId) => this.tab.pendingPluginIds.add(pluginId));
                             this.tab.markDirty();
-                            new Notice(`Staged ${n} plugin changes. Save from Plugin management.`);
+                            new Notice(`Staged ${n} plugin changes. Save to apply them.`);
+                            this.display();
                         }
                     }),
             )
@@ -460,7 +470,8 @@ class MaintenancePage extends SettingPage {
             t.setValue(this.plugin.data.showConsoleLog).onChange(async (v) => {
                 this.plugin.data.showConsoleLog = v;
                 this.plugin.configureLogger();
-                await this.plugin.saveSettings();
+                this.tab.markDirty();
+                this.display();
             }),
         );
     }
@@ -486,7 +497,10 @@ export class SettingsTab extends PluginSettingTab {
     }
     setControlValue(key: string, value: unknown) {
         (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
-        void this.plugin.saveSettings();
+        // Keep declarative controls on the same draft lifecycle as plugin modes;
+        // otherwise Save/Discard cannot provide an atomic, predictable result.
+        this.markDirty();
+        this.update();
     }
     getSettingDefinitions(): SettingDefinitionItem[] {
         this.plugin.updateManifests();
@@ -499,6 +513,11 @@ export class SettingsTab extends PluginSettingTab {
                 name: "Behaviour",
                 desc: "Configure default loading behaviour.",
                 items: [
+                    {
+                        name: "Changes",
+                        desc: "Settings changes are staged until you save them.",
+                        render: (setting) => this.configurePendingControls(setting),
+                    },
                     { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
                     {
                         name: "Auto-remove uninstalled entries",
@@ -507,8 +526,14 @@ export class SettingsTab extends PluginSettingTab {
                             setting.addToggle((toggle) =>
                                 toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange(async (value) => {
                                     this.plugin.settings.pruneUninstalledEntries = value;
-                                    if (value) await this.plugin.backupAndPruneUninstalledEntries();
-                                    await this.plugin.saveSettings();
+                                    this.markDirty();
+                                    try {
+                                        // Back up before pruning so enabling cleanup never loses
+                                        // the stale entries before the user can save the draft.
+                                        if (value) await this.plugin.backupAndPruneUninstalledEntries();
+                                    } finally {
+                                        this.update();
+                                    }
                                 }),
                             );
                         },
@@ -521,24 +546,64 @@ export class SettingsTab extends PluginSettingTab {
     markDirty() {
         this.dirty = true;
     }
+    configurePendingControls(setting: Setting, onRefresh?: () => void) {
+        setting
+            .setClass("lazy-plugin-save-controls")
+            .setName("Changes")
+            .setDesc("Settings changes are staged until you save them. Plugin mode changes are applied when saved.")
+            .addButton((button) =>
+                button
+                    .setButtonText(this.pendingPluginIds.size > 0 ? `Save & apply (${this.pendingPluginIds.size})` : "Save changes")
+                    .setCta()
+                    .setDisabled(!this.hasPendingChanges)
+                    .onClick(async () => {
+                        await this.saveChanges();
+                        onRefresh?.();
+                    }),
+            )
+            .addButton((button) =>
+                button
+                    .setButtonText("Discard")
+                    .setDisabled(!this.hasPendingChanges)
+                    .onClick(async () => {
+                        if (await this.discardChanges()) onRefresh?.();
+                    }),
+            );
+    }
+    renderPendingControls(container: HTMLElement, onRefresh?: () => void) {
+        container.querySelector(".lazy-plugin-save-controls")?.remove();
+        const setting = new Setting(container);
+        this.configurePendingControls(setting, onRefresh);
+        container.prepend(setting.settingEl);
+    }
     resetPending() {
         this.dirty = false;
         this.pendingPluginIds.clear();
     }
     async saveChanges() {
         if (!this.hasPendingChanges) return;
+        const pluginIds = Array.from(this.pendingPluginIds);
         await this.plugin.saveSettings();
-        await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds: Array.from(this.pendingPluginIds) });
+        if (pluginIds.length > 0) {
+            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds });
+        }
         this.resetPending();
-        new Notice("Settings saved and applied");
+        new Notice(pluginIds.length > 0 ? "Settings saved and applied" : "Settings saved");
         this.update();
     }
-    async discardChanges() {
-        if (!(await showConfirmModal(this.app, { message: "Discard all unsaved changes?" }))) return;
+    async discardPendingChanges(refresh = true) {
         await this.plugin.loadSettings();
+        // Debug logging is applied at runtime, so restore it after reloading the
+        // persisted draft when the user discards changes.
+        this.plugin.configureLogger();
         this.resetPending();
-        this.update();
+        if (refresh) this.update();
+    }
+    async discardChanges(): Promise<boolean> {
+        if (!(await showConfirmModal(this.app, { message: "Discard all unsaved changes?" }))) return false;
+        await this.discardPendingChanges();
         new Notice("Changes discarded");
+        return true;
     }
 }
 
