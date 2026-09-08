@@ -169,8 +169,13 @@ export class LazyOptionsModal extends Modal {
                     .setCta()
                     .onClick(() => {
                         const hasChanges = JSON.stringify(this.options) !== this.initialOptionsSnapshot;
-                        const pluginSettings = this.plugin.settings.plugins[this.pluginId];
-                        if (hasChanges && pluginSettings) {
+                        if (hasChanges) {
+                            // Plugin settings are sparse until a mode is explicitly
+                            // configured, but advanced options must still be saveable.
+                            const pluginSettings = (this.plugin.settings.plugins[this.pluginId] ??= {
+                                mode: this.plugin.getPluginMode(this.pluginId),
+                                userConfigured: false,
+                            });
                             pluginSettings.lazyOptions = this.options;
                             // For backward compatibility during transition, also update the global maps
                             this.plugin.settings.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
