@@ -69,6 +69,9 @@ importers:
       conventional-changelog-conventionalcommits:
         specifier: ^10.2.1
         version: 10.2.1
+      electron:
+        specifier: 41.0.3
+        version: 41.0.3
       esbuild:
         specifier: 0.28.1
         version: 0.28.1

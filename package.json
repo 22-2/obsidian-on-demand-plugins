@@ -46,6 +46,7 @@
         "@types/node": "^26.1.1",
         "@vitest/ui": "^4.1.10",
         "conventional-changelog-conventionalcommits": "^10.2.1",
+        "electron": "41.0.3",
         "esbuild": "0.28.1",
         "eslint": "^10.6.0",
         "eslint-plugin-obsidianmd": "^0.4.1",
