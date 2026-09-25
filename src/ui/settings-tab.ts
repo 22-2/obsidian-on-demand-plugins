@@ -390,13 +390,30 @@ class PluginPage extends SettingPage {
                     };
                     this.tab.pendingPluginIds.add(manifest.id);
                     this.tab.markDirty();
-                    // Re-apply an active filter after a mode change so rows and the
-                    // result count do not show plugins that no longer match it.
-                    this.renderInfiniteList();
+                    // リスト全体を作り直すとスクロール位置・フォーカス・IntersectionObserverが
+                    // 失われるため、対象行だけを surgical に更新するのが定石。
+                    // フィルタに合致しなくなった行だけ取り除き、それ以外はDOMを触らない。
+                    const nextMode = value as PluginMode;
+                    const mismatched =
+                        (this.mode && nextMode !== this.mode) ||
+                        (this.filter && !manifest.name.toLowerCase().includes(this.filter.toLowerCase()));
+                    if (mismatched) {
+                        setting.settingEl.remove();
+                        this.loadedCount = Math.max(this.loadedCount - 1, 0);
+                    }
+                    this.refreshListMeta();
                     this.tab.renderPendingControls(this.containerEl, () => this.display());
                 });
             });
         });
+    }
+    private refreshListMeta() {
+        const host = this.containerEl.querySelector<HTMLElement>(".lazy-plugin-infinite-host");
+        const plugins = this.plugin.manifests.filter((manifest) => (!this.filter || manifest.name.toLowerCase().includes(this.filter.toLowerCase())) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
+        const countEl = host?.querySelector<HTMLElement>(".lazy-plugin-results-count");
+        if (countEl) countEl.setText(`${plugins.length} plugins`);
+        const statsEl = this.containerEl.querySelector(".lazy-plugin-statistics .setting-item-name");
+        if (statsEl) statsEl.setText(pluginStatisticsText(this.plugin));
     }
     private disconnectInfiniteScroll() {
         this.infiniteScrollObserver?.disconnect();
