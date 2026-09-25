@@ -34,7 +34,6 @@
         "store2": "^2.14.4"
     },
     "devDependencies": {
-        "@22-2/esbuild-plugin-obsidian-copy": "github:22-2/esbuild-plugin-obsidian-copy#3677bb62f4af684968629eb8fc508260240fb916",
         "@eslint/js": "^10.0.1",
         "@obsidian-typings/obsidian-public-latest": "^6.22.0",
         "@playwright/test": "^1.59.1",
