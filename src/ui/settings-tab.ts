@@ -9,6 +9,7 @@ import type { MaintenanceFeature, SyncDirection } from "src/features/maintenance
 import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/maintenance/maintenance-feature";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
+import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 
 type PluginStatistics = {
     alwaysEnabled: number;
@@ -308,8 +309,9 @@ class PluginPage extends SettingPage {
                         this.tab.update();
                     }),
             );
-        new Setting(this.containerEl)
-            .setName("Filter")
+        const filterSetting = new Setting(this.containerEl).setName("Filter");
+        filterSetting.setClass("lazy-plugin-filter-row");
+        filterSetting
             .addText((t) =>
                 t
                     .setPlaceholder("Plugin name")
@@ -368,36 +370,57 @@ class PluginPage extends SettingPage {
             if (!manifest) return;
             const setting = new Setting(listEl).setName(manifest.name);
             setting.setDesc(manifest.description);
-            new ExtraButtonComponent(setting.controlEl)
-                .setIcon("gear")
-                .setTooltip("Advanced lazy options")
-                .onClick(() =>
-                    new LazyOptionsModal(this.app, this.plugin, manifest.id, () => {
-                        this.tab.pendingPluginIds.add(manifest.id);
-                        this.tab.markDirty();
-                        this.tab.renderPendingControls(this.containerEl, () => this.display());
-                    }).open(),
-                );
-            setting.addDropdown((dropdown) => {
-                Object.keys(PluginModes).forEach((key) => dropdown.addOption(key, PluginModes[key as PluginMode]));
-                dropdown.setValue(this.plugin.getPluginMode(manifest.id)).onChange((value) => {
-                    // Changing the mode should preserve advanced lazy options so
-                    // users can temporarily disable a plugin without reconfiguring it.
-                    this.plugin.settings.plugins[manifest.id] = {
-                        ...(this.plugin.settings.plugins[manifest.id] ?? {}),
-                        mode: value as PluginMode,
-                        userConfigured: true,
-                    };
-                    this.tab.pendingPluginIds.add(manifest.id);
-                    this.tab.markDirty();
-                    // Keep the row in place right after a mode change so consecutive
-                    // edits or undoing a mistaken change stays possible.
-                    // Re-applying the filter can wait until the user changes the filter.
-                    this.refreshStats();
-                    this.tab.renderPendingControls(this.containerEl, () => this.display());
+            setting.setClass("lazy-plugin-mode-row");
+            // The current mode lives in a passive badge so the row never owns
+            // an editable control; edits go through the 3-dot menu instead.
+            const badge = setting.descEl.createDiv({
+                cls: "lazy-plugin-mode-badge",
+                text: PluginModes[this.plugin.getPluginMode(manifest.id)],
+            });
+            const actionsButton = new ExtraButtonComponent(setting.controlEl)
+                .setIcon("ellipsis-vertical")
+                .setTooltip("Plugin actions");
+            // ExtraButtonComponent.onClick receives no MouseEvent, so anchor
+            // the menu to the button rect instead of the mouse position.
+            actionsButton.onClick(() => {
+                const menu = new Menu();
+                addPluginRowMenuItems(menu, {
+                    getMode: () => this.plugin.getPluginMode(manifest.id),
+                    onOpenDetails: () =>
+                        new LazyOptionsModal(this.app, this.plugin, manifest.id, () => {
+                            this.tab.pendingPluginIds.add(manifest.id);
+                            this.tab.markDirty();
+                            this.tab.renderPendingControls(this.containerEl, () => this.display());
+                        }).open(),
+                    onToggleEnabled: (enabled) =>
+                        this.applyRowModeChange(
+                            manifest.id,
+                            enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED,
+                            badge,
+                        ),
+                    onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, badge),
                 });
+                const rect = actionsButton.extraSettingsEl.getBoundingClientRect();
+                menu.showAtPosition({ x: rect.left, y: rect.bottom });
             });
         });
+    }
+    private applyRowModeChange(pluginId: string, mode: PluginMode, badge: HTMLElement) {
+        // Changing the mode should preserve advanced lazy options so
+        // users can temporarily disable a plugin without reconfiguring it.
+        this.plugin.settings.plugins[pluginId] = {
+            ...(this.plugin.settings.plugins[pluginId] ?? {}),
+            mode,
+            userConfigured: true,
+        };
+        this.tab.pendingPluginIds.add(pluginId);
+        this.tab.markDirty();
+        // Update only the badge in place so the row stays where it is even
+        // when it no longer matches the active filter; re-filtering waits
+        // until the user changes the filter conditions.
+        badge.setText(PluginModes[mode]);
+        this.refreshStats();
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
     }
     private refreshStats() {
         const statsEl = this.containerEl.querySelector(".lazy-plugin-statistics .setting-item-name");

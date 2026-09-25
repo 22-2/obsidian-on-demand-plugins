@@ -30,6 +30,31 @@
     background: var(--background-primary);
 }
 
+.lazy-plugin-filter-row .dropdown {
+    width: 210px;
+    max-width: 210px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lazy-plugin-mode-badge {
+    margin-top: 2px;
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.lazy-plugin-mode-row .setting-item-info {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.lazy-plugin-mode-row .setting-item-name,
+.lazy-plugin-mode-row .setting-item-description {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
 .lazy-plugin-infinite-sentinel {
     height: 1px;
 }
