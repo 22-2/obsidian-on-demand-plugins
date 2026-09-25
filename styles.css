@@ -14,6 +14,11 @@
     font-size: 0.8em;
 }
 
+.lazy-plugin-statistics .setting-item-name {
+    font-variant-numeric: tabular-nums;
+    white-space: normal;
+}
+
 .lazy-plugin-progress-bar {
     width: 100%;
 }

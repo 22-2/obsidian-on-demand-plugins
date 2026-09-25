@@ -3,12 +3,44 @@ import type { App, ButtonComponent, DropdownComponent, SettingDefinitionItem } f
 import { ExtraButtonComponent, FileSystemAdapter, Menu, Modal, Notice, Platform, PluginSettingTab, Setting, SettingPage, normalizePath } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
-import type { PLUGIN_MODE } from "src/core/types";
-import { PluginModes } from "src/core/types";
+import { PLUGIN_MODE, PluginModes } from "src/core/types";
+import type { PLUGIN_MODE as PluginMode } from "src/core/types";
 import type { MaintenanceFeature, SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/maintenance/maintenance-feature";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
+
+type PluginStatistics = {
+    alwaysEnabled: number;
+    alwaysDisabled: number;
+    lazy: number;
+    lazyOnLayoutReady: number;
+    total: number;
+};
+
+function getPluginStatistics(plugin: OnDemandPlugin): PluginStatistics {
+    const counts: PluginStatistics = { alwaysEnabled: 0, alwaysDisabled: 0, lazy: 0, lazyOnLayoutReady: 0, total: plugin.manifests.length };
+    // Keep the four modes separate so each status indicator shows its own count.
+    plugin.manifests.forEach(({ id }) => {
+        const mode = plugin.getPluginMode(id);
+        if (mode === PLUGIN_MODE.ALWAYS_ENABLED) counts.alwaysEnabled++;
+        else if (mode === PLUGIN_MODE.ALWAYS_DISABLED) counts.alwaysDisabled++;
+        else if (mode === PLUGIN_MODE.LAZY_ON_LAYOUT_READY) counts.lazyOnLayoutReady++;
+        else counts.lazy++;
+    });
+    return counts;
+}
+
+function pluginStatisticsText(plugin: OnDemandPlugin): string {
+    const counts = getPluginStatistics(plugin);
+    // Spaces and middots instead of bare slashes so the Setting name doesn't look cramped.
+    return `⛔ ${counts.alwaysDisabled} · 🤲 ${counts.lazy} · 🚀 ${counts.lazyOnLayoutReady} · ✅ ${counts.alwaysEnabled}`;
+}
+
+function pluginManagementSummary(plugin: OnDemandPlugin): string {
+    const counts = getPluginStatistics(plugin);
+    return `${counts.total} plugins`;
+}
 
 async function openBackupDirectory(plugin: OnDemandPlugin) {
     if (!Platform.isDesktopApp || !(plugin.app.vault.adapter instanceof FileSystemAdapter)) {
@@ -239,7 +271,7 @@ function profileIdsFor(service: OnDemandPlugin["core"]["settingsService"]) {
 class PluginPage extends SettingPage {
     private static readonly PAGE_SIZE = 24;
     private filter = "";
-    private mode?: PLUGIN_MODE;
+    private mode?: PluginMode;
     private app: App;
     private plugin: OnDemandPlugin;
     private tab: SettingsTab;
@@ -259,6 +291,11 @@ class PluginPage extends SettingPage {
         this.plugin.updateManifests();
         this.containerEl.empty();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
+        new Setting(this.containerEl).setName("Statistics").setHeading();
+        new Setting(this.containerEl)
+            .setName(pluginStatisticsText(this.plugin))
+            .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
+            .setClass("lazy-plugin-statistics");
         new Setting(this.containerEl)
             .setName("Plugins")
             .setHeading()
@@ -284,9 +321,9 @@ class PluginPage extends SettingPage {
             )
             .addDropdown((d) => {
                 d.addOption("", "All");
-                Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PLUGIN_MODE]));
+                Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PluginMode]));
                 d.setValue(this.mode ?? "").onChange((v) => {
-                    this.mode = v ? (v as PLUGIN_MODE) : undefined;
+                    this.mode = v ? (v as PluginMode) : undefined;
                     this.renderInfiniteList();
                 });
             });
@@ -342,13 +379,13 @@ class PluginPage extends SettingPage {
                     }).open(),
                 );
             setting.addDropdown((dropdown) => {
-                Object.keys(PluginModes).forEach((key) => dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]));
+                Object.keys(PluginModes).forEach((key) => dropdown.addOption(key, PluginModes[key as PluginMode]));
                 dropdown.setValue(this.plugin.getPluginMode(manifest.id)).onChange((value) => {
                     // Changing the mode should preserve advanced lazy options so
                     // users can temporarily disable a plugin without reconfiguring it.
                     this.plugin.settings.plugins[manifest.id] = {
                         ...(this.plugin.settings.plugins[manifest.id] ?? {}),
-                        mode: value as PLUGIN_MODE,
+                        mode: value as PluginMode,
                         userConfigured: true,
                     };
                     this.tab.pendingPluginIds.add(manifest.id);
@@ -370,8 +407,8 @@ class PluginPage extends SettingPage {
 class MaintenancePage extends SettingPage {
     private plugin: OnDemandPlugin;
     private tab: SettingsTab;
-    private from = "alwaysDisabled" as PLUGIN_MODE;
-    private to = "lazy" as PLUGIN_MODE;
+    private from = "alwaysDisabled" as PluginMode;
+    private to = "lazy" as PluginMode;
     private syncDirection: SyncDirection = "lazyToCore";
     constructor(plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
@@ -439,7 +476,7 @@ class MaintenancePage extends SettingPage {
         new Setting(this.containerEl).setName("From mode").addDropdown((d) =>
             this.modes(d)
                 .setValue(this.from)
-                .onChange((v) => (this.from = v as PLUGIN_MODE)),
+                .onChange((v) => (this.from = v as PluginMode)),
         );
         new Setting(this.containerEl)
             .setName("To mode")
@@ -463,7 +500,7 @@ class MaintenancePage extends SettingPage {
             .addDropdown((d) =>
                 this.modes(d)
                     .setValue(this.to)
-                    .onChange((v) => (this.to = v as PLUGIN_MODE)),
+                    .onChange((v) => (this.to = v as PluginMode)),
             );
         new Setting(this.containerEl).setName("Debug options").setHeading();
         new Setting(this.containerEl).setName("Debug log output").addToggle((t) =>
@@ -476,7 +513,7 @@ class MaintenancePage extends SettingPage {
         );
     }
     private modes(d: DropdownComponent) {
-        Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PLUGIN_MODE]));
+        Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PluginMode]));
         return d;
     }
 }
@@ -504,10 +541,17 @@ export class SettingsTab extends PluginSettingTab {
     }
     getSettingDefinitions(): SettingDefinitionItem[] {
         this.plugin.updateManifests();
-        const modes = Object.fromEntries(Object.keys(PluginModes).map((key) => [key, PluginModes[key as PLUGIN_MODE]]));
+        const modes = Object.fromEntries(Object.keys(PluginModes).map((key) => [key, PluginModes[key as PluginMode]]));
         return [
             { type: "page", name: "Profile management", desc: "Manage profiles and device defaults.", page: () => new ProfileManagementPage(this.app, this.plugin, this) },
-            { type: "page", name: "Plugin management", desc: "Configure plugin loading modes.", displayValue: () => `${this.plugin.manifests.length} plugins`, page: () => new PluginPage(this.app, this.plugin, this) },
+            {
+                type: "page",
+                name: "Plugin management",
+                desc: "Configure plugin loading modes.",
+                // Keep the familiar total visible beside the page name while compactly surfacing its mode breakdown.
+                displayValue: () => pluginManagementSummary(this.plugin),
+                page: () => new PluginPage(this.app, this.plugin, this),
+            },
             {
                 type: "page",
                 name: "Behaviour",
