@@ -22,10 +22,12 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     const page = obsidian.page;
     // Settings open in a separate window on Obsidian 1.13, so the main vault page does not contain its UI.
     const settingsPagePromise = page.context().waitForEvent("page");
-    await page.evaluate(() => app.setting.open());
+    await page.evaluate(() => {
+        app.setting.open();
+        app.setting.openTabById("on-demand-plugins");
+    });
     const settingsPage = await settingsPagePromise;
     await settingsPage.waitForLoadState("domcontentloaded");
-    await settingsPage.evaluate(() => app.setting.openTabById("on-demand-plugins"));
 
     const pluginManagementLink = settingsPage.getByText("Plugin management", { exact: true });
     await expect(pluginManagementLink).toBeVisible();
