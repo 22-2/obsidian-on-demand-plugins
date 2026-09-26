@@ -5,6 +5,7 @@ import type { PLUGIN_MODE as PluginMode } from "src/core/types";
 export interface PluginRowMenuOptions {
     getMode: () => PluginMode;
     onOpenDetails: () => void;
+    onOpenCommunityPage: () => void;
     onRevealInExplorer: () => void;
     onToggleEnabled: (enabled: boolean) => void;
     onSelectMode: (mode: PluginMode) => void;
@@ -37,9 +38,16 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
 
     menu.addItem((item) =>
         item
-            .setTitle("Details")
+            .setTitle("Open details")
             .setIcon("gear")
             .onClick(() => options.onOpenDetails()),
+    );
+
+    menu.addItem((item) =>
+        item
+            .setTitle("Open community page")
+            .setIcon("globe")
+            .onClick(() => options.onOpenCommunityPage()),
     );
 
     menu.addItem((item) =>

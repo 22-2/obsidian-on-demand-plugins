@@ -77,6 +77,27 @@ async function openPluginDirectory(app: App, manifest: { dir?: string; name: str
     }
 }
 
+async function openPluginCommunityPage(pluginId: string) {
+    const url = `https://obsidian.md/plugins?id=${encodeURIComponent(pluginId)}`;
+    // Use Electron's external URL handler so desktop links open in the system default browser.
+    if (Platform.isDesktopApp) {
+        try {
+            const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as
+                | { shell?: { openExternal: (url: string) => Promise<void> } }
+                | undefined;
+            if (electron?.shell?.openExternal) {
+                await electron.shell.openExternal(url);
+                return;
+            }
+        } catch (error) {
+            new Notice(`Could not open the community page: ${error instanceof Error ? error.message : String(error)}`);
+            return;
+        }
+    }
+    // Mobile does not expose Electron's shell API; let the platform handle the external URL.
+    window.open(url, "_blank");
+}
+
 async function openBackupDirectory(plugin: OnDemandPlugin) {
     if (!Platform.isDesktopApp || !(plugin.app.vault.adapter instanceof FileSystemAdapter)) {
         new Notice("Opening the backup folder is available on desktop only.");
@@ -448,6 +469,9 @@ class PluginPage extends SettingPage {
                             this.tab.markDirty();
                             this.tab.renderPendingControls(this.containerEl, () => this.display());
                         }).open(),
+                    onOpenCommunityPage: () => {
+                        void openPluginCommunityPage(manifest.id);
+                    },
                     onRevealInExplorer: () => void openPluginDirectory(this.app, manifest),
                     onToggleEnabled: (enabled) =>
                         this.applyRowModeChange(
