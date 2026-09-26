@@ -11,6 +11,7 @@ import { toggleLoggerBy } from "src/core/utils";
 import { BackupFeature } from "src/features/backup/backup-feature";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
+import { ManualToggleFeature } from "src/features/manual-toggle/manual-toggle-feature";
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { CoreContainer } from "src/services/core-container";
 import { SettingsTab } from "src/ui/settings-tab";
@@ -37,6 +38,7 @@ export default class OnDemandPlugin extends Plugin {
         this.features = new FeatureManager(ctx, this.core, this.events);
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
+        this.features.register(new ManualToggleFeature());
         this.features.register(new LazyEngineFeature());
         this.features.register(new StartupPolicyFeature());
 

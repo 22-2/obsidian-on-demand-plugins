@@ -1,5 +1,6 @@
 export const App = class {};
 export const Modal = class {};
+export const FuzzySuggestModal = class {};
 export const Plugin = class {};
 export const Setting = class {};
 export const Notice = class {
