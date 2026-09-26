@@ -48,7 +48,13 @@ function enabledBadgeText(app: App, pluginId: string): string {
     // Show the actual runtime state (in-memory loaded), not the staged mode:
     // lazy plugins rest unloaded until triggered, so deriving from the mode
     // alone would wrongly mark every non-disabled plugin as enabled.
-    return isPluginLoaded(app, pluginId) ? "🟢 Enabled" : "🔴 Disabled";
+    return isPluginLoaded(app, pluginId) ? "Loaded" : "Not loaded";
+}
+
+function pluginModeLabel(mode: PluginMode): string {
+    // Keep the mode emoji as a quick visual cue while the fixed grid column
+    // keeps each row's live state aligned.
+    return PluginModes[mode];
 }
 
 async function openBackupDirectory(plugin: OnDemandPlugin) {
@@ -381,20 +387,31 @@ class PluginPage extends SettingPage {
         plugins.slice(start, end).forEach((manifest) => {
             if (!manifest) return;
             const setting = new Setting(listEl).setName(manifest.name);
-            setting.setDesc(manifest.description);
             setting.setClass("lazy-plugin-mode-row");
+            // Give variable-length descriptions their own line so metadata
+            // always starts at a predictable position within each row.
+            setting.descEl.createDiv({ cls: "lazy-plugin-description", text: manifest.description });
             // The current mode lives in passive badges so the row never owns
             // an editable control; edits go through the 3-dot menu instead.
             const badges = setting.descEl.createDiv({ cls: "lazy-plugin-badges" });
+            const mode = this.plugin.getPluginMode(manifest.id);
             const modeBadge = badges.createSpan({
                 cls: "lazy-plugin-mode-badge",
-                text: PluginModes[this.plugin.getPluginMode(manifest.id)],
+                text: pluginModeLabel(mode),
             });
             // Show the live runtime state; the staged mode alone cannot tell
             // whether a lazy plugin is actually loaded right now.
             const enabledBadge = badges.createSpan({
                 cls: "lazy-plugin-enabled-badge",
                 text: enabledBadgeText(this.app, manifest.id),
+            });
+            enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
+            // Author names vary widely in length; keep them on a separate
+            // line and omit the attribution prefix when no author is given.
+            const author = manifest.author?.trim();
+            setting.descEl.createDiv({
+                cls: "lazy-plugin-meta-badge",
+                text: `v${manifest.version}${author ? ` · by ${author}` : ""}`,
             });
             const actionsButton = new ExtraButtonComponent(setting.controlEl)
                 .setIcon("ellipsis-vertical")
@@ -438,8 +455,9 @@ class PluginPage extends SettingPage {
         // Update only the badges in place so the row stays where it is even
         // when it no longer matches the active filter; re-filtering waits
         // until the user changes the filter conditions.
-        modeBadge.setText(PluginModes[mode]);
+        modeBadge.setText(pluginModeLabel(mode));
         enabledBadge.setText(enabledBadgeText(this.app, pluginId));
+        enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, pluginId));
         this.refreshStats();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
     }

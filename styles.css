@@ -38,21 +38,96 @@
     white-space: nowrap;
 }
 
+.lazy-plugin-list-body {
+    /* A single list surface makes long and short plugin descriptions feel
+       like variations of one row pattern instead of mismatched cards. */
+    overflow: hidden;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-secondary);
+}
+
+.lazy-plugin-list-body:empty {
+    display: none;
+}
+
+.lazy-plugin-list-body > .lazy-plugin-mode-row {
+    align-items: flex-start;
+    flex-direction: row;
+    gap: var(--size-4-3);
+    margin: 0;
+    padding: var(--size-4-4);
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.lazy-plugin-list-body > .lazy-plugin-mode-row + .lazy-plugin-mode-row {
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.lazy-plugin-mode-row .setting-item-name {
+    color: var(--text-normal);
+    font-weight: var(--font-medium);
+    line-height: 1.3;
+}
+
+.lazy-plugin-mode-row .setting-item-description {
+    margin-top: var(--size-4-1);
+}
+
+.lazy-plugin-description {
+    color: var(--text-muted);
+    line-height: 1.45;
+}
+
 .lazy-plugin-badges {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px 8px;
-    margin-top: 2px;
+    /* Reserve the same mode column in every row so runtime indicators do
+       not shift with label length. Long author names live outside this grid. */
+    display: grid;
+    grid-template-columns: minmax(0, 28ch) max-content;
+    align-items: center;
+    gap: var(--size-4-1) var(--size-4-2);
+    margin-top: var(--size-4-2);
+    font-size: var(--font-ui-smaller);
+    line-height: 1.4;
 }
 
 .lazy-plugin-mode-badge {
-    color: var(--text-faint);
-    font-size: var(--font-ui-smaller);
+    justify-self: start;
+    padding: 2px 7px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    color: var(--text-muted);
+    white-space: nowrap;
 }
 
 .lazy-plugin-enabled-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.lazy-plugin-enabled-badge::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+}
+
+.lazy-plugin-enabled-badge.is-loaded::before {
+    background: var(--color-green);
+}
+
+.lazy-plugin-meta-badge {
+    margin-top: var(--size-4-1);
     color: var(--text-faint);
     font-size: var(--font-ui-smaller);
+    line-height: 1.4;
 }
 
 .lazy-plugin-mode-row .setting-item-info {
@@ -64,6 +139,25 @@
 .lazy-plugin-mode-row .setting-item-description {
     white-space: normal;
     overflow-wrap: anywhere;
+}
+
+.lazy-plugin-mode-row .setting-item-control {
+    align-self: flex-start;
+    flex: 0 0 auto;
+}
+
+@media (max-width: 500px) {
+    .lazy-plugin-badges {
+        /* A narrow info column may not fit both labels; wrap at the gap
+           instead of splitting the longest mode badge across words. */
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .lazy-plugin-mode-badge {
+        max-width: 100%;
+        white-space: normal;
+    }
 }
 
 .lazy-plugin-infinite-sentinel {
