@@ -10,6 +10,7 @@ import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/main
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
+import { isPluginLoaded } from "src/core/utils";
 
 type PluginStatistics = {
     alwaysEnabled: number;
@@ -41,6 +42,13 @@ function pluginStatisticsText(plugin: OnDemandPlugin): string {
 function pluginManagementSummary(plugin: OnDemandPlugin): string {
     const counts = getPluginStatistics(plugin);
     return `${counts.total} plugins`;
+}
+
+function enabledBadgeText(app: App, pluginId: string): string {
+    // Show the actual runtime state (in-memory loaded), not the staged mode:
+    // lazy plugins rest unloaded until triggered, so deriving from the mode
+    // alone would wrongly mark every non-disabled plugin as enabled.
+    return isPluginLoaded(app, pluginId) ? "🟢 Enabled" : "🔴 Disabled";
 }
 
 async function openBackupDirectory(plugin: OnDemandPlugin) {
@@ -371,11 +379,18 @@ class PluginPage extends SettingPage {
             const setting = new Setting(listEl).setName(manifest.name);
             setting.setDesc(manifest.description);
             setting.setClass("lazy-plugin-mode-row");
-            // The current mode lives in a passive badge so the row never owns
+            // The current mode lives in passive badges so the row never owns
             // an editable control; edits go through the 3-dot menu instead.
-            const badge = setting.descEl.createDiv({
+            const badges = setting.descEl.createDiv({ cls: "lazy-plugin-badges" });
+            const modeBadge = badges.createSpan({
                 cls: "lazy-plugin-mode-badge",
                 text: PluginModes[this.plugin.getPluginMode(manifest.id)],
+            });
+            // Show the live runtime state; the staged mode alone cannot tell
+            // whether a lazy plugin is actually loaded right now.
+            const enabledBadge = badges.createSpan({
+                cls: "lazy-plugin-enabled-badge",
+                text: enabledBadgeText(this.app, manifest.id),
             });
             const actionsButton = new ExtraButtonComponent(setting.controlEl)
                 .setIcon("ellipsis-vertical")
@@ -392,20 +407,21 @@ class PluginPage extends SettingPage {
                             this.tab.markDirty();
                             this.tab.renderPendingControls(this.containerEl, () => this.display());
                         }).open(),
-                    onToggleEnabled: (enabled) =>
-                        this.applyRowModeChange(
-                            manifest.id,
-                            enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED,
-                            badge,
-                        ),
-                    onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, badge),
+                        onToggleEnabled: (enabled) =>
+                            this.applyRowModeChange(
+                                manifest.id,
+                                enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED,
+                                modeBadge,
+                                enabledBadge,
+                            ),
+                        onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, modeBadge, enabledBadge),
                 });
                 const rect = actionsButton.extraSettingsEl.getBoundingClientRect();
                 menu.showAtPosition({ x: rect.left, y: rect.bottom });
             });
         });
     }
-    private applyRowModeChange(pluginId: string, mode: PluginMode, badge: HTMLElement) {
+    private applyRowModeChange(pluginId: string, mode: PluginMode, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
         // Changing the mode should preserve advanced lazy options so
         // users can temporarily disable a plugin without reconfiguring it.
         this.plugin.settings.plugins[pluginId] = {
@@ -415,10 +431,11 @@ class PluginPage extends SettingPage {
         };
         this.tab.pendingPluginIds.add(pluginId);
         this.tab.markDirty();
-        // Update only the badge in place so the row stays where it is even
+        // Update only the badges in place so the row stays where it is even
         // when it no longer matches the active filter; re-filtering waits
         // until the user changes the filter conditions.
-        badge.setText(PluginModes[mode]);
+        modeBadge.setText(PluginModes[mode]);
+        enabledBadge.setText(enabledBadgeText(this.app, pluginId));
         this.refreshStats();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
     }

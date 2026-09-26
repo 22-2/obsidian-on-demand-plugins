@@ -38,10 +38,21 @@
     white-space: nowrap;
 }
 
-.lazy-plugin-mode-badge {
+.lazy-plugin-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
     margin-top: 2px;
-    color: var(--text-muted);
-    font-size: var(--font-ui-small);
+}
+
+.lazy-plugin-mode-badge {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-enabled-badge {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
 }
 
 .lazy-plugin-mode-row .setting-item-info {
