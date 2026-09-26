@@ -314,7 +314,11 @@ class PluginPage extends SettingPage {
                     .setTooltip("Refresh plugin list")
                     .onClick(() => {
                         this.plugin.updateManifests();
-                        this.tab.update();
+                        // Re-render the list directly: tab.update() does not
+                        // guarantee the open page is re-displayed, so relying
+                        // on it leaves live badges (e.g. Enabled after an
+                        // on-demand load) stale.
+                        this.renderInfiniteList();
                     }),
             );
         const filterSetting = new Setting(this.containerEl).setName("Filter");
