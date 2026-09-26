@@ -40,7 +40,7 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
 
     await row.locator(".clickable-icon").click();
     await expect(settingsPage.getByText("Disable plugin", { exact: true })).toBeVisible();
-    await settingsPage.getByText("🚀 Lazy on layout ready", { exact: true }).click();
+    await settingsPage.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" }).click();
 
     // Exercise the real menu-to-row path: the page keeps the row mounted while it stages this edit.
     await expect(row).toBeVisible();
