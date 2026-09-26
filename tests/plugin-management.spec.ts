@@ -45,5 +45,5 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     // Exercise the real menu-to-row path: the page keeps the row mounted while it stages this edit.
     await expect(row).toBeVisible();
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
-    await expect(settingsPage.locator(".lazy-plugin-save-controls button")).toHaveText("Save & apply (1)");
+    await expect(settingsPage.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeEnabled();
 });
