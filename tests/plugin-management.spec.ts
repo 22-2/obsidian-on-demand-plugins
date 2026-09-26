@@ -38,6 +38,9 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     await expect(row).toHaveCount(1);
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
 
+    // Obsidian's macOS menu is not exposed as a DOM menu in headless CI; Windows exercises the actual menu action.
+    test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
+
     await row.locator(".clickable-icon").click();
     // The Obsidian Menu API can render from the vault window even when its Settings row lives in another window.
     const menuPage = await Promise.any(
