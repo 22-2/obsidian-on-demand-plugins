@@ -30,3 +30,4 @@ repomix-output.md
 playwright-report/
 test-results/
 .env
+.ci-artifacts/
