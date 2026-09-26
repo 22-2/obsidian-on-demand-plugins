@@ -2,6 +2,7 @@
 import type { App, ButtonComponent, DropdownComponent, SettingDefinitionItem } from "obsidian";
 import { ExtraButtonComponent, FileSystemAdapter, Menu, Modal, Notice, Platform, PluginSettingTab, Setting, SettingPage, normalizePath } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
+import { openExternalUrl, openSystemPath } from "src/core/external-open";
 import { FeatureEvents } from "src/core/event-bus";
 import { PLUGIN_MODE, PluginModes } from "src/core/types";
 import type { PLUGIN_MODE as PluginMode } from "src/core/types";
@@ -69,8 +70,7 @@ async function openPluginDirectory(app: App, manifest: { dir?: string; name: str
         return;
     }
     try {
-        const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as { shell?: { openPath: (path: string) => Promise<string> } } | undefined;
-        const error = await electron?.shell?.openPath(`${app.vault.adapter.getBasePath()}/${manifest.dir}`);
+        const error = await openSystemPath(`${app.vault.adapter.getBasePath()}/${manifest.dir}`);
         if (error) new Notice(`Could not open the plugin folder: ${error}`);
     } catch (error) {
         new Notice(`Could not open the plugin folder: ${error instanceof Error ? error.message : String(error)}`);
@@ -79,23 +79,11 @@ async function openPluginDirectory(app: App, manifest: { dir?: string; name: str
 
 async function openPluginCommunityPage(pluginId: string) {
     const url = `https://obsidian.md/plugins?id=${encodeURIComponent(pluginId)}`;
-    // Use Electron's external URL handler so desktop links open in the system default browser.
-    if (Platform.isDesktopApp) {
-        try {
-            const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as
-                | { shell?: { openExternal: (url: string) => Promise<void> } }
-                | undefined;
-            if (electron?.shell?.openExternal) {
-                await electron.shell.openExternal(url);
-                return;
-            }
-        } catch (error) {
-            new Notice(`Could not open the community page: ${error instanceof Error ? error.message : String(error)}`);
-            return;
-        }
+    try {
+        await openExternalUrl(url);
+    } catch (error) {
+        new Notice(`Could not open the community page: ${error instanceof Error ? error.message : String(error)}`);
     }
-    // Mobile does not expose Electron's shell API; let the platform handle the external URL.
-    window.open(url, "_blank");
 }
 
 async function openBackupDirectory(plugin: OnDemandPlugin) {
@@ -108,8 +96,7 @@ async function openBackupDirectory(plugin: OnDemandPlugin) {
     const backupPath = normalizePath(`${plugin.manifest.dir}/backups`);
     try {
         if (!(await adapter.exists(backupPath))) await adapter.mkdir(backupPath);
-        const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as { shell?: { openPath: (path: string) => Promise<string> } } | undefined;
-        const error = await electron?.shell?.openPath(`${adapter.getBasePath()}/${backupPath}`);
+        const error = await openSystemPath(`${adapter.getBasePath()}/${backupPath}`);
         if (error) new Notice(`Could not open the backup folder: ${error}`);
     } catch (error) {
         new Notice(`Could not open the backup folder: ${error instanceof Error ? error.message : String(error)}`);
