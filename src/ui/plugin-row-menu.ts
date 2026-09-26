@@ -40,10 +40,12 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
 
     menu.addSeparator();
     menu.addItem((item) => item.setTitle("Mode").setDisabled(true));
+    const current = options.getMode();
     for (const mode of MODE_ORDER) {
         menu.addItem((item) =>
             item
                 .setTitle(PluginModes[mode])
+                .setChecked(mode === current)
                 .onClick(() => options.onSelectMode(mode)),
         );
     }
