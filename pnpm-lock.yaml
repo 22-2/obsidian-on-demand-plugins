@@ -67,8 +67,8 @@ importers:
         specifier: ^10.4.0
         version: 10.4.0
       electron:
-        specifier: 41.10.7
-        version: 41.10.7(supports-color@7.2.0)
+        specifier: 44.4.5
+        version: 44.4.5(supports-color@7.2.0)
       esbuild:
         specifier: 0.28.2
         version: 0.28.2
@@ -91,8 +91,8 @@ importers:
         specifier: ^1.13.1
         version: 1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)
       obsidian-e2e-toolkit:
-        specifier: github:22-2/obsidian-e2e-toolkit#1.1.0
-        version: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f(@playwright/test@1.63.0)(electron@41.10.7(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0)
+        specifier: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.2.0/obsidian-e2e-toolkit-1.2.0.tgz
+        version: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.2.0/obsidian-e2e-toolkit-1.2.0.tgz(@playwright/test@1.63.0)(electron@44.4.5(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0)
       playwright:
         specifier: ^1.63.0
         version: 1.63.0
@@ -989,6 +989,10 @@ packages:
     resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
     engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
 
+  chalk@6.0.0:
+    resolution: {integrity: sha512-2uNTXIuTTxk7ciZgAU1BQcgnchcG0xXnrs6jzkQfj9SsRa9M2s5zE8WT96hS6KmG4MzWHSrvH43DF1m4XRkrFg==}
+    engines: {node: '>=22'}
+
   char-regex@1.0.2:
     resolution: {integrity: sha512-kWWXztvZ5SBQV+eRgKFeh8q5sLuZY2+8WUIzlxWVTg+oGwY14qylx1KbKzHd8P6ZYkAg0xyIDU9JMHhyJMZ1jw==}
     engines: {node: '>=10'}
@@ -1166,8 +1170,8 @@ packages:
   duplexer2@0.1.4:
     resolution: {integrity: sha512-asLFVfWWtJ90ZyOUHMqk7/S2w2guQKxUI2itj3d92ADHhxUSbCMGi1f1cBcJ7xM1To+pE/Khbwo1yuNbMEPKeA==}
 
-  electron@41.10.7:
-    resolution: {integrity: sha512-AqIiefddlf5i+HYCGatr8VlBuEbWJpad4/yloBFYcMB2r57j7xhW1ogiJ+BfA5kxQyfmSs5yjwy54Me+wJn1jw==}
+  electron@44.4.5:
+    resolution: {integrity: sha512-SjgoaeYsSWZfJzubgQU7juvuXMTvn6/e1gAHdGFA/yuMbpF+I+skYqIJ6DdXBXHeWbkbpNpmwZCTpiivtlWZSw==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -2302,13 +2306,13 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f:
-    resolution: {gitHosted: true, integrity: sha512-BJtSzYYQKK45DZCbIBiG5Ni5teFrIsmouViAtAADgk8jJ/whENVfJAbqkkFdU+D8I0OX/ldEvoaq3J89SahCwg==, tarball: https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f}
-    version: 1.1.0
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.2.0/obsidian-e2e-toolkit-1.2.0.tgz:
+    resolution: {integrity: sha512-B5iT8GVKYfCjRqkx6elx+6RqL4yPsiU4NjzN9VjlvUc203H43S4xZm0gSijPbpJQ5L0oYXnKRtHbyqDOpIyZ1Q==, tarball: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.2.0/obsidian-e2e-toolkit-1.2.0.tgz}
+    version: 1.2.0
     engines: {node: '>=23.0.0'}
     peerDependencies:
       '@playwright/test': ^1.56.0
-      electron: ^41.0.3
+      electron: '*'
       playwright: ^1.56.0
 
   obsidian@1.13.1:
@@ -4182,6 +4186,8 @@ snapshots:
 
   chalk@5.6.2: {}
 
+  chalk@6.0.0: {}
+
   char-regex@1.0.2: {}
 
   chownr@3.0.0: {}
@@ -4365,7 +4371,7 @@ snapshots:
     dependencies:
       readable-stream: 2.3.8
 
-  electron@41.10.7(supports-color@7.2.0):
+  electron@44.4.5(supports-color@7.2.0):
     dependencies:
       '@electron-internal/extract-zip': 1.0.5
       '@electron/get': 5.1.0(supports-color@7.2.0)
@@ -5605,12 +5611,12 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.2
 
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/76a509d94376f7b5b00f68985ce64b626f53860f(@playwright/test@1.63.0)(electron@41.10.7(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0):
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.2.0/obsidian-e2e-toolkit-1.2.0.tgz(@playwright/test@1.63.0)(electron@44.4.5(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0):
     dependencies:
       '@electron/asar': 4.3.0
       '@playwright/test': 1.63.0
-      chalk: 5.6.2
-      electron: 41.10.7(supports-color@7.2.0)
+      chalk: 6.0.0
+      electron: 44.4.5(supports-color@7.2.0)
       es-toolkit: 1.52.0
       extract-zip: 2.0.1(supports-color@7.2.0)
       find-up: 8.0.0
