@@ -3,6 +3,7 @@ import {
     ensureBuilt,
     findCommandByPrefix,
     pluginUnderTestId,
+    readCommunityPlugins,
     targetPluginId,
     triggerActiveLeafChange,
     useOnDemandPlugins,
@@ -11,6 +12,46 @@ import {
 } from "./test-utils";
 
 useOnDemandPlugins();
+
+test("in-memory plugin commands enable and disable a selected plugin", async ({ obsidian }) => {
+    if (!ensureBuilt()) return;
+
+    await obsidian.waitReady();
+    const pluginHandle = await obsidian.plugin(pluginUnderTestId);
+    await pluginHandle.evaluate(async (plugin, pluginId) => {
+        // Keep the target lazy so Obsidian's enable/disable sync patch preserves its saved policy.
+        await plugin.updatePluginSettings(pluginId, "lazy");
+        await app.plugins.disablePlugin(pluginId);
+    }, targetPluginId);
+    expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
+    const enabledOnDiskBefore = await readCommunityPlugins(obsidian);
+
+    await obsidian.page.evaluate((commandId) => app.commands.executeCommandById(commandId), `${pluginUnderTestId}:enable-plugin-in-memory`);
+    const enablePicker = obsidian.page.getByPlaceholder("Select a plugin to enable");
+    await expect(enablePicker).toBeVisible();
+    await enablePicker.fill(targetPluginId);
+    const enableChoice = obsidian.page.locator(".suggestion-item").filter({ hasText: targetPluginId });
+    await expect(enableChoice).toBeVisible();
+    await enableChoice.click();
+    expect(await waitForPluginEnabled(obsidian, targetPluginId)).toBe(true);
+    expect(await readCommunityPlugins(obsidian)).toEqual(enabledOnDiskBefore);
+
+    const modeAfterEnable = await pluginHandle.evaluate((plugin, pluginId) => plugin.getPluginMode(pluginId), targetPluginId);
+    expect(modeAfterEnable).toBe("lazy");
+
+    await obsidian.page.evaluate((commandId) => app.commands.executeCommandById(commandId), `${pluginUnderTestId}:disable-plugin-in-memory`);
+    const disablePicker = obsidian.page.getByPlaceholder("Select a plugin to disable");
+    await expect(disablePicker).toBeVisible();
+    await disablePicker.fill(targetPluginId);
+    const disableChoice = obsidian.page.locator(".suggestion-item").filter({ hasText: targetPluginId });
+    await expect(disableChoice).toBeVisible();
+    await disableChoice.click();
+    expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
+    expect(await readCommunityPlugins(obsidian)).toEqual(enabledOnDiskBefore);
+
+    const modeAfterDisable = await pluginHandle.evaluate((plugin, pluginId) => plugin.getPluginMode(pluginId), targetPluginId);
+    expect(modeAfterDisable).toBe("lazy");
+});
 
 test("manual enable/disable is stable for lazy (command)", async ({ obsidian }) => {
     if (!ensureBuilt()) return;

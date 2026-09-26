@@ -1,4 +1,5 @@
 import { expect, test } from "obsidian-e2e-toolkit";
+import type { Page } from "@playwright/test";
 import {
     ensureBuilt,
     pluginUnderTestId,
@@ -8,19 +9,8 @@ import {
 
 useOnDemandPlugins();
 
-test("plugin management row menu stages a mode change in place", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
-    const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await pluginHandle.evaluate(async (plugin, pluginId) => {
-        // Start from a known mode so the row badge and toggle action are deterministic.
-        await plugin.updatePluginSettings(pluginId, "lazy");
-    }, targetPluginId);
-
-    const page = obsidian.page;
-    // Settings open in a separate window on Obsidian 1.13, so the main vault page does not contain its UI.
+async function openPluginManagement(page: Page): Promise<Page> {
+    // Obsidian 1.13 opens Settings in a separate window, so follow that page for settings UI assertions.
     const settingsPagePromise = page.context().waitForEvent("page");
     await page.evaluate(() => {
         app.setting.open();
@@ -32,6 +22,22 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     const pluginManagementLink = settingsPage.getByText("Plugin management", { exact: true });
     await expect(pluginManagementLink).toBeVisible();
     await pluginManagementLink.click();
+    return settingsPage;
+}
+
+test("plugin management row menu saves and applies a mode change in place", async ({ obsidian }) => {
+    if (!ensureBuilt()) return;
+
+    await obsidian.waitReady();
+
+    const pluginHandle = await obsidian.plugin(pluginUnderTestId);
+    await pluginHandle.evaluate(async (plugin, pluginId) => {
+        // Start from a known mode so the row badge and toggle action are deterministic.
+        await plugin.updatePluginSettings(pluginId, "lazy");
+    }, targetPluginId);
+
+    const page = obsidian.page;
+    const settingsPage = await openPluginManagement(page);
 
     await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
     const row = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
@@ -54,5 +60,60 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     // Exercise the real menu-to-row path: the page keeps the row mounted while it stages this edit.
     await expect(row).toBeVisible();
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
-    await expect(settingsPage.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeEnabled();
+    const saveButton = settingsPage.getByRole("button", { name: "Save & apply (1)", exact: true });
+    await expect(saveButton).toBeEnabled();
+
+    // Applying policies normally reloads Obsidian; intercept only that reload so CI can inspect the saved state.
+    await settingsPage.evaluate(() => {
+        const commands = app.commands as unknown as {
+            executeCommandById: (commandId: string) => unknown;
+            __originalExecuteCommandById?: (commandId: string) => unknown;
+            __requestedReload?: boolean;
+        };
+        commands.__originalExecuteCommandById = commands.executeCommandById;
+        commands.__requestedReload = false;
+        commands.executeCommandById = ((commandId: string) => {
+            if (commandId === "app:reload") {
+                commands.__requestedReload = true;
+                return true;
+            }
+            return commands.__originalExecuteCommandById?.call(commands, commandId) ?? false;
+        });
+    });
+    await saveButton.click();
+
+    await expect(settingsPage.getByRole("button", { name: "Save changes", exact: true })).toBeDisabled();
+    await expect.poll(() => settingsPage.evaluate((pluginId) => {
+        const plugins = app.plugins as unknown as {
+            plugins: Record<string, { settings: { plugins: Record<string, { mode?: string }> } }>;
+        };
+        const plugin = plugins.plugins["on-demand-plugins"];
+        return plugin.settings.plugins[pluginId]?.mode;
+    }, targetPluginId)).toBe("lazyOnLayoutReady");
+    expect(await settingsPage.evaluate(() => (app.commands as unknown as { __requestedReload?: boolean }).__requestedReload)).toBe(true);
+});
+
+test("plugin management refresh updates the live loaded badge", async ({ obsidian }) => {
+    if (!ensureBuilt()) return;
+
+    await obsidian.waitReady();
+    const pluginHandle = await obsidian.plugin(pluginUnderTestId);
+    await pluginHandle.evaluate(async (plugin, pluginId) => {
+        await plugin.updatePluginSettings(pluginId, "lazy");
+        await app.plugins.disablePlugin(pluginId);
+    }, targetPluginId);
+
+    const settingsPage = await openPluginManagement(obsidian.page);
+    await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
+    const row = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
+    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Not loaded");
+
+    await settingsPage.evaluate((pluginId) => app.plugins.enablePlugin(pluginId), targetPluginId);
+    await expect.poll(() => settingsPage.evaluate((pluginId) => Boolean(app.plugins.plugins[pluginId]?._loaded), targetPluginId)).toBe(true);
+    // The badge is intentionally a snapshot until Refresh plugin list re-renders the row.
+    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Not loaded");
+
+    const pluginsHeading = settingsPage.locator(".setting-item-heading").filter({ hasText: "Plugins" });
+    await pluginsHeading.locator(".clickable-icon").click();
+    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded");
 });
