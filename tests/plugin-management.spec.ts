@@ -20,11 +20,32 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     }, targetPluginId);
 
     const page = obsidian.page;
-    await page.evaluate(() => {
+    const settingsOpenResult = await page.evaluate(() => {
         // Use Obsidian's user-facing command so the settings view is mounted before selecting its plugin tab.
-        app.commands.executeCommandById("app:open-settings");
-        (app as unknown as { setting: { openTabById: (tabId: string) => void } }).setting.openTabById("on-demand-plugins");
+        const result = app.commands.executeCommandById("app:open-settings");
+        return {
+            result,
+            matchingCommands: Object.keys(app.commands.commands).filter((id) => id.includes("settings")),
+        };
     });
+    console.log("Open settings command:", JSON.stringify(settingsOpenResult));
+    await page.waitForTimeout(500);
+    const activeTab = await page.evaluate(() => {
+        const setting = (app as unknown as {
+            setting: {
+                activeTab?: { id?: string; name?: string; setting?: { contentEl?: HTMLElement } };
+                openTabById: (tabId: string) => void;
+            };
+        }).setting;
+        setting.openTabById("on-demand-plugins");
+        return {
+            id: setting.activeTab?.id,
+            name: setting.activeTab?.name,
+            content: setting.activeTab?.setting?.contentEl?.innerText?.slice(0, 500),
+        };
+    });
+    console.log("Selected plugin settings tab:", JSON.stringify(activeTab));
+
     const pluginManagementLink = page.getByText("Plugin management", { exact: true });
     await expect(pluginManagementLink).toBeVisible();
     await pluginManagementLink.click();
