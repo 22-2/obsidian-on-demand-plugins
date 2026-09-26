@@ -24,7 +24,7 @@ const MODE_ORDER: PluginMode[] = [
 export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions): void {
     menu.addItem((item) =>
         item
-            .setTitle("Open details")
+            .setTitle("Details")
             .setIcon("gear")
             .onClick(() => options.onOpenDetails()),
     );
