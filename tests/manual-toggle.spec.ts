@@ -17,8 +17,10 @@ test("in-memory plugin commands enable and disable a selected plugin", async ({ 
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
-    const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await pluginHandle.evaluate(async (plugin, pluginId) => {
+    await obsidian.page.evaluate(async (pluginId) => {
+        const plugin = app.plugins.plugins["on-demand-plugins"] as typeof app.plugins.plugins[string] & {
+            updatePluginSettings: (id: string, mode: "lazy") => Promise<void>;
+        };
         // Keep the target lazy so Obsidian's enable/disable sync patch preserves its saved policy.
         await plugin.updatePluginSettings(pluginId, "lazy");
         await app.plugins.disablePlugin(pluginId);
@@ -36,7 +38,10 @@ test("in-memory plugin commands enable and disable a selected plugin", async ({ 
     expect(await waitForPluginEnabled(obsidian, targetPluginId)).toBe(true);
     expect(await readCommunityPlugins(obsidian)).toEqual(enabledOnDiskBefore);
 
-    const modeAfterEnable = await pluginHandle.evaluate((plugin, pluginId) => plugin.getPluginMode(pluginId), targetPluginId);
+    const modeAfterEnable = await obsidian.page.evaluate((pluginId) =>
+        (app.plugins.plugins["on-demand-plugins"] as typeof app.plugins.plugins[string] & { getPluginMode: (id: string) => string }).getPluginMode(pluginId),
+        targetPluginId,
+    );
     expect(modeAfterEnable).toBe("lazy");
 
     await obsidian.page.evaluate((commandId) => app.commands.executeCommandById(commandId), `${pluginUnderTestId}:disable-plugin-in-memory`);
@@ -49,7 +54,10 @@ test("in-memory plugin commands enable and disable a selected plugin", async ({ 
     expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
     expect(await readCommunityPlugins(obsidian)).toEqual(enabledOnDiskBefore);
 
-    const modeAfterDisable = await pluginHandle.evaluate((plugin, pluginId) => plugin.getPluginMode(pluginId), targetPluginId);
+    const modeAfterDisable = await obsidian.page.evaluate((pluginId) =>
+        (app.plugins.plugins["on-demand-plugins"] as typeof app.plugins.plugins[string] & { getPluginMode: (id: string) => string }).getPluginMode(pluginId),
+        targetPluginId,
+    );
     expect(modeAfterDisable).toBe("lazy");
 });
 
