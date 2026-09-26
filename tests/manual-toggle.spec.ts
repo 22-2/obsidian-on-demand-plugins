@@ -25,7 +25,8 @@ test("in-memory plugin commands enable and disable a selected plugin", async ({ 
         await plugin.updatePluginSettings(pluginId, "lazy");
         await app.plugins.disablePlugin(pluginId);
     }, targetPluginId);
-    expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
+    // This command filters by the plugin object's live load flag, which can differ from Obsidian's enabled set.
+    await expect.poll(() => obsidian.page.evaluate((pluginId) => Boolean(app.plugins.plugins[pluginId]?._loaded), targetPluginId)).toBe(false);
     const enabledOnDiskBefore = await readCommunityPlugins(obsidian);
 
     await obsidian.page.evaluate((commandId) => app.commands.executeCommandById(commandId), `${pluginUnderTestId}:enable-plugin-in-memory`);
@@ -35,7 +36,7 @@ test("in-memory plugin commands enable and disable a selected plugin", async ({ 
     const enableChoice = obsidian.page.locator(".suggestion-item").filter({ hasText: targetPluginId });
     await expect(enableChoice).toBeVisible();
     await enableChoice.click();
-    expect(await waitForPluginEnabled(obsidian, targetPluginId)).toBe(true);
+    await expect.poll(() => obsidian.page.evaluate((pluginId) => Boolean(app.plugins.plugins[pluginId]?._loaded), targetPluginId)).toBe(true);
     expect(await readCommunityPlugins(obsidian)).toEqual(enabledOnDiskBefore);
 
     const modeAfterEnable = await obsidian.page.evaluate((pluginId) =>
@@ -51,7 +52,7 @@ test("in-memory plugin commands enable and disable a selected plugin", async ({ 
     const disableChoice = obsidian.page.locator(".suggestion-item").filter({ hasText: targetPluginId });
     await expect(disableChoice).toBeVisible();
     await disableChoice.click();
-    expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
+    await expect.poll(() => obsidian.page.evaluate((pluginId) => Boolean(app.plugins.plugins[pluginId]?._loaded), targetPluginId)).toBe(false);
     expect(await readCommunityPlugins(obsidian)).toEqual(enabledOnDiskBefore);
 
     const modeAfterDisable = await obsidian.page.evaluate((pluginId) =>
