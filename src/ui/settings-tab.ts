@@ -57,6 +57,26 @@ function pluginModeLabel(mode: PluginMode): string {
     return PluginModes[mode];
 }
 
+async function openPluginDirectory(app: App, manifest: { dir?: string; name: string }) {
+    // Mirror openBackupDirectory: shell.openPath needs a desktop adapter and
+    // an absolute path, so bail out early anywhere else.
+    if (!Platform.isDesktopApp || !(app.vault.adapter instanceof FileSystemAdapter)) {
+        new Notice("Revealing the plugin folder is available on desktop only.");
+        return;
+    }
+    if (!manifest.dir) {
+        new Notice(`Could not locate the folder for ${manifest.name}.`);
+        return;
+    }
+    try {
+        const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as { shell?: { openPath: (path: string) => Promise<string> } } | undefined;
+        const error = await electron?.shell?.openPath(`${app.vault.adapter.getBasePath()}/${manifest.dir}`);
+        if (error) new Notice(`Could not open the plugin folder: ${error}`);
+    } catch (error) {
+        new Notice(`Could not open the plugin folder: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
 async function openBackupDirectory(plugin: OnDemandPlugin) {
     if (!Platform.isDesktopApp || !(plugin.app.vault.adapter instanceof FileSystemAdapter)) {
         new Notice("Opening the backup folder is available on desktop only.");
@@ -428,14 +448,15 @@ class PluginPage extends SettingPage {
                             this.tab.markDirty();
                             this.tab.renderPendingControls(this.containerEl, () => this.display());
                         }).open(),
-                        onToggleEnabled: (enabled) =>
-                            this.applyRowModeChange(
-                                manifest.id,
-                                enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED,
-                                modeBadge,
-                                enabledBadge,
-                            ),
-                        onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, modeBadge, enabledBadge),
+                    onRevealInExplorer: () => void openPluginDirectory(this.app, manifest),
+                    onToggleEnabled: (enabled) =>
+                        this.applyRowModeChange(
+                            manifest.id,
+                            enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED,
+                            modeBadge,
+                            enabledBadge,
+                        ),
+                    onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, modeBadge, enabledBadge),
                 });
                 const rect = actionsButton.extraSettingsEl.getBoundingClientRect();
                 menu.showAtPosition({ x: rect.left, y: rect.bottom });

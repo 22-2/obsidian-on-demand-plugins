@@ -5,6 +5,7 @@ import type { PLUGIN_MODE as PluginMode } from "src/core/types";
 export interface PluginRowMenuOptions {
     getMode: () => PluginMode;
     onOpenDetails: () => void;
+    onRevealInExplorer: () => void;
     onToggleEnabled: (enabled: boolean) => void;
     onSelectMode: (mode: PluginMode) => void;
 }
@@ -22,12 +23,6 @@ const MODE_ORDER: PluginMode[] = [
  * rebuild the list (which would reset scroll and break infinite scroll).
  */
 export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions): void {
-    menu.addItem((item) =>
-        item
-            .setTitle("Details")
-            .setIcon("gear")
-            .onClick(() => options.onOpenDetails()),
-    );
 
     // Shortcut for the most common toggle; fine-grained choice lives below.
     const isDisabled = options.getMode() === PLUGIN_MODE.ALWAYS_DISABLED;
@@ -36,6 +31,22 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
             .setTitle(isDisabled ? "Enable plugin" : "Disable plugin")
             .setIcon(isDisabled ? "toggle-right" : "toggle-left")
             .onClick(() => options.onToggleEnabled(!isDisabled)),
+    );
+
+    menu.addSeparator();
+
+    menu.addItem((item) =>
+        item
+            .setTitle("Details")
+            .setIcon("gear")
+            .onClick(() => options.onOpenDetails()),
+    );
+
+    menu.addItem((item) =>
+        item
+            .setTitle("Show in system explorer")
+            .setIcon("folder-open")
+            .onClick(() => options.onRevealInExplorer()),
     );
 
     menu.addSeparator();
