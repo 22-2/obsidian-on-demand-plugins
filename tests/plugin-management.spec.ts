@@ -19,17 +19,14 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
         await plugin.updatePluginSettings(pluginId, "lazy");
     }, targetPluginId);
 
-    await obsidian.page.evaluate(() => {
-        const setting = (app as unknown as {
-            setting: {
-                open: () => void;
-                openTabById: (tabId: string) => void;
-            };
-        }).setting;
-        setting.open();
-        setting.openTabById("on-demand-plugins");
-    });
     const page = obsidian.page;
+    await page.evaluate(() => {
+        (app as unknown as { setting: { open: () => void } }).setting.open();
+    });
+    const settingsTab = page.getByText("On-Demand", { exact: true });
+    await expect(settingsTab).toBeVisible();
+    await settingsTab.click();
+
     const pluginManagementLink = page.getByText("Plugin management", { exact: true });
     await expect(pluginManagementLink).toBeVisible();
     await pluginManagementLink.click();
