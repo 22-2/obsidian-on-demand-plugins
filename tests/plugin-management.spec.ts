@@ -39,8 +39,14 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
 
     await row.locator(".clickable-icon").click();
-    await expect(settingsPage.getByText("Disable plugin", { exact: true })).toBeVisible();
-    await settingsPage.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" }).click();
+    // The Obsidian Menu API can render from the vault window even when its Settings row lives in another window.
+    const menuPage = await Promise.any(
+        page.context().pages().map(async (candidate) => {
+            await candidate.getByText("Disable plugin", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+            return candidate;
+        }),
+    );
+    await menuPage.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" }).click();
 
     // Exercise the real menu-to-row path: the page keeps the row mounted while it stages this edit.
     await expect(row).toBeVisible();
