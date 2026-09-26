@@ -20,47 +20,28 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
     }, targetPluginId);
 
     const page = obsidian.page;
-    const settingsOpenResult = await page.evaluate(() => {
-        // Use Obsidian's user-facing command so the settings view is mounted before selecting its plugin tab.
-        const result = app.commands.executeCommandById("app:open-settings");
-        return {
-            result,
-            matchingCommands: Object.keys(app.commands.commands).filter((id) => id.includes("settings")),
-        };
-    });
-    console.log("Open settings command:", JSON.stringify(settingsOpenResult));
-    await page.waitForTimeout(500);
-    const activeTab = await page.evaluate(() => {
-        const setting = (app as unknown as {
-            setting: {
-                activeTab?: { id?: string; name?: string; setting?: { contentEl?: HTMLElement } };
-                openTabById: (tabId: string) => void;
-            };
-        }).setting;
-        setting.openTabById("on-demand-plugins");
-        return {
-            id: setting.activeTab?.id,
-            name: setting.activeTab?.name,
-            content: setting.activeTab?.setting?.contentEl?.innerText?.slice(0, 500),
-        };
-    });
-    console.log("Selected plugin settings tab:", JSON.stringify(activeTab));
+    // Settings open in a separate window on Obsidian 1.13, so the main vault page does not contain its UI.
+    const settingsPagePromise = page.context().waitForEvent("page");
+    await page.evaluate(() => app.setting.open());
+    const settingsPage = await settingsPagePromise;
+    await settingsPage.waitForLoadState("domcontentloaded");
+    await settingsPage.evaluate(() => app.setting.openTabById("on-demand-plugins"));
 
-    const pluginManagementLink = page.getByText("Plugin management", { exact: true });
+    const pluginManagementLink = settingsPage.getByText("Plugin management", { exact: true });
     await expect(pluginManagementLink).toBeVisible();
     await pluginManagementLink.click();
 
-    await page.locator(".lazy-plugin-filter-row input").fill("BRAT");
-    const row = page.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
+    await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
+    const row = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
     await expect(row).toHaveCount(1);
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
 
     await row.locator(".clickable-icon").click();
-    await expect(page.getByText("Disable plugin", { exact: true })).toBeVisible();
-    await page.getByText("🚀 Lazy on layout ready", { exact: true }).click();
+    await expect(settingsPage.getByText("Disable plugin", { exact: true })).toBeVisible();
+    await settingsPage.getByText("🚀 Lazy on layout ready", { exact: true }).click();
 
     // Exercise the real menu-to-row path: the page keeps the row mounted while it stages this edit.
     await expect(row).toBeVisible();
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
-    await expect(page.locator(".lazy-plugin-save-controls button")).toHaveText("Save & apply (1)");
+    await expect(settingsPage.locator(".lazy-plugin-save-controls button")).toHaveText("Save & apply (1)");
 });
