@@ -21,12 +21,10 @@ test("plugin management row menu stages a mode change in place", async ({ obsidi
 
     const page = obsidian.page;
     await page.evaluate(() => {
-        (app as unknown as { setting: { open: () => void } }).setting.open();
+        // Use Obsidian's user-facing command so the settings view is mounted before selecting its plugin tab.
+        app.commands.executeCommandById("app:open-settings");
+        (app as unknown as { setting: { openTabById: (tabId: string) => void } }).setting.openTabById("on-demand-plugins");
     });
-    const settingsTab = page.getByText("On-Demand", { exact: true });
-    await expect(settingsTab).toBeVisible();
-    await settingsTab.click();
-
     const pluginManagementLink = page.getByText("Plugin management", { exact: true });
     await expect(pluginManagementLink).toBeVisible();
     await pluginManagementLink.click();
