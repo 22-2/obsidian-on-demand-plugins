@@ -21,6 +21,14 @@ jobs:
             matrix:
                 os: [macos-latest, windows-latest]
 
+        # Share authentication and asset paths so installation and test setup cannot omit them.
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
+            OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
+            # versions.json maps plugin compatibility; select the test version from the input or latest.
+            OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: ${{ github.event.inputs.obsidian_version || 'latest' }}
+
         steps:
             - name: Checkout
               uses: actions/checkout@v6
@@ -37,15 +45,6 @@ jobs:
                   cache: "pnpm"
                   cache-dependency-path: pnpm-lock.yaml
 
-            - name: Read Obsidian version from versions.json
-              id: set-version
-              run: |
-                  node -e '
-                    const fs = require("fs");
-                    const ver = JSON.parse(fs.readFileSync("versions.json", "utf8")).obsidian || "latest";
-                    fs.appendFileSync(process.env.GITHUB_OUTPUT, `obsidian_version=${ver}\n`);
-                  '
-
             - name: Cache plugin downloads
               uses: actions/cache@v5
               with:
@@ -58,13 +57,7 @@ jobs:
               uses: actions/cache@v5
               with:
                   path: obsidian-e2e-toolkit-assets
-                  key: >-
-                      ${{ runner.os }}-obsidians-e2e-toolkit-v4-${{
-                        github.event_name == 'workflow_dispatch'
-                        && github.event.inputs.obsidian_version
-                        || steps.set-version.outputs.obsidian_version
-                        || 'latest'
-                      }}
+                  key: ${{ runner.os }}-obsidians-e2e-toolkit-v4-${{ env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION }}
                   restore-keys: |
                       ${{ runner.os }}-obsidians-e2e-toolkit-v4-
 
@@ -78,8 +71,6 @@ jobs:
                       ${{ runner.os }}-playwright-chromium-
 
             - name: Install dependencies
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                   git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
                   pnpm install --no-frozen-lockfile
@@ -90,13 +81,11 @@ jobs:
               run: pnpm exec electron --version
 
             - name: Install Playwright chromium
-              # macOS runner では cdn.playwright.dev からの DL が 100% 表示後に
-              # スタールすることがある。Playwright 側に全体タイムアウトが無いため、
-              # 試行ごとのタイムアウト + リトライでハングを防ぐ。
+              # Downloads from cdn.playwright.dev can stall after reaching 100% on macOS.
+              # Playwright has no overall download timeout, so bound each attempt
+              # and retry to prevent the job from hanging.
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               uses: nick-fields/retry@v4
-              env:
-                  PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
               with:
                   timeout_minutes: 10
                   max_attempts: 3
@@ -107,23 +96,11 @@ jobs:
               run: pnpm run build
 
             - name: Ensure toolkit Obsidian is installed
-              env:
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  OBSIDIAN_E2E_TOOLKIT_HOME: ${{ github.workspace }}
-                  OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: >-
-                      ${{
-                        github.event_name == 'workflow_dispatch'
-                        && github.event.inputs.obsidian_version
-                        || steps.set-version.outputs.obsidian_version
-                        || 'latest'
-                      }}
               run: node node_modules/obsidian-e2e-toolkit/scripts/setup.mjs
 
             - name: Run E2E tests
               env:
                   CI: true
-                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-                  PLAYWRIGHT_BROWSERS_PATH: .cache/ms-playwright
               run: pnpm run test:e2e
 
             - name: Upload Playwright report
