@@ -25,11 +25,11 @@ const MODE_ORDER: PluginMode[] = [
  */
 export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions): void {
 
-    // Shortcut for the most common toggle; fine-grained choice lives below.
+    // Label the staged in-memory change so users know it is not persisted immediately.
     const isDisabled = options.getMode() === PLUGIN_MODE.ALWAYS_DISABLED;
     menu.addItem((item) =>
         item
-            .setTitle(isDisabled ? "Enable plugin" : "Disable plugin")
+            .setTitle(isDisabled ? "Enable plugin (in memory only)" : "Disable plugin (in memory only)")
             .setIcon(isDisabled ? "toggle-right" : "toggle-left")
             .onClick(() => options.onToggleEnabled(!isDisabled)),
     );
