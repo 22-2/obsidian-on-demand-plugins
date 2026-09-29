@@ -51,7 +51,8 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     // The Obsidian Menu API can render from the vault window even when its Settings row lives in another window.
     const menuPage = await Promise.any(
         page.context().pages().map(async (candidate) => {
-            await candidate.getByText("Disable plugin", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+            // Runtime toggles are labeled explicitly to distinguish them from saved mode changes.
+            await candidate.getByText("Disable plugin (in memory only)", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
             return candidate;
         }),
     );
