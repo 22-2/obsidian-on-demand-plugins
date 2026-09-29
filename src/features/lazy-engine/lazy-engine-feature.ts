@@ -10,6 +10,7 @@ import { FileLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/fil
 import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
+import { patchPluginLoad } from "src/patches/plugin-load";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchPluginRegisterView } from "src/patches/view-registry";
 import { patchSetViewState } from "src/patches/view-state";
@@ -43,6 +44,7 @@ export class LazyEngineFeature implements AppFeature {
         this.fileLoader = new FileLazyLoader(ctx, this.lazyRunner, { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") });
 
         // 3. Patches and Subscriptions
+        ctx.register(patchPluginLoad(ctx.obsidianPlugins));
         patchSetViewState({
             register: (unload) => this.ctx.register(unload),
             onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),

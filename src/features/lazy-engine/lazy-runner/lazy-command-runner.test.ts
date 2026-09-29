@@ -57,6 +57,15 @@ describe("LazyCommandRunner", () => {
     });
 
     describe("ensurePluginLoaded", () => {
+        it("reuses a CLI-loaded plugin absent from the enabled set", async () => {
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(false);
+
+            expect(await runner.ensurePluginLoaded("graph-analysis-ex")).toBe(true);
+            expect(mockCtx.obsidianPlugins.enablePlugin).not.toHaveBeenCalled();
+            expect(mockRegistry.syncCommandWrappersForPlugin).toHaveBeenCalledWith("graph-analysis-ex");
+        });
+
         it("should return true if plugin is already loaded and enabled", async () => {
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
             vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);

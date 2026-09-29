@@ -7,7 +7,7 @@ import pTimeout from "p-timeout";
 import pWaitFor from "p-wait-for";
 import type { CommandRegistry, PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
-import { isPluginEnabled, isPluginLoaded } from "src/core/utils";
+import { isPluginLoaded } from "src/core/utils";
 import { CommandExecutor } from "src/features/lazy-engine/lazy-runner/command-executor";
 
 const logger = log.getLogger("OnDemandPlugin/LazyCommandRunner");
@@ -92,9 +92,9 @@ export class LazyCommandRunner implements PluginLoader {
         return await mutex.runExclusive(async () => {
             try {
                 const loaded = isPluginLoaded(this.ctx.app, pluginId);
-                const enabled = isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, pluginId);
-
-                if (enabled && loaded) {
+                // CLI loads can leave a live instance outside enabledPlugins;
+                // runtime readiness must not depend on the saved enablement policy.
+                if (loaded) {
                     this.commandRegistry.syncCommandWrappersForPlugin(pluginId);
                     return true;
                 }
