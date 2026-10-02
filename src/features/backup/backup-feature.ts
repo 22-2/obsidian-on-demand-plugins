@@ -1,6 +1,7 @@
 import log from "loglevel";
 import type { AppFeature } from "src/core/feature";
 import type { PluginContext } from "src/core/plugin-context";
+import { PLUGIN_MODE, SETTINGS_SCHEMA_VERSION } from "src/core/types";
 
 // Needed dynamic import from obsidian
 import { normalizePath } from "obsidian";
@@ -8,17 +9,38 @@ import { normalizePath } from "obsidian";
 const logger = log.getLogger("OnDemandPlugin/BackupFeature");
 const INITIAL_INSTALL_BACKUP_DIRNAME = "initial-install";
 
-function hasProfilesRecord(value: unknown): value is { profiles: Record<string, unknown> } {
-    return typeof value === "object" && value !== null && "profiles" in value && typeof value.profiles === "object" && value.profiles !== null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function hasExternalProfileStorage(value: unknown): value is { profileStorageVersion: number } {
-    return typeof value === "object" && value !== null && "profileStorageVersion" in value && value.profileStorageVersion === 1;
+function hasValidInlineProfiles(value: unknown): value is { profiles: Record<string, unknown> } {
+    if (!isRecord(value) || !isRecord(value.profiles) || Object.keys(value.profiles).length === 0) return false;
+    return Object.entries(value.profiles).every(([id, profile]) => {
+        if (!isRecord(profile) || profile.id !== id || typeof profile.name !== "string" || !isRecord(profile.settings)) return false;
+        const settings = profile.settings;
+        if (settings.defaultMode !== undefined && !Object.values(PLUGIN_MODE).includes(settings.defaultMode as (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE])) return false;
+        if (settings.pruneUninstalledEntries !== undefined && typeof settings.pruneUninstalledEntries !== "boolean") return false;
+        return ["plugins", "lazyOnViews", "lazyOnFiles"].every((key) => settings[key] === undefined || isRecord(settings[key]));
+    });
+}
+
+function isLegacyExternalProfileData(value: unknown): value is { profileStorageVersion: number } {
+    return isRecord(value) && value.profileStorageVersion === 1 && !Object.hasOwn(value, "profiles");
+}
+
+function isSupportedDataFormat(value: unknown): boolean {
+    if (!isRecord(value)) return false;
+    if (value.settingsSchemaVersion !== undefined && value.settingsSchemaVersion !== SETTINGS_SCHEMA_VERSION) return false;
+    if (value.profileStorageVersion !== undefined && value.profileStorageVersion !== 1) return false;
+    if (Object.hasOwn(value, "profiles")) return hasValidInlineProfiles(value);
+    return isLegacyExternalProfileData(value);
 }
 
 export class BackupFeature implements AppFeature {
     private backupDir!: string;
     private ctx!: PluginContext;
+    // Reason: concurrent backup requests must not choose the same filename or rotate another request's new files.
+    private backupQueue: Promise<void> = Promise.resolve();
 
     async onload(ctx: PluginContext) {
         this.ctx = ctx;
@@ -77,6 +99,12 @@ export class BackupFeature implements AppFeature {
     }
 
     async createBackup(options?: { dataBackupPath?: string; communityBackupPath?: string; profileBackupPath?: string; rotate?: boolean }) {
+        const pending = this.backupQueue.then(() => this.createBackupNow(options));
+        this.backupQueue = pending.catch(() => undefined);
+        await pending;
+    }
+
+    private async createBackupNow(options?: { dataBackupPath?: string; communityBackupPath?: string; profileBackupPath?: string; rotate?: boolean }) {
         if (!this.ctx) return;
 
         await this.ensureBackupFolder();
@@ -89,6 +117,7 @@ export class BackupFeature implements AppFeature {
         let dataContent: string;
         let communityContent: string;
         let profilesContent: string | undefined;
+        let dataParsed: unknown;
 
         try {
             dataContent = await adapter.read(dataPath);
@@ -100,8 +129,8 @@ export class BackupFeature implements AppFeature {
 
         // 2. Validate json
         try {
-            const dataParsed: unknown = JSON.parse(dataContent);
-            if (!hasProfilesRecord(dataParsed) && !hasExternalProfileStorage(dataParsed)) {
+            dataParsed = JSON.parse(dataContent);
+            if (!isSupportedDataFormat(dataParsed)) {
                 logger.warn("Invalid data.json for backup, skipping validation failed.");
                 return;
             }
@@ -110,10 +139,19 @@ export class BackupFeature implements AppFeature {
             return;
         }
 
-        try {
-            profilesContent = await this.readProfilesSnapshot();
-        } catch (e) {
-            logger.warn("Failed to read external profiles for backup", e);
+        // Reason: legacy external layouts need a separate profile snapshot; inline profiles already live in data.json.
+        if (isLegacyExternalProfileData(dataParsed)) {
+            try {
+                const externalSnapshot = await this.readProfilesSnapshot();
+                if (!externalSnapshot.valid) {
+                    logger.warn("Invalid external profiles for backup, skipping backup and rotation.");
+                    return;
+                }
+                profilesContent = externalSnapshot.content;
+            } catch (e) {
+                logger.warn("Failed to read external profiles for backup", e);
+                return;
+            }
         }
 
         try {
@@ -128,7 +166,7 @@ export class BackupFeature implements AppFeature {
         }
 
         // 3. Save backup
-        const timestamp = window.moment().format("YYYYMMDD-HHmmss");
+        const timestamp = await this.uniqueBackupTimestamp();
         const dataBackupPath = options?.dataBackupPath ?? normalizePath(`${this.backupDir}/data_${timestamp}.json`);
         const communityBackupPath = options?.communityBackupPath ?? normalizePath(`${this.backupDir}/community-plugins_${timestamp}.json`);
         const profileBackupPath = options?.profileBackupPath ?? normalizePath(`${this.backupDir}/profiles_${timestamp}.json`);
@@ -221,19 +259,65 @@ export class BackupFeature implements AppFeature {
         }
     }
 
-    private async readProfilesSnapshot(): Promise<string | undefined> {
+    private async uniqueBackupTimestamp(): Promise<string> {
+        const adapter = this.ctx.app.vault.adapter;
+        const base = window.moment().format("YYYYMMDD-HHmmss-SSS");
+        let files = new Set<string>();
+        let listed = true;
+        try {
+            files = new Set((await adapter.list(this.backupDir)).files);
+        } catch (error) {
+            listed = false;
+            logger.warn("Could not list backups to choose a unique timestamp", error);
+        }
+
+        if (!listed) return `${base}-${window.crypto.randomUUID()}`;
+
+        let timestamp = base;
+        let sequence = 1;
+        const hasCollision = (candidate: string) => [`data_${candidate}.json`, `community-plugins_${candidate}.json`, `profiles_${candidate}.json`].some((name) => files.has(normalizePath(`${this.backupDir}/${name}`)));
+        while (hasCollision(timestamp)) {
+            timestamp = `${base}-${String(sequence).padStart(2, "0")}`;
+            sequence += 1;
+        }
+        return timestamp;
+    }
+
+    private async readProfilesSnapshot(): Promise<{ valid: boolean; content?: string }> {
         const adapter = this.ctx.app.vault.adapter;
         const profilesDir = normalizePath(`${this.ctx._plugin.manifest.dir}/profiles`);
-        if (!(await adapter.exists(profilesDir))) return undefined;
+        if (!(await adapter.exists(profilesDir))) return { valid: false };
 
         const { files } = await adapter.list(profilesDir);
         const profileFiles = files.filter((path) => path.endsWith(".json") && !path.endsWith(".json.bak"));
-        if (profileFiles.length === 0) return undefined;
+        if (profileFiles.length === 0) return { valid: false };
 
         const contents: Record<string, string> = {};
+        const profileIds = new Set<string>();
         for (const path of profileFiles) {
-            contents[path.slice(`${profilesDir}/`.length)] = await adapter.read(path);
+            const filename = path.slice(`${profilesDir}/`.length, -5);
+            let content: string;
+            let profile: unknown;
+            try {
+                content = await adapter.read(path);
+                profile = JSON.parse(content);
+            } catch {
+                return { valid: false };
+            }
+            if (!isRecord(profile) || typeof profile.id !== "string" || decodeURIComponent(filename) !== profile.id || profileIds.has(profile.id) || typeof profile.name !== "string" || !isRecord(profile.settings)) {
+                return { valid: false };
+            }
+            profileIds.add(profile.id);
+            const settings = profile.settings;
+            if (settings.defaultMode !== undefined && !Object.values(PLUGIN_MODE).includes(settings.defaultMode as (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE])) {
+                return { valid: false };
+            }
+            if (settings.pruneUninstalledEntries !== undefined && typeof settings.pruneUninstalledEntries !== "boolean") return { valid: false };
+            if (["plugins", "lazyOnViews", "lazyOnFiles"].some((key) => settings[key] !== undefined && !isRecord(settings[key]))) {
+                return { valid: false };
+            }
+            contents[`${filename}.json`] = content;
         }
-        return JSON.stringify({ version: 1, files: contents });
+        return { valid: true, content: JSON.stringify({ version: 1, files: contents }) };
     }
 }

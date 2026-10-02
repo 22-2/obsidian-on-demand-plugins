@@ -40,7 +40,13 @@ export default class OnDemandPlugin extends Plugin {
         this.features.register(new LazyEngineFeature());
         this.features.register(new StartupPolicyFeature());
 
-        await this.loadSettings();
+        try {
+            await this.loadSettings();
+        } catch (error) {
+            // Reason: settings validation stops startup before features can safely use a default replacement.
+            this.core.destroy();
+            throw error;
+        }
         this.configureLogger();
 
         // Registry needs to update manifests after settings are loaded
@@ -123,7 +129,6 @@ export default class OnDemandPlugin extends Plugin {
 
     async saveSettings() {
         await this.core.settingsService.save();
-        this.app.workspace.trigger("ondemand-plugins:settings-saved");
     }
 
     // ─── Plugin configuration ──────────────────────────────────
@@ -159,7 +164,8 @@ export default class OnDemandPlugin extends Plugin {
             hasChanges = true;
         }
 
-        if (hasChanges) {
+        // Reason: inferred defaults on a missing data.json may be waiting for Sync and should not be published at startup.
+        if (hasChanges && !this.core.settingsService.isFirstLoad) {
             await this.saveSettings();
         }
     }

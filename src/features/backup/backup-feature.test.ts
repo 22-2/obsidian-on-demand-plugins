@@ -63,7 +63,7 @@ describe("BackupFeature", () => {
 
         mockAdapter.exists.mockResolvedValue(true);
         mockAdapter.read.mockImplementation((path: string) => {
-            if (path.includes("data.json")) return '{"profiles": {}}';
+            if (path.includes("data.json")) return '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
             if (path.includes("community-plugins.json")) return "[]";
             return "";
         });
@@ -118,7 +118,7 @@ describe("BackupFeature", () => {
     it("should skip backup if community-plugins.json is not an array", async () => {
         mockAdapter.exists.mockResolvedValue(true);
         mockAdapter.read.mockImplementation((path: string) => {
-            if (path.includes("data.json")) return '{"profiles": {}}';
+            if (path.includes("data.json")) return '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
             if (path.includes("community-plugins.json")) return '{"not_array": true}';
             return "";
         });
@@ -132,7 +132,7 @@ describe("BackupFeature", () => {
 
     it("should write backup files if JSON is valid", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        const validData = '{"profiles": {}}';
+        const validData = '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
         const validCommunity = '["plugin1", "plugin2"]';
 
         mockAdapter.read.mockImplementation((path: string) => {
@@ -183,11 +183,81 @@ describe("BackupFeature", () => {
         expect(profileWriteCall![1]).toContain(JSON.stringify(profileContent));
     });
 
+    it("does not snapshot stale local profiles when the current data is inline", async () => {
+        mockAdapter.exists.mockResolvedValue(true);
+        const validData = '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return validData;
+            if (path.includes("community-plugins.json")) return "[]";
+            return '{"id":"Old","name":"Old","settings":{}}';
+        });
+        mockAdapter.list.mockResolvedValue({ folders: [], files: ["mock/plugin/dir/profiles/Old.json"] });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.list).not.toHaveBeenCalledWith("mock/plugin/dir/profiles");
+        expect(mockAdapter.write).toHaveBeenCalledTimes(2);
+    });
+
+    it("skips backup and rotation when any legacy external profile is invalid", async () => {
+        mockAdapter.exists.mockResolvedValue(true);
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profileStorageVersion":1}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return path.endsWith("Default.json") ? '{"id":"Default","name":"Default","settings":{}}' : "{broken";
+        });
+        mockAdapter.list.mockResolvedValue({ folders: [], files: ["mock/plugin/dir/profiles/Default.json", "mock/plugin/dir/profiles/Other.json"] });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+        expect(mockAdapter.remove).not.toHaveBeenCalled();
+    });
+
+    it("creates distinct backups for concurrent requests with the same clock time", async () => {
+        const now = vi.spyOn(Date, "now").mockReturnValue(1_780_000_000_000);
+        const files = new Set<string>();
+        mockAdapter.exists.mockResolvedValue(true);
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return "";
+        });
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the adapter mock must return a Promise like the vault API.
+        mockAdapter.list.mockImplementation((path: string) =>
+            Promise.resolve({
+                folders: [],
+                files: path === "mock/plugin/dir/backups" ? Array.from(files) : [],
+            }),
+        );
+        // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the adapter mock must return a Promise like the vault API.
+        mockAdapter.write.mockImplementation((path: string) => {
+            files.add(path);
+            return Promise.resolve();
+        });
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+
+        try {
+            await Promise.all([backupFeature.createBackup(), backupFeature.createBackup()]);
+        } finally {
+            now.mockRestore();
+        }
+
+        const dataBackupPaths = Array.from(files).filter((path) => path.includes("/data_"));
+        expect(dataBackupPaths).toHaveLength(2);
+        expect(new Set(dataBackupPaths).size).toBe(2);
+    });
+
     it("should create immutable initial-install backup whenever it is missing", async () => {
         // Keep this callback synchronous to satisfy lint rules for void-expected arguments.
         mockAdapter.exists.mockImplementation((path: string) => path === "mock/plugin/dir/backups");
 
-        const validData = '{"profiles": {}}';
+        const validData = '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
         const validCommunity = '["plugin1"]';
         mockAdapter.read.mockImplementation((path: string) => {
             if (path.includes("data.json")) return validData;
@@ -201,7 +271,8 @@ describe("BackupFeature", () => {
         expect(mockAdapter.mkdir).toHaveBeenCalledWith("mock/plugin/dir/backups/initial-install");
         expect(mockAdapter.write).toHaveBeenCalledWith("mock/plugin/dir/backups/initial-install/data.json", validData);
         expect(mockAdapter.write).toHaveBeenCalledWith("mock/plugin/dir/backups/initial-install/community-plugins.json", validCommunity);
-        expect(mockAdapter.list).not.toHaveBeenCalled();
+        expect(mockAdapter.list).toHaveBeenCalledTimes(1);
+        expect(mockAdapter.list).toHaveBeenCalledWith("mock/plugin/dir/backups");
     });
 
     it("should not overwrite immutable initial-install backup when it already exists", async () => {
@@ -215,7 +286,7 @@ describe("BackupFeature", () => {
 
     it("should rotate old backups keeping only the latest 3", async () => {
         mockAdapter.exists.mockResolvedValue(true);
-        const validData = '{"profiles": {}}';
+        const validData = '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
         const validCommunity = "[]";
 
         mockAdapter.read.mockImplementation((path: string) => {
