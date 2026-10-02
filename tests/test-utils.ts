@@ -36,7 +36,8 @@ export function useVaultPlugins(pluginPaths: readonly string[], options: TestVau
             enableBrowserConsoleLogging: options.enableBrowserConsoleLogging ?? false,
             logLevel: options.logLevel ?? "info",
             fresh: options.fresh ?? true,
-            plugins: pluginPaths.map((pluginPath) => ({ path: pluginPath })),
+            // Reason: each test vault must own its settings files instead of writing through a shared plugin symlink.
+            plugins: pluginPaths.map((pluginPath) => ({ path: pluginPath, symlink: false })),
         },
     });
 }
@@ -53,6 +54,11 @@ export function useOnDemandPluginsWithTargets(
         enableBrowserConsoleLogging: true,
         ...options,
     });
+}
+
+export function useOnDemandPluginOnly(options: TestVaultOptions = {}) {
+    // Reason: persistence tests should exercise the plugin under test without depending on unrelated downloaded fixtures.
+    useVaultPlugins([repoRoot], options);
 }
 
 export function useOnDemandPlugins() {

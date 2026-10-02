@@ -68,6 +68,8 @@ export interface Profile {
 export interface LazySettings {
     showConsoleLog: boolean;
     lastLazyPluginVersion?: string;
+    // Reason: refusing unknown schema versions prevents older plugin builds from overwriting newer synced settings.
+    settingsSchemaVersion?: number;
     profileStorageVersion?: number;
 
     // Profile Management
@@ -87,6 +89,7 @@ export interface LazySettings {
 }
 
 export const DEFAULT_PROFILE_ID = "Default";
+export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
