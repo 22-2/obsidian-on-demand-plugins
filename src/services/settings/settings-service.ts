@@ -1,22 +1,38 @@
 import log from "loglevel";
-import { Platform } from "obsidian";
+import type { DataAdapter } from "obsidian";
+import { Notice, Platform, normalizePath } from "obsidian";
 import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, LazySettings, Profile } from "src/core/types";
-import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, PLUGIN_MODE, SETTINGS_SCHEMA_VERSION } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { ProfileStorage } from "src/services/settings/profile-storage";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsService");
+type SettingsSnapshot = { kind: "missing"; value?: undefined; fingerprint?: undefined } | { kind: "valid"; value: Record<string, unknown>; fingerprint: string } | { kind: "corrupt"; value?: undefined; fingerprint?: undefined };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stableStringify(value: unknown): string {
+    if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
+    if (isRecord(value)) {
+        return `{${Object.keys(value)
+            .sort()
+            .filter((key) => value[key] !== undefined)
+            .map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+            .join(",")}}`;
+    }
+    return JSON.stringify(value) ?? "null";
 }
 
 export class SettingsService {
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
     private plugin: OnDemandPlugin;
     private profileStorage: ProfileStorage;
-    private profileStorageEnabled = false;
+    private persistedFingerprint?: string;
+    private writesBlocked = false;
+    private saveQueue: Promise<void> = Promise.resolve();
 
     // Populated in load().
     data!: LazySettings;
@@ -35,55 +51,59 @@ export class SettingsService {
     }
 
     async load() {
-        // 1. Load raw data
-        const rawLoaded: unknown = await this.plugin.loadData();
-        const loaded = isRecord(rawLoaded) ? (rawLoaded as Partial<LazySettings>) : {};
-        this.isFirstLoad = Object.keys(loaded).length === 0;
+        this.writesBlocked = false;
+        this.persistedFingerprint = undefined;
+        const snapshot = await this.readPersistedSnapshot();
+        if (snapshot.kind === "corrupt") {
+            this.blockSettings("The settings file is damaged. Restore a valid data.json backup, then reload the plugin.");
+        }
+
+        this.isFirstLoad = snapshot.kind === "missing";
+        this.persistedFingerprint = snapshot.fingerprint;
+        const loaded = (snapshot.value ?? {}) as Partial<LazySettings>;
+
+        if (loaded.settingsSchemaVersion !== undefined && loaded.settingsSchemaVersion !== SETTINGS_SCHEMA_VERSION) {
+            this.blockSettings("These settings were saved by a newer or unsupported format. Update the plugin before changing them.");
+        }
+        if (loaded.profileStorageVersion !== undefined && loaded.profileStorageVersion !== 1) {
+            this.blockSettings("These settings use an unsupported profile storage format. Update the plugin before changing them.");
+        }
 
         // 2. Merge with defaults (deep clone defaults first so we don't mutate
         // the shared DEFAULT_SETTINGS object during runtime edits).
         this.data = Object.assign(structuredClone(DEFAULT_SETTINGS), loaded);
 
-        const storedProfiles = await this.profileStorage.load();
-        this.profileStorageEnabled = storedProfiles.available;
-        const hasExternalStorageMarker = loaded.profileStorageVersion === 1;
-        const legacyProfiles = isRecord(this.data.profiles) ? this.data.profiles : {};
-        let shouldMigrateProfiles = storedProfiles.available && !hasExternalStorageMarker;
-
-        if (Object.keys(storedProfiles.profiles).length > 0) {
-            this.data.profiles = hasExternalStorageMarker ? storedProfiles.profiles : { ...legacyProfiles, ...storedProfiles.profiles };
-        } else if (hasExternalStorageMarker && storedProfiles.filesFound) {
-            // Keep the normalizer below from treating the default template as a
-            // valid external profile when every stored profile is corrupt.
-            this.data.profiles = {};
-        }
-
-        if (storedProfiles.corruptPaths.length > 0) {
-            logger.warn("Some external profile files could not be read", storedProfiles.corruptPaths);
-        }
-
-        // 2b. Ensure top-level profile references are valid before migration.
-        // First drop any corrupt (null/non-object) profile entries so a later
-        // `profiles[id].settings` read can't throw. An empty object is a valid
-        // record but has no profiles to activate, so treat "no usable profiles"
-        // (missing map, or all entries pruned) the same as a fresh install and
-        // seed the Default profile.
-        if (isRecord(this.data.profiles)) {
-            for (const [id, profile] of Object.entries(this.data.profiles)) {
-                if (!isRecord(profile)) {
-                    delete this.data.profiles[id];
-                }
+        let shouldMigrateExternalProfiles = false;
+        const hasInlineProfiles = Object.hasOwn(loaded, "profiles");
+        if (loaded.profileStorageVersion === 1 && !hasInlineProfiles) {
+            const storedProfiles = await this.profileStorage.load();
+            if (!storedProfiles.available || !storedProfiles.filesFound || storedProfiles.corruptPaths.length > 0 || !this.isValidProfileMap(storedProfiles.profiles)) {
+                logger.warn("External profile migration source is missing or invalid", storedProfiles.corruptPaths);
+                this.blockSettings("External profiles could not be verified. Keep the profiles folder intact and restore valid data before saving.");
             }
+            this.data.profiles = storedProfiles.profiles;
+            shouldMigrateExternalProfiles = true;
+        } else if (hasInlineProfiles) {
+            // Inline profiles are the sync source of truth. Never merge local
+            // profiles/ files here, because doing so would undo synced deletions.
+            if (!this.isValidProfileMap(loaded.profiles)) {
+                this.blockSettings("The profiles in data.json are incomplete or damaged. Restore a valid backup before saving.");
+            }
+            this.data.profiles = loaded.profiles;
+        } else if (isRecord(loaded.desktop) || isRecord(loaded.mobile)) {
+            if ((loaded.desktop !== undefined && !this.isValidDeviceSettings(loaded.desktop)) || (loaded.mobile !== undefined && !this.isValidDeviceSettings(loaded.mobile))) {
+                this.blockSettings("Legacy settings are incomplete or damaged. Restore a valid backup before saving.");
+            }
+        } else if (!this.isFirstLoad) {
+            this.blockSettings("The settings file has no recognized profile data. Restore a valid backup before saving.");
         }
-        if (!isRecord(this.data.profiles) || Object.keys(this.data.profiles).length === 0) {
-            this.data.profiles = {
-                [DEFAULT_PROFILE_ID]: {
-                    id: DEFAULT_PROFILE_ID,
-                    name: DEFAULT_PROFILE_ID,
-                    settings: structuredClone(DEFAULT_DEVICE_SETTINGS),
-                },
-            };
-        }
+        const shouldMigrateLegacySettings = !hasInlineProfiles && !shouldMigrateExternalProfiles && (isRecord(loaded.desktop) || isRecord(loaded.mobile));
+
+        // The old external-storage marker is removed as soon as we have a
+        // verified inline source; new writes always keep the full profile map.
+        delete this.data.profileStorageVersion;
+        this.data.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
+
         if (typeof this.data.desktopProfileId !== "string") {
             this.data.desktopProfileId = DEFAULT_PROFILE_ID;
         }
@@ -92,7 +112,8 @@ export class SettingsService {
         }
 
         // 3. Migration: Convert legacy format if needed
-        this.migrateLegacySettings();
+        // Reason: older desktop/mobile keys can remain in mixed files, but inline profiles are the newer sync source of truth.
+        if (shouldMigrateLegacySettings) this.migrateLegacySettings();
 
         // 4. Determine which profile to activate
         // By default, pick the one assigned to the current platform
@@ -129,21 +150,76 @@ export class SettingsService {
         // but generally profiles should store this now.
         // The original code merged `loadJSON(app, "lazyOnViews")`.
         // We can keep this behavior for the active profile to maintain continuity.
-        const storedViews = loadLocalStorage<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
-        if (storedViews && Object.keys(storedViews).length > 0) {
-            this.settings.lazyOnViews = {
-                ...(this.settings.lazyOnViews ?? {}),
-                ...(storedViews as { [k: string]: string[] }),
-            };
+        // Reason: store2 is a legacy fallback and may hydrate only a recognized desktop/mobile legacy file.
+        if (shouldMigrateLegacySettings) {
+            const storedViews = loadLocalStorage<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
+            if (storedViews && Object.keys(storedViews).length > 0) {
+                this.settings.lazyOnViews = {
+                    ...(this.settings.lazyOnViews ?? {}),
+                    ...(storedViews as { [k: string]: string[] }),
+                };
+            }
         }
 
-        if (shouldMigrateProfiles) {
+        if (shouldMigrateExternalProfiles) {
             try {
                 await this.save();
             } catch (error) {
-                logger.warn("Failed to migrate profiles to external storage; keeping data.json fallback", error);
+                if (this.writesBlocked) throw error;
+                logger.warn("Failed to migrate external profiles into data.json", error);
             }
         }
+    }
+
+    private async readPersistedSnapshot(): Promise<SettingsSnapshot> {
+        const candidate = this.plugin as unknown as {
+            app?: { vault?: { adapter?: DataAdapter } };
+            manifest?: { dir?: string };
+            loadData(): Promise<unknown>;
+        };
+        const adapter = candidate.app?.vault?.adapter;
+        const dir = candidate.manifest?.dir;
+
+        if (adapter && dir) {
+            const dataPath = normalizePath(`${dir}/data.json`);
+            try {
+                if (!(await adapter.exists(dataPath))) return { kind: "missing" };
+                const value: unknown = JSON.parse(await adapter.read(dataPath));
+                if (!isRecord(value)) return { kind: "corrupt" };
+                return { kind: "valid", value, fingerprint: stableStringify(value) };
+            } catch {
+                return { kind: "corrupt" };
+            }
+        }
+
+        try {
+            const value: unknown = await candidate.loadData();
+            if (value === null || value === undefined) return { kind: "missing" };
+            if (!isRecord(value)) return { kind: "corrupt" };
+            return { kind: "valid", value, fingerprint: stableStringify(value) };
+        } catch {
+            return { kind: "corrupt" };
+        }
+    }
+
+    private isValidProfileMap(value: unknown): value is Record<string, Profile> {
+        if (!isRecord(value) || Object.keys(value).length === 0) return false;
+        return Object.entries(value).every(([key, profile]) => {
+            return isRecord(profile) && profile.id === key && typeof profile.name === "string" && this.isValidDeviceSettings(profile.settings);
+        });
+    }
+
+    private isValidDeviceSettings(value: unknown): value is DeviceSettings {
+        if (!isRecord(value)) return false;
+        if (value.defaultMode !== undefined && !Object.values(PLUGIN_MODE).includes(value.defaultMode as (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE])) return false;
+        if (value.pruneUninstalledEntries !== undefined && typeof value.pruneUninstalledEntries !== "boolean") return false;
+        return ["plugins", "lazyOnViews", "lazyOnFiles"].every((key) => value[key] === undefined || isRecord(value[key]));
+    }
+
+    private blockSettings(message: string): never {
+        this.writesBlocked = true;
+        new Notice(message);
+        throw new Error(message);
     }
 
     private migrateLegacySettings() {
@@ -224,30 +300,47 @@ export class SettingsService {
     }
 
     async save() {
+        // Reason: serialize snapshots so concurrent setting changes cannot race the disk fingerprint and overwrite one another.
+        const pendingSave = this.saveQueue.then(() => this.saveNow());
+        this.saveQueue = pendingSave.catch(() => undefined);
+        await pendingSave;
+    }
+
+    private async saveNow() {
+        if (this.writesBlocked || !this.data || !this.settings || !this.currentProfileId) {
+            throw new Error("Settings cannot be saved until a valid settings file is loaded.");
+        }
+
+        const latest = await this.readPersistedSnapshot();
+        if (latest.kind === "corrupt") {
+            this.blockSettings("The settings file changed into an unreadable state. Restore a valid backup, then reload the plugin.");
+        }
+        const expectedMissing = this.persistedFingerprint === undefined;
+        const currentMissing = latest.kind === "missing";
+        // Reason: Obsidian Sync can deliver a newer data.json after load; compare before save to avoid replacing that copy.
+        if (expectedMissing !== currentMissing || (!currentMissing && latest.kind === "valid" && latest.fingerprint !== this.persistedFingerprint)) {
+            this.blockSettings("Settings changed on disk after this plugin loaded. Reload the plugin before saving to avoid overwriting newer data.");
+        }
+
         // Ensure the current settings are reflected in the data object
         // (Since this.settings is a reference, it should be, but good to be safe)
         if (this.data.profiles[this.currentProfileId]) {
             this.data.profiles[this.currentProfileId].settings = this.settings;
         }
-        if (!this.profileStorageEnabled) {
-            await this.plugin.saveData(this.data);
-            return;
+        if (!this.isValidProfileMap(this.data.profiles)) {
+            this.blockSettings("The in-memory profiles are incomplete. Restore a valid backup before saving.");
         }
 
-        try {
-            await this.profileStorage.save(this.data.profiles);
-            const persisted = { ...this.data } as Partial<LazySettings>;
-            delete persisted.profiles;
-            persisted.profileStorageVersion = 1;
-            await this.plugin.saveData(persisted);
-        } catch (error) {
-            // Keep a complete data.json fallback if external storage is not
-            // writable. The next load can retry migration without losing data.
-            logger.warn("Failed to save external profiles; writing data.json fallback", error);
-            const fallback = { ...this.data } as Partial<LazySettings>;
-            delete fallback.profileStorageVersion;
-            await this.plugin.saveData(fallback);
-        }
+        const persisted = structuredClone(this.data);
+        delete persisted.profileStorageVersion;
+        persisted.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
+        // Keep every profile in Obsidian's plugin data.json so Sync transfers the
+        // complete configuration in one file; profiles/ remains the old migration copy for manual recovery.
+        await this.plugin.saveData(persisted);
+        this.persistedFingerprint = stableStringify(persisted);
+        this.isFirstLoad = false;
+        // Reason: profile dialogs save through this service directly, so central emission keeps every successful save backed up.
+        this.plugin.app.workspace.trigger("ondemand-plugins:settings-saved");
     }
 
     /**

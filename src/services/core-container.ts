@@ -68,8 +68,7 @@ export class CoreContainer {
                 settings: backupSettings,
             };
 
-            // Create an initial file backup
-            await this.ctx.saveSettings();
+            // Reason: a missing data.json may be an unsynced file on a new device, so startup defaults stay in memory until a user saves.
             return;
         }
 

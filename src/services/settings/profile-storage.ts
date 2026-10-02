@@ -11,7 +11,7 @@ export interface ProfileStorageLoadResult {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === "object" && value !== null;
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseProfile(value: unknown): Profile | undefined {
@@ -61,70 +61,38 @@ export class ProfileStorage {
             return empty;
         }
 
-        const profilePaths = new Set<string>();
-        for (const path of files) {
-            if (path.endsWith(".json")) profilePaths.add(path);
-            if (path.endsWith(".json.bak")) profilePaths.add(path.slice(0, -4));
-        }
+        // Only current profile files may be migrated into data.json. A .bak can
+        // be stale after a deliberate deletion, so using it here could resurrect
+        // profiles the user removed.
+        const profilePaths = files.filter((path) => path.endsWith(".json") && !path.endsWith(".json.bak"));
 
         const result: ProfileStorageLoadResult = {
             available: true,
-            filesFound: profilePaths.size > 0,
+            filesFound: profilePaths.length > 0,
             profiles: {},
             corruptPaths: [],
         };
 
         for (const path of profilePaths) {
-            const candidates = [path, `${path}.bak`];
             let profile: Profile | undefined;
-            for (const candidatePath of candidates) {
-                try {
-                    profile = parseProfile(JSON.parse(await this.adapter.read(candidatePath)));
-                } catch {
-                    profile = undefined;
-                }
-                if (profile) break;
+            try {
+                profile = parseProfile(JSON.parse(await this.adapter.read(path)));
+            } catch {
+                profile = undefined;
             }
-
             if (!profile) {
                 result.corruptPaths.push(path);
                 continue;
             }
-            if (!result.profiles[profile.id]) result.profiles[profile.id] = profile;
+            const expectedId = this.idFromPath(path);
+            if (profile.id !== expectedId || result.profiles[profile.id]) {
+                result.corruptPaths.push(path);
+                continue;
+            }
+            result.profiles[profile.id] = profile;
         }
 
         return result;
-    }
-
-    async save(profiles: Record<string, Profile>): Promise<void> {
-        if (!this.adapter || !this.profilesDir) return;
-
-        if (!(await this.adapter.exists(this.profilesDir))) {
-            await this.adapter.mkdir(this.profilesDir);
-        }
-
-        const existingFiles = (await this.adapter.list(this.profilesDir)).files;
-        const currentIds = new Set(Object.keys(profiles));
-
-        for (const profile of Object.values(profiles)) {
-            const path = this.profilePath(profile.id);
-            if (await this.adapter.exists(path)) {
-                const previous = await this.adapter.read(path);
-                await this.adapter.write(`${path}.bak`, previous);
-            }
-            await this.adapter.write(path, JSON.stringify(profile, null, 2));
-        }
-
-        for (const path of existingFiles.filter((candidate) => candidate.endsWith(".json") && !candidate.endsWith(".json.bak"))) {
-            const id = this.idFromPath(path);
-            if (!id || currentIds.has(id)) continue;
-            await this.adapter.remove(path);
-            if (await this.adapter.exists(`${path}.bak`)) await this.adapter.remove(`${path}.bak`);
-        }
-    }
-
-    private profilePath(id: string): string {
-        return normalizePath(`${this.profilesDir}/${encodeURIComponent(id)}.json`);
     }
 
     private idFromPath(path: string): string | undefined {
