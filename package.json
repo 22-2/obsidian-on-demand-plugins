@@ -16,7 +16,7 @@
         "test": "vitest",
         "lint": "pnpm exec eslint ./src",
         "format": "pnpm run lint --fix && pnpm exec prettier --editorconfig --write ./src && pnpx organize-imports-cli tsconfig.json",
-        "release": "pnpm dlx semantic-release",
+        "release": "semantic-release",
         "release:dry": "pnpm release --dry-run"
     },
     "keywords": [],
@@ -44,7 +44,7 @@
         "@semantic-release/release-notes-generator": "^14.1.1",
         "@types/node": "^26.6.2",
         "@vitest/ui": "^5.0.1",
-        "conventional-changelog-conventionalcommits": "^10.4.0",
+        "conventional-changelog-conventionalcommits": "^9.3.1",
         "electron": "44.4.5",
         "esbuild": "0.28.2",
         "eslint": "^10.11.0",
@@ -56,6 +56,7 @@
         "obsidian-e2e-toolkit": "https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.2.2/obsidian-e2e-toolkit-1.2.2.tgz",
         "playwright": "^1.63.0",
         "prettier": "^3.9.9",
+        "semantic-release": "^25.0.9",
         "typescript": "npm:@typescript/typescript6@6.0.2",
         "typescript-eslint": "^8.70.1",
         "vitest": "^5.0.1"
