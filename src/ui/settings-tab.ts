@@ -473,9 +473,10 @@ class PluginPage extends SettingPage {
             const actionsButton = new ExtraButtonComponent(setting.controlEl)
                 .setIcon("ellipsis-vertical")
                 .setTooltip("Plugin actions");
-            // ExtraButtonComponent.onClick receives no MouseEvent, so anchor
-            // the menu to the button rect instead of the mouse position.
-            actionsButton.onClick(() => {
+            actionsButton.extraSettingsEl.addClass("lazy-plugin-row-actions-desktop");
+            // Both controls open the same menu; anchor it to the visible control
+            // because ExtraButtonComponent callbacks do not provide a MouseEvent.
+            const openActions = (anchor: HTMLElement) => {
                 const menu = new Menu();
                 addPluginRowMenuItems(menu, {
                     getMode: () => this.plugin.getPluginMode(manifest.id),
@@ -498,8 +499,19 @@ class PluginPage extends SettingPage {
                         ),
                     onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, modeBadge, enabledBadge),
                 });
-                const rect = actionsButton.extraSettingsEl.getBoundingClientRect();
-                menu.showAtPosition({ x: rect.left, y: rect.bottom });
+                const rect = anchor.getBoundingClientRect();
+                // Settings can live in a separate window; use its document so the
+                // menu and anchor coordinates refer to the same visible surface.
+                menu.showAtPosition({ x: rect.left, y: rect.bottom }, anchor.ownerDocument);
+            };
+            actionsButton.onClick(() => openActions(actionsButton.extraSettingsEl));
+            // A labeled native button makes the mobile action easier to discover
+            // and press while sharing the desktop menu's behavior.
+            setting.addButton((button) => {
+                button.setIcon("ellipsis-vertical").onClick(() => openActions(button.buttonEl));
+                // setIcon replaces button contents, so append the label afterward.
+                button.buttonEl.createSpan({ text: "Actions" });
+                button.buttonEl.addClass("lazy-plugin-row-actions-mobile");
             });
         });
     }

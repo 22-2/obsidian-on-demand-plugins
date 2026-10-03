@@ -147,6 +147,78 @@
     flex: 0 0 auto;
 }
 
+/* Labeled actions use a wider touch target on mobile; keep the compact desktop control. */
+.lazy-plugin-row-actions-mobile {
+    display: none;
+}
+
+.is-mobile .lazy-plugin-row-actions-desktop {
+    display: none;
+}
+
+.is-mobile .lazy-plugin-list-body > .setting-item.lazy-plugin-mode-row {
+    /* A footer leaves the full row width available for descriptions and long plugin names. */
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.is-mobile .lazy-plugin-mode-row .setting-item-info {
+    margin-right: 0;
+    width: 100%;
+}
+
+.is-mobile .lazy-plugin-list-body > .setting-item.lazy-plugin-mode-row > .setting-item-control {
+    /* Match the specificity of Obsidian's phone modal rule, which forces controls to full width. */
+    min-width: 0;
+    width: 100%;
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    justify-content: flex-end;
+}
+
+.is-mobile .lazy-plugin-list-body .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-mobile {
+    /* A wide button aligned to the right is easier to reach and hit with a thumb. */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--size-4-2);
+    min-width: 112px;
+    width: 112px;
+    min-height: 44px;
+    padding: var(--size-4-2) var(--size-4-4);
+    margin: 0;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--background-primary);
+}
+
+.is-mobile .lazy-plugin-badges {
+    /* Tablets also use mobile Setting styles, even above the phone media breakpoint. */
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.is-mobile .lazy-plugin-mode-badge {
+    max-width: 100%;
+    white-space: normal;
+}
+
+.is-mobile .lazy-plugin-filter-row .setting-item-control {
+    /* Equal flexible columns prevent the fixed desktop dropdown width from squeezing the search field. */
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--size-4-2);
+    width: 100%;
+}
+
+.is-mobile .lazy-plugin-filter-row input,
+.is-mobile .lazy-plugin-filter-row .dropdown {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
 @media (max-width: 500px) {
     .lazy-plugin-badges {
         /* A narrow info column may not fit both labels; wrap at the gap
