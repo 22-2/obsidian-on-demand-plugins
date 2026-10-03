@@ -2,13 +2,89 @@
 import type { App, ButtonComponent, DropdownComponent, SettingDefinitionItem } from "obsidian";
 import { ExtraButtonComponent, FileSystemAdapter, Menu, Modal, Notice, Platform, PluginSettingTab, Setting, SettingPage, normalizePath } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
+import { openExternalUrl, openSystemPath } from "src/core/external-open";
 import { FeatureEvents } from "src/core/event-bus";
-import type { PLUGIN_MODE } from "src/core/types";
-import { PluginModes } from "src/core/types";
+import { PLUGIN_MODE, PluginModes } from "src/core/types";
+import type { LazySettings, PLUGIN_MODE as PluginMode } from "src/core/types";
 import type { MaintenanceFeature, SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/maintenance/maintenance-feature";
+import { stableStringify } from "src/services/settings/settings-service";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
+import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
+import { isPluginLoaded } from "src/core/utils";
+
+type PluginStatistics = {
+    alwaysEnabled: number;
+    alwaysDisabled: number;
+    lazy: number;
+    lazyOnLayoutReady: number;
+    total: number;
+};
+
+function getPluginStatistics(plugin: OnDemandPlugin): PluginStatistics {
+    const counts: PluginStatistics = { alwaysEnabled: 0, alwaysDisabled: 0, lazy: 0, lazyOnLayoutReady: 0, total: plugin.manifests.length };
+    // Keep the four modes separate so each status indicator shows its own count.
+    plugin.manifests.forEach(({ id }) => {
+        const mode = plugin.getPluginMode(id);
+        if (mode === PLUGIN_MODE.ALWAYS_ENABLED) counts.alwaysEnabled++;
+        else if (mode === PLUGIN_MODE.ALWAYS_DISABLED) counts.alwaysDisabled++;
+        else if (mode === PLUGIN_MODE.LAZY_ON_LAYOUT_READY) counts.lazyOnLayoutReady++;
+        else counts.lazy++;
+    });
+    return counts;
+}
+
+function pluginStatisticsText(plugin: OnDemandPlugin): string {
+    const counts = getPluginStatistics(plugin);
+    // Spaces and middots instead of bare slashes so the Setting name doesn't look cramped.
+    return `⛔ ${counts.alwaysDisabled} · 🤲 ${counts.lazy} · 🚀 ${counts.lazyOnLayoutReady} · ✅ ${counts.alwaysEnabled}`;
+}
+
+function pluginManagementSummary(plugin: OnDemandPlugin): string {
+    const counts = getPluginStatistics(plugin);
+    return `${counts.total} plugins`;
+}
+
+function enabledBadgeText(app: App, pluginId: string, savedPluginIds?: ReadonlySet<string>): string {
+    // Live runtime load is distinct from saved policy; only confirmed disk absence should be called in-memory only.
+    if (!isPluginLoaded(app, pluginId)) return "Not loaded";
+    return savedPluginIds && !savedPluginIds.has(pluginId) ? "Loaded (in memory only)" : "Loaded";
+}
+
+function pluginModeLabel(mode: PluginMode): string {
+    // Keep the mode emoji as a quick visual cue while the fixed grid column
+    // keeps each row's live state aligned.
+    return PluginModes[mode];
+}
+
+async function openPluginDirectory(app: App, manifest: { dir?: string; name: string }) {
+    // Mirror openBackupDirectory: shell.openPath needs a desktop adapter and
+    // an absolute path, so bail out early anywhere else.
+    if (!Platform.isDesktopApp || !(app.vault.adapter instanceof FileSystemAdapter)) {
+        new Notice("Revealing the plugin folder is available on desktop only.");
+        return;
+    }
+    if (!manifest.dir) {
+        new Notice(`Could not locate the folder for ${manifest.name}.`);
+        return;
+    }
+    try {
+        const error = await openSystemPath(`${app.vault.adapter.getBasePath()}/${manifest.dir}`);
+        if (error) new Notice(`Could not open the plugin folder: ${error}`);
+    } catch (error) {
+        new Notice(`Could not open the plugin folder: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
+
+async function openPluginCommunityPage(pluginId: string) {
+    const url = `https://obsidian.md/plugins?id=${encodeURIComponent(pluginId)}`;
+    try {
+        await openExternalUrl(url);
+    } catch (error) {
+        new Notice(`Could not open the community page: ${error instanceof Error ? error.message : String(error)}`);
+    }
+}
 
 async function openBackupDirectory(plugin: OnDemandPlugin) {
     if (!Platform.isDesktopApp || !(plugin.app.vault.adapter instanceof FileSystemAdapter)) {
@@ -20,8 +96,7 @@ async function openBackupDirectory(plugin: OnDemandPlugin) {
     const backupPath = normalizePath(`${plugin.manifest.dir}/backups`);
     try {
         if (!(await adapter.exists(backupPath))) await adapter.mkdir(backupPath);
-        const electron = (window as Window & { require?: (moduleName: string) => unknown }).require?.("electron") as { shell?: { openPath: (path: string) => Promise<string> } } | undefined;
-        const error = await electron?.shell?.openPath(`${adapter.getBasePath()}/${backupPath}`);
+        const error = await openSystemPath(`${adapter.getBasePath()}/${backupPath}`);
         if (error) new Notice(`Could not open the backup folder: ${error}`);
     } catch (error) {
         new Notice(`Could not open the backup folder: ${error instanceof Error ? error.message : String(error)}`);
@@ -178,6 +253,9 @@ class ProfileManagementPage extends SettingPage {
         new Setting(this.containerEl).setName(label).addDropdown((dropdown) => {
             Object.values(service.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
             dropdown.setValue(currentId).onChange(async (profileId) => {
+                // Selecting the already-active default changes nothing, so keep the draft clean.
+                const activeId = type === "desktop" ? service.data.desktopProfileId : service.data.mobileProfileId;
+                if (profileId === activeId) return;
                 service.setDeviceDefault(profileId, type);
                 this.tab.markDirty();
                 this.display();
@@ -207,9 +285,15 @@ class ProfileManagementPage extends SettingPage {
                 .setButtonText("Save")
                 .setCta()
                 .onClick(async () => {
-                    if (!name.trim()) return;
+                    const nextName = name.trim();
+                    if (!nextName) return;
                     const service = this.plugin.core.settingsService;
-                    service.renameProfile(id, name.trim());
+                    // Renaming to the same name changes nothing, so keep the draft clean.
+                    if (nextName === service.data.profiles[id]?.name) {
+                        modal.close();
+                        return;
+                    }
+                    service.renameProfile(id, nextName);
                     this.tab.markDirty();
                     modal.close();
                     this.display();
@@ -250,12 +334,14 @@ function profileIdsFor(service: OnDemandPlugin["core"]["settingsService"]) {
 class PluginPage extends SettingPage {
     private static readonly PAGE_SIZE = 24;
     private filter = "";
-    private mode?: PLUGIN_MODE;
+    private mode?: PluginMode;
     private app: App;
     private plugin: OnDemandPlugin;
     private tab: SettingsTab;
     private infiniteScrollObserver?: IntersectionObserver;
     private loadedCount = 0;
+    private savedCommunityPluginIds?: Set<string>;
+    private communityPluginReadId = 0;
     constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.app = app;
@@ -268,8 +354,14 @@ class PluginPage extends SettingPage {
         // Refresh the registry whenever this page is entered so the count and
         // list reflect the current Obsidian plugin manifests.
         this.plugin.updateManifests();
+        void this.refreshCommunityPluginSnapshot();
         this.containerEl.empty();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
+        new Setting(this.containerEl).setName("Statistics").setHeading();
+        new Setting(this.containerEl)
+            .setName(pluginStatisticsText(this.plugin))
+            .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
+            .setClass("lazy-plugin-statistics");
         new Setting(this.containerEl)
             .setName("Plugins")
             .setHeading()
@@ -279,11 +371,17 @@ class PluginPage extends SettingPage {
                     .setTooltip("Refresh plugin list")
                     .onClick(() => {
                         this.plugin.updateManifests();
-                        this.tab.update();
+                        void this.refreshCommunityPluginSnapshot();
+                        // Re-render the list directly: tab.update() does not
+                        // guarantee the open page is re-displayed, so relying
+                        // on it leaves live badges (e.g. Enabled after an
+                        // on-demand load) stale.
+                        this.renderInfiniteList();
                     }),
             );
-        new Setting(this.containerEl)
-            .setName("Filter")
+        const filterSetting = new Setting(this.containerEl).setName("Filter");
+        filterSetting.setClass("lazy-plugin-filter-row");
+        filterSetting
             .addText((t) =>
                 t
                     .setPlaceholder("Plugin name")
@@ -295,9 +393,9 @@ class PluginPage extends SettingPage {
             )
             .addDropdown((d) => {
                 d.addOption("", "All");
-                Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PLUGIN_MODE]));
+                Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PluginMode]));
                 d.setValue(this.mode ?? "").onChange((v) => {
-                    this.mode = v ? (v as PLUGIN_MODE) : undefined;
+                    this.mode = v ? (v as PluginMode) : undefined;
                     this.renderInfiniteList();
                 });
             });
@@ -306,6 +404,7 @@ class PluginPage extends SettingPage {
     }
     hide() {
         this.disconnectInfiniteScroll();
+        this.communityPluginReadId++;
         super.hide();
     }
     private renderInfiniteList() {
@@ -341,35 +440,115 @@ class PluginPage extends SettingPage {
         plugins.slice(start, end).forEach((manifest) => {
             if (!manifest) return;
             const setting = new Setting(listEl).setName(manifest.name);
-            setting.setDesc(manifest.description);
-            new ExtraButtonComponent(setting.controlEl)
-                .setIcon("gear")
-                .setTooltip("Advanced lazy options")
-                .onClick(() =>
-                    new LazyOptionsModal(this.app, this.plugin, manifest.id, () => {
-                        this.tab.pendingPluginIds.add(manifest.id);
-                        this.tab.markDirty();
-                        this.tab.renderPendingControls(this.containerEl, () => this.display());
-                    }).open(),
-                );
-            setting.addDropdown((dropdown) => {
-                Object.keys(PluginModes).forEach((key) => dropdown.addOption(key, PluginModes[key as PLUGIN_MODE]));
-                dropdown.setValue(this.plugin.getPluginMode(manifest.id)).onChange((value) => {
-                    // Changing the mode should preserve advanced lazy options so
-                    // users can temporarily disable a plugin without reconfiguring it.
-                    this.plugin.settings.plugins[manifest.id] = {
-                        ...(this.plugin.settings.plugins[manifest.id] ?? {}),
-                        mode: value as PLUGIN_MODE,
-                        userConfigured: true,
-                    };
-                    this.tab.pendingPluginIds.add(manifest.id);
-                    this.tab.markDirty();
-                    // Re-apply an active filter after a mode change so rows and the
-                    // result count do not show plugins that no longer match it.
-                    this.renderInfiniteList();
-                    this.tab.renderPendingControls(this.containerEl, () => this.display());
-                });
+            setting.setClass("lazy-plugin-mode-row");
+            // Give variable-length descriptions their own line so metadata
+            // always starts at a predictable position within each row.
+            setting.descEl.createDiv({ cls: "lazy-plugin-description", text: manifest.description });
+            // The current mode lives in passive badges so the row never owns
+            // an editable control; edits go through the 3-dot menu instead.
+            const badges = setting.descEl.createDiv({ cls: "lazy-plugin-badges" });
+            const mode = this.plugin.getPluginMode(manifest.id);
+            const modeBadge = badges.createSpan({
+                cls: "lazy-plugin-mode-badge",
+                text: pluginModeLabel(mode),
             });
+            // Show the live runtime state; the staged mode alone cannot tell
+            // whether a lazy plugin is actually loaded right now.
+            const enabledBadge = badges.createSpan({
+                cls: "lazy-plugin-enabled-badge",
+                text: enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds),
+            });
+            enabledBadge.setAttr("data-plugin-id", manifest.id);
+            enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
+            // Author names vary widely in length; keep them on a separate
+            // line and omit the attribution prefix when no author is given.
+            const author = manifest.author?.trim();
+            setting.descEl.createDiv({
+                cls: "lazy-plugin-meta-badge",
+                text: `v${manifest.version}${author ? ` · by ${author}` : ""}`,
+            });
+            const actionsButton = new ExtraButtonComponent(setting.controlEl)
+                .setIcon("ellipsis-vertical")
+                .setTooltip("Plugin actions");
+            // ExtraButtonComponent.onClick receives no MouseEvent, so anchor
+            // the menu to the button rect instead of the mouse position.
+            actionsButton.onClick(() => {
+                const menu = new Menu();
+                addPluginRowMenuItems(menu, {
+                    getMode: () => this.plugin.getPluginMode(manifest.id),
+                    onOpenDetails: () =>
+                        new LazyOptionsModal(this.app, this.plugin, manifest.id, () => {
+                            this.tab.pendingPluginIds.add(manifest.id);
+                            this.tab.markDirty();
+                            this.tab.renderPendingControls(this.containerEl, () => this.display());
+                        }).open(),
+                    onOpenCommunityPage: () => {
+                        void openPluginCommunityPage(manifest.id);
+                    },
+                    onRevealInExplorer: () => void openPluginDirectory(this.app, manifest),
+                    onToggleEnabled: (enabled) =>
+                        this.applyRowModeChange(
+                            manifest.id,
+                            enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED,
+                            modeBadge,
+                            enabledBadge,
+                        ),
+                    onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, modeBadge, enabledBadge),
+                });
+                const rect = actionsButton.extraSettingsEl.getBoundingClientRect();
+                menu.showAtPosition({ x: rect.left, y: rect.bottom });
+            });
+        });
+    }
+    private applyRowModeChange(pluginId: string, mode: PluginMode, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
+        // Selecting the effective mode changes nothing semantically, so skip creating
+        // an explicit entry just to flip userConfigured and keep the draft clean.
+        const current = this.plugin.settings.plugins[pluginId];
+        if (this.plugin.getPluginMode(pluginId) === mode && (current?.mode === undefined || current.mode === mode)) return;
+        // Changing the mode should preserve advanced lazy options so
+        // users can temporarily disable a plugin without reconfiguring it.
+        this.plugin.settings.plugins[pluginId] = {
+            ...(this.plugin.settings.plugins[pluginId] ?? {}),
+            mode,
+            userConfigured: true,
+        };
+        this.tab.pendingPluginIds.add(pluginId);
+        this.tab.markDirty();
+        // Update only the badges in place so the row stays where it is even
+        // when it no longer matches the active filter; re-filtering waits
+        // until the user changes the filter conditions.
+        modeBadge.setText(pluginModeLabel(mode));
+        enabledBadge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
+        enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, pluginId));
+        this.refreshStats();
+        this.tab.renderPendingControls(this.containerEl, () => this.display());
+    }
+    private refreshStats() {
+        const statsEl = this.containerEl.querySelector(".lazy-plugin-statistics .setting-item-name");
+        if (statsEl) statsEl.setText(pluginStatisticsText(this.plugin));
+    }
+    private async refreshCommunityPluginSnapshot() {
+        const readId = ++this.communityPluginReadId;
+        this.savedCommunityPluginIds = undefined;
+        let parsed: unknown;
+        try {
+            parsed = await this.app.vault.readConfigJson("community-plugins");
+        } catch {
+            parsed = undefined;
+        }
+        if (readId !== this.communityPluginReadId) return;
+        if (Array.isArray(parsed) && parsed.every((id): id is string => typeof id === "string")) {
+            this.savedCommunityPluginIds = new Set(parsed);
+        }
+        this.updateVisibleEnabledBadges();
+    }
+    private updateVisibleEnabledBadges() {
+        this.containerEl.querySelectorAll<HTMLElement>(".lazy-plugin-enabled-badge").forEach((badge) => {
+            const pluginId = badge.dataset.pluginId;
+            if (!pluginId) return;
+            const loaded = isPluginLoaded(this.app, pluginId);
+            badge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
+            badge.toggleClass("is-loaded", loaded);
         });
     }
     private disconnectInfiniteScroll() {
@@ -381,8 +560,8 @@ class PluginPage extends SettingPage {
 class MaintenancePage extends SettingPage {
     private plugin: OnDemandPlugin;
     private tab: SettingsTab;
-    private from = "alwaysDisabled" as PLUGIN_MODE;
-    private to = "lazy" as PLUGIN_MODE;
+    private from = "alwaysDisabled" as PluginMode;
+    private to = "lazy" as PluginMode;
     private syncDirection: SyncDirection = "lazyToCore";
     constructor(plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
@@ -450,7 +629,7 @@ class MaintenancePage extends SettingPage {
         new Setting(this.containerEl).setName("From mode").addDropdown((d) =>
             this.modes(d)
                 .setValue(this.from)
-                .onChange((v) => (this.from = v as PLUGIN_MODE)),
+                .onChange((v) => (this.from = v as PluginMode)),
         );
         new Setting(this.containerEl)
             .setName("To mode")
@@ -474,7 +653,7 @@ class MaintenancePage extends SettingPage {
             .addDropdown((d) =>
                 this.modes(d)
                     .setValue(this.to)
-                    .onChange((v) => (this.to = v as PLUGIN_MODE)),
+                    .onChange((v) => (this.to = v as PluginMode)),
             );
         new Setting(this.containerEl).setName("Debug options").setHeading();
         new Setting(this.containerEl).setName("Debug log output").addToggle((t) =>
@@ -487,27 +666,57 @@ class MaintenancePage extends SettingPage {
         );
     }
     private modes(d: DropdownComponent) {
-        Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PLUGIN_MODE]));
+        Object.keys(PluginModes).forEach((k) => d.addOption(k, PluginModes[k as PluginMode]));
         return d;
     }
 }
 
 export class SettingsTab extends PluginSettingTab {
     pendingPluginIds = new Set<string>();
-    private dirty = false;
+    private baselineData?: LazySettings;
+    private baselineFingerprint?: string;
     public plugin: OnDemandPlugin;
     constructor(app: App, plugin: OnDemandPlugin) {
         super(app, plugin);
         this.plugin = plugin;
+        this.captureBaseline();
     }
     get hasPendingChanges() {
-        return this.dirty || this.pendingPluginIds.size > 0;
+        // Compare the live draft against the last saved baseline so touching a
+        // control and reverting it back leaves no pending change.
+        const service = this.plugin.core?.settingsService;
+        if (!service?.data) return this.pendingPluginIds.size > 0;
+        this.ensureBaseline();
+        return stableStringify(service.data) !== this.baselineFingerprint;
+    }
+    /** Plugin IDs whose staged entry actually differs from the baseline, so reverted rows are not applied. */
+    getChangedPluginIds(): string[] {
+        const service = this.plugin.core?.settingsService;
+        if (!service?.data || !this.baselineData) return Array.from(this.pendingPluginIds);
+        const profileId = service.currentProfileId;
+        const currentPlugins = service.data.profiles[profileId]?.settings.plugins ?? {};
+        const baselinePlugins = this.baselineData.profiles[profileId]?.settings.plugins ?? {};
+        const ids = new Set([...Object.keys(currentPlugins), ...Object.keys(baselinePlugins)]);
+        return [...ids].filter((id) => stableStringify(currentPlugins[id]) !== stableStringify(baselinePlugins[id]));
+    }
+    private ensureBaseline() {
+        if (this.baselineData === undefined || this.baselineFingerprint === undefined) this.captureBaseline();
+    }
+    private captureBaseline() {
+        const service = this.plugin.core?.settingsService;
+        if (!service?.data) return;
+        // Deep clone so later in-memory edits cannot mutate the comparison source.
+        this.baselineData = structuredClone(service.data);
+        this.baselineFingerprint = stableStringify(service.data);
     }
     getControlValue(key: string) {
         return (this.plugin.settings as unknown as Record<string, unknown>)[key];
     }
     setControlValue(key: string, value: unknown) {
-        (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+        const controls = this.plugin.settings as unknown as Record<string, unknown>;
+        // Assigning the same value changes nothing, so keep the draft clean.
+        if (Object.is(controls[key], value)) return;
+        controls[key] = value;
         // Keep declarative controls on the same draft lifecycle as plugin modes;
         // otherwise Save/Discard cannot provide an atomic, predictable result.
         this.markDirty();
@@ -515,10 +724,17 @@ export class SettingsTab extends PluginSettingTab {
     }
     getSettingDefinitions(): SettingDefinitionItem[] {
         this.plugin.updateManifests();
-        const modes = Object.fromEntries(Object.keys(PluginModes).map((key) => [key, PluginModes[key as PLUGIN_MODE]]));
+        const modes = Object.fromEntries(Object.keys(PluginModes).map((key) => [key, PluginModes[key as PluginMode]]));
         return [
             { type: "page", name: "Profile management", desc: "Manage profiles and device defaults.", page: () => new ProfileManagementPage(this.app, this.plugin, this) },
-            { type: "page", name: "Plugin management", desc: "Configure plugin loading modes.", displayValue: () => `${this.plugin.manifests.length} plugins`, page: () => new PluginPage(this.app, this.plugin, this) },
+            {
+                type: "page",
+                name: "Plugin management",
+                desc: "Configure plugin loading modes.",
+                // Keep the familiar total visible beside the page name while compactly surfacing its mode breakdown.
+                displayValue: () => pluginManagementSummary(this.plugin),
+                page: () => new PluginPage(this.app, this.plugin, this),
+            },
             {
                 type: "page",
                 name: "Behaviour",
@@ -555,16 +771,21 @@ export class SettingsTab extends PluginSettingTab {
         ];
     }
     markDirty() {
-        this.dirty = true;
+        // Dirty state is derived from the baseline diff, so just ensure the baseline exists.
+        // Existing callers invoke this after mutating settings; never recapture here or the edit would compare against itself.
+        this.ensureBaseline();
     }
     configurePendingControls(setting: Setting, onRefresh?: () => void) {
+        setting.setClass("lazy-plugin-save-controls");
+        // Sticky positioning applies only with pending changes so the bar does not cling to the top when there is nothing to save.
+        setting.settingEl.toggleClass("has-pending-changes", this.hasPendingChanges);
+        const changedPluginIds = this.getChangedPluginIds();
         setting
-            .setClass("lazy-plugin-save-controls")
             .setName("Changes")
             .setDesc("Settings changes are staged until you save them. Plugin mode changes are applied when saved.")
             .addButton((button) =>
                 button
-                    .setButtonText(this.pendingPluginIds.size > 0 ? `Save & apply (${this.pendingPluginIds.size})` : "Save changes")
+                    .setButtonText(changedPluginIds.length > 0 ? `Save & apply (${changedPluginIds.length})` : "Save changes")
                     .setCta()
                     .setDisabled(!this.hasPendingChanges)
                     .onClick(async () => {
@@ -583,17 +804,20 @@ export class SettingsTab extends PluginSettingTab {
     }
     renderPendingControls(container: HTMLElement, onRefresh?: () => void) {
         container.querySelector(".lazy-plugin-save-controls")?.remove();
+        // Show the pinned bar only while a draft exists so Plugin/Profile/Maintenance pages stay unpinned when clean.
+        if (!this.hasPendingChanges) return;
         const setting = new Setting(container);
         this.configurePendingControls(setting, onRefresh);
         container.prepend(setting.settingEl);
     }
     resetPending() {
-        this.dirty = false;
         this.pendingPluginIds.clear();
+        // Re-baseline to the current (saved or reloaded) state so earlier edits no longer count as pending.
+        this.captureBaseline();
     }
     async saveChanges() {
         if (!this.hasPendingChanges) return;
-        const pluginIds = Array.from(this.pendingPluginIds);
+        const pluginIds = this.getChangedPluginIds();
         await this.plugin.saveSettings();
         if (pluginIds.length > 0) {
             await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds });
