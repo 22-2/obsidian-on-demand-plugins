@@ -5,9 +5,10 @@ import { showConfirmModal } from "src/core/confirm-modal";
 import { openExternalUrl, openSystemPath } from "src/core/external-open";
 import { FeatureEvents } from "src/core/event-bus";
 import { PLUGIN_MODE, PluginModes } from "src/core/types";
-import type { PLUGIN_MODE as PluginMode } from "src/core/types";
+import type { LazySettings, PLUGIN_MODE as PluginMode } from "src/core/types";
 import type { MaintenanceFeature, SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature as MaintenanceFeatureClass } from "src/features/maintenance/maintenance-feature";
+import { stableStringify } from "src/services/settings/settings-service";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
@@ -252,6 +253,9 @@ class ProfileManagementPage extends SettingPage {
         new Setting(this.containerEl).setName(label).addDropdown((dropdown) => {
             Object.values(service.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
             dropdown.setValue(currentId).onChange(async (profileId) => {
+                // Selecting the already-active default changes nothing, so keep the draft clean.
+                const activeId = type === "desktop" ? service.data.desktopProfileId : service.data.mobileProfileId;
+                if (profileId === activeId) return;
                 service.setDeviceDefault(profileId, type);
                 this.tab.markDirty();
                 this.display();
@@ -281,9 +285,15 @@ class ProfileManagementPage extends SettingPage {
                 .setButtonText("Save")
                 .setCta()
                 .onClick(async () => {
-                    if (!name.trim()) return;
+                    const nextName = name.trim();
+                    if (!nextName) return;
                     const service = this.plugin.core.settingsService;
-                    service.renameProfile(id, name.trim());
+                    // Renaming to the same name changes nothing, so keep the draft clean.
+                    if (nextName === service.data.profiles[id]?.name) {
+                        modal.close();
+                        return;
+                    }
+                    service.renameProfile(id, nextName);
                     this.tab.markDirty();
                     modal.close();
                     this.display();
@@ -491,6 +501,10 @@ class PluginPage extends SettingPage {
         });
     }
     private applyRowModeChange(pluginId: string, mode: PluginMode, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
+        // Selecting the effective mode changes nothing semantically, so skip creating
+        // an explicit entry just to flip userConfigured and keep the draft clean.
+        const current = this.plugin.settings.plugins[pluginId];
+        if (this.plugin.getPluginMode(pluginId) === mode && (current?.mode === undefined || current.mode === mode)) return;
         // Changing the mode should preserve advanced lazy options so
         // users can temporarily disable a plugin without reconfiguring it.
         this.plugin.settings.plugins[pluginId] = {
@@ -659,20 +673,50 @@ class MaintenancePage extends SettingPage {
 
 export class SettingsTab extends PluginSettingTab {
     pendingPluginIds = new Set<string>();
-    private dirty = false;
+    private baselineData?: LazySettings;
+    private baselineFingerprint?: string;
     public plugin: OnDemandPlugin;
     constructor(app: App, plugin: OnDemandPlugin) {
         super(app, plugin);
         this.plugin = plugin;
+        this.captureBaseline();
     }
     get hasPendingChanges() {
-        return this.dirty || this.pendingPluginIds.size > 0;
+        // Compare the live draft against the last saved baseline so touching a
+        // control and reverting it back leaves no pending change.
+        const service = this.plugin.core?.settingsService;
+        if (!service?.data) return this.pendingPluginIds.size > 0;
+        this.ensureBaseline();
+        return stableStringify(service.data) !== this.baselineFingerprint;
+    }
+    /** Plugin IDs whose staged entry actually differs from the baseline, so reverted rows are not applied. */
+    getChangedPluginIds(): string[] {
+        const service = this.plugin.core?.settingsService;
+        if (!service?.data || !this.baselineData) return Array.from(this.pendingPluginIds);
+        const profileId = service.currentProfileId;
+        const currentPlugins = service.data.profiles[profileId]?.settings.plugins ?? {};
+        const baselinePlugins = this.baselineData.profiles[profileId]?.settings.plugins ?? {};
+        const ids = new Set([...Object.keys(currentPlugins), ...Object.keys(baselinePlugins)]);
+        return [...ids].filter((id) => stableStringify(currentPlugins[id]) !== stableStringify(baselinePlugins[id]));
+    }
+    private ensureBaseline() {
+        if (this.baselineData === undefined || this.baselineFingerprint === undefined) this.captureBaseline();
+    }
+    private captureBaseline() {
+        const service = this.plugin.core?.settingsService;
+        if (!service?.data) return;
+        // Deep clone so later in-memory edits cannot mutate the comparison source.
+        this.baselineData = structuredClone(service.data);
+        this.baselineFingerprint = stableStringify(service.data);
     }
     getControlValue(key: string) {
         return (this.plugin.settings as unknown as Record<string, unknown>)[key];
     }
     setControlValue(key: string, value: unknown) {
-        (this.plugin.settings as unknown as Record<string, unknown>)[key] = value;
+        const controls = this.plugin.settings as unknown as Record<string, unknown>;
+        // Assigning the same value changes nothing, so keep the draft clean.
+        if (Object.is(controls[key], value)) return;
+        controls[key] = value;
         // Keep declarative controls on the same draft lifecycle as plugin modes;
         // otherwise Save/Discard cannot provide an atomic, predictable result.
         this.markDirty();
@@ -727,18 +771,21 @@ export class SettingsTab extends PluginSettingTab {
         ];
     }
     markDirty() {
-        this.dirty = true;
+        // Dirty state is derived from the baseline diff, so just ensure the baseline exists.
+        // Existing callers invoke this after mutating settings; never recapture here or the edit would compare against itself.
+        this.ensureBaseline();
     }
     configurePendingControls(setting: Setting, onRefresh?: () => void) {
         setting.setClass("lazy-plugin-save-controls");
         // Sticky positioning applies only with pending changes so the bar does not cling to the top when there is nothing to save.
         setting.settingEl.toggleClass("has-pending-changes", this.hasPendingChanges);
+        const changedPluginIds = this.getChangedPluginIds();
         setting
             .setName("Changes")
             .setDesc("Settings changes are staged until you save them. Plugin mode changes are applied when saved.")
             .addButton((button) =>
                 button
-                    .setButtonText(this.pendingPluginIds.size > 0 ? `Save & apply (${this.pendingPluginIds.size})` : "Save changes")
+                    .setButtonText(changedPluginIds.length > 0 ? `Save & apply (${changedPluginIds.length})` : "Save changes")
                     .setCta()
                     .setDisabled(!this.hasPendingChanges)
                     .onClick(async () => {
@@ -764,12 +811,13 @@ export class SettingsTab extends PluginSettingTab {
         container.prepend(setting.settingEl);
     }
     resetPending() {
-        this.dirty = false;
         this.pendingPluginIds.clear();
+        // Re-baseline to the current (saved or reloaded) state so earlier edits no longer count as pending.
+        this.captureBaseline();
     }
     async saveChanges() {
         if (!this.hasPendingChanges) return;
-        const pluginIds = Array.from(this.pendingPluginIds);
+        const pluginIds = this.getChangedPluginIds();
         await this.plugin.saveSettings();
         if (pluginIds.length > 0) {
             await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds });

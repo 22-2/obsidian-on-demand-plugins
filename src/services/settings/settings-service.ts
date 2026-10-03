@@ -14,7 +14,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function stableStringify(value: unknown): string {
+export function stableStringify(value: unknown): string {
     if (Array.isArray(value)) return `[${value.map(stableStringify).join(",")}]`;
     if (isRecord(value)) {
         return `{${Object.keys(value)
