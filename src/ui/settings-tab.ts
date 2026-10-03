@@ -412,7 +412,10 @@ class PluginPage extends SettingPage {
         const host = this.containerEl.querySelector<HTMLElement>(".lazy-plugin-infinite-host");
         if (!host) return;
         host.empty();
-        const plugins = this.plugin.manifests.filter((manifest) => (!this.filter || manifest.name.toLowerCase().includes(this.filter.toLowerCase())) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
+        // Mobile keyboards often append a space after a completed name; normalize
+        // only the query so typing and internal spaces in plugin names stay intact.
+        const query = this.filter.trim().toLowerCase();
+        const plugins = this.plugin.manifests.filter((manifest) => (!query || manifest.name.toLowerCase().includes(query)) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
         host.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
         const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
         this.loadedCount = Math.min(PluginPage.PAGE_SIZE, plugins.length);
