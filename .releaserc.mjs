@@ -42,8 +42,8 @@ export default {
         [
             "@semantic-release/exec",
             {
-                // バージョン更新スクリプトだけが必要で、lockfile依存のinstallは不要。
-                prepareCmd: "pnpm dlx tsx version-bump.mts ${nextRelease.version}",
+                // Node.js の型除去で直接実行し、dlx の一時環境で esbuild のビルド承認が必要になるのを避ける。
+                prepareCmd: "pnpm exec node version-bump.mts ${nextRelease.version}",
             },
         ],
         [
