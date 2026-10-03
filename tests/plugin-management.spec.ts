@@ -99,6 +99,13 @@ test("plugin management refresh updates the live loaded badge", async ({ obsidia
         };
         await plugin.updatePluginSettings(pluginId, "lazy");
         await app.plugins.disablePlugin(pluginId);
+        const savedPluginIds = await app.vault.readConfigJson("community-plugins");
+        if (Array.isArray(savedPluginIds)) {
+            await app.vault.writeConfigJson(
+                "community-plugins",
+                savedPluginIds.filter((id): id is string => typeof id === "string" && id !== pluginId),
+            );
+        }
     }, targetPluginId);
 
     const settingsPage = await openPluginManagement(obsidian.page);
@@ -108,10 +115,16 @@ test("plugin management refresh updates the live loaded badge", async ({ obsidia
 
     await obsidian.page.evaluate((pluginId) => app.plugins.enablePlugin(pluginId), targetPluginId);
     await expect.poll(() => obsidian.page.evaluate((pluginId) => Boolean(app.plugins.plugins[pluginId]?._loaded), targetPluginId)).toBe(true);
-    // The badge is intentionally a snapshot until Refresh plugin list re-renders the row.
-    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Not loaded");
 
     const pluginsHeading = settingsPage.locator(".setting-item-heading").filter({ hasText: "Plugins" });
+    await pluginsHeading.locator(".clickable-icon").click();
+    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
+
+    await obsidian.page.evaluate(async (pluginId) => {
+        const savedPluginIds = await app.vault.readConfigJson("community-plugins");
+        const savedIds = Array.isArray(savedPluginIds) ? savedPluginIds.filter((id): id is string => typeof id === "string") : [];
+        await app.vault.writeConfigJson("community-plugins", [...new Set([...savedIds, pluginId])]);
+    }, targetPluginId);
     await pluginsHeading.locator(".clickable-icon").click();
     await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded");
 });

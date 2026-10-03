@@ -45,11 +45,10 @@ function pluginManagementSummary(plugin: OnDemandPlugin): string {
     return `${counts.total} plugins`;
 }
 
-function enabledBadgeText(app: App, pluginId: string): string {
-    // Show the actual runtime state (in-memory loaded), not the staged mode:
-    // lazy plugins rest unloaded until triggered, so deriving from the mode
-    // alone would wrongly mark every non-disabled plugin as enabled.
-    return isPluginLoaded(app, pluginId) ? "Loaded" : "Not loaded";
+function enabledBadgeText(app: App, pluginId: string, savedPluginIds?: ReadonlySet<string>): string {
+    // Live runtime load is distinct from saved policy; only confirmed disk absence should be called in-memory only.
+    if (!isPluginLoaded(app, pluginId)) return "Not loaded";
+    return savedPluginIds && !savedPluginIds.has(pluginId) ? "Loaded (in memory only)" : "Loaded";
 }
 
 function pluginModeLabel(mode: PluginMode): string {
@@ -331,6 +330,8 @@ class PluginPage extends SettingPage {
     private tab: SettingsTab;
     private infiniteScrollObserver?: IntersectionObserver;
     private loadedCount = 0;
+    private savedCommunityPluginIds?: Set<string>;
+    private communityPluginReadId = 0;
     constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.app = app;
@@ -343,6 +344,7 @@ class PluginPage extends SettingPage {
         // Refresh the registry whenever this page is entered so the count and
         // list reflect the current Obsidian plugin manifests.
         this.plugin.updateManifests();
+        void this.refreshCommunityPluginSnapshot();
         this.containerEl.empty();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
         new Setting(this.containerEl).setName("Statistics").setHeading();
@@ -359,6 +361,7 @@ class PluginPage extends SettingPage {
                     .setTooltip("Refresh plugin list")
                     .onClick(() => {
                         this.plugin.updateManifests();
+                        void this.refreshCommunityPluginSnapshot();
                         // Re-render the list directly: tab.update() does not
                         // guarantee the open page is re-displayed, so relying
                         // on it leaves live badges (e.g. Enabled after an
@@ -391,6 +394,7 @@ class PluginPage extends SettingPage {
     }
     hide() {
         this.disconnectInfiniteScroll();
+        this.communityPluginReadId++;
         super.hide();
     }
     private renderInfiniteList() {
@@ -442,8 +446,9 @@ class PluginPage extends SettingPage {
             // whether a lazy plugin is actually loaded right now.
             const enabledBadge = badges.createSpan({
                 cls: "lazy-plugin-enabled-badge",
-                text: enabledBadgeText(this.app, manifest.id),
+                text: enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds),
             });
+            enabledBadge.setAttr("data-plugin-id", manifest.id);
             enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
             // Author names vary widely in length; keep them on a separate
             // line and omit the attribution prefix when no author is given.
@@ -499,7 +504,7 @@ class PluginPage extends SettingPage {
         // when it no longer matches the active filter; re-filtering waits
         // until the user changes the filter conditions.
         modeBadge.setText(pluginModeLabel(mode));
-        enabledBadge.setText(enabledBadgeText(this.app, pluginId));
+        enabledBadge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
         enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, pluginId));
         this.refreshStats();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
@@ -507,6 +512,30 @@ class PluginPage extends SettingPage {
     private refreshStats() {
         const statsEl = this.containerEl.querySelector(".lazy-plugin-statistics .setting-item-name");
         if (statsEl) statsEl.setText(pluginStatisticsText(this.plugin));
+    }
+    private async refreshCommunityPluginSnapshot() {
+        const readId = ++this.communityPluginReadId;
+        this.savedCommunityPluginIds = undefined;
+        let parsed: unknown;
+        try {
+            parsed = await this.app.vault.readConfigJson("community-plugins");
+        } catch {
+            parsed = undefined;
+        }
+        if (readId !== this.communityPluginReadId) return;
+        if (Array.isArray(parsed) && parsed.every((id): id is string => typeof id === "string")) {
+            this.savedCommunityPluginIds = new Set(parsed);
+        }
+        this.updateVisibleEnabledBadges();
+    }
+    private updateVisibleEnabledBadges() {
+        this.containerEl.querySelectorAll<HTMLElement>(".lazy-plugin-enabled-badge").forEach((badge) => {
+            const pluginId = badge.dataset.pluginId;
+            if (!pluginId) return;
+            const loaded = isPluginLoaded(this.app, pluginId);
+            badge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
+            badge.toggleClass("is-loaded", loaded);
+        });
     }
     private disconnectInfiniteScroll() {
         this.infiniteScrollObserver?.disconnect();
