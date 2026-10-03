@@ -23,7 +23,8 @@
     width: 100%;
 }
 
-.lazy-plugin-save-controls {
+.lazy-plugin-save-controls.has-pending-changes {
+    /* Pin to the top only while unsaved changes exist; otherwise keep the row in normal flow. */
     position: sticky;
     top: 0;
     z-index: 2;

@@ -730,8 +730,10 @@ export class SettingsTab extends PluginSettingTab {
         this.dirty = true;
     }
     configurePendingControls(setting: Setting, onRefresh?: () => void) {
+        setting.setClass("lazy-plugin-save-controls");
+        // Sticky positioning applies only with pending changes so the bar does not cling to the top when there is nothing to save.
+        setting.settingEl.toggleClass("has-pending-changes", this.hasPendingChanges);
         setting
-            .setClass("lazy-plugin-save-controls")
             .setName("Changes")
             .setDesc("Settings changes are staged until you save them. Plugin mode changes are applied when saved.")
             .addButton((button) =>
@@ -755,6 +757,8 @@ export class SettingsTab extends PluginSettingTab {
     }
     renderPendingControls(container: HTMLElement, onRefresh?: () => void) {
         container.querySelector(".lazy-plugin-save-controls")?.remove();
+        // Show the pinned bar only while a draft exists so Plugin/Profile/Maintenance pages stay unpinned when clean.
+        if (!this.hasPendingChanges) return;
         const setting = new Setting(container);
         this.configurePendingControls(setting, onRefresh);
         container.prepend(setting.settingEl);
