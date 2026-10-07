@@ -25,6 +25,8 @@ jobs:
     e2e:
         runs-on: ${{ matrix.os }}
         strategy:
+            # Let each OS finish so one platform's failure doesn't hide the other's result.
+            fail-fast: false
             matrix:
                 os: [macos-latest, windows-latest]
 
