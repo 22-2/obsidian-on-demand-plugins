@@ -3,7 +3,7 @@ name: E2E Tests
 on:
     # Branch pushes are covered by pull_request; push only runs for main to avoid duplicate runs.
     push:
-        branches: [main]
+        branches: [main, dev]
     pull_request: {}
     workflow_dispatch:
         inputs:
