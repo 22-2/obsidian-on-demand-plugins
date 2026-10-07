@@ -1,0 +1,6 @@
+{
+    "extends": "./.release-it.mjs",
+    "hooks": {
+        "after:bump": "node scripts/update-release-versions.mjs ${version}"
+    }
+}

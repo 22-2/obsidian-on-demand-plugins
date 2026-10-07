@@ -26,31 +26,22 @@ test("capture enabled plugins snapshot before reload (lineage should be unloaded
         await plugin.saveSettings();
     });
 
-    // Install a reload interceptor that saves enabledPlugins to localStorage
+    // Capture enabledPlugins at the moment reload is requested, then swallow the
+    // reload itself: letting it navigate would destroy the evaluate() context
+    // below before its promise settles, and only the snapshot matters here.
     await obsidian.page.evaluate(() => {
-        // @ts-ignore
         const original = app.commands.executeCommandById.bind(app.commands);
-        (app as any).__onDemand_reload_original = original;
         app.commands.executeCommandById = (id: string) => {
-            if (id === "app:reload") {
-                try {
-                    const arr = [...(app.plugins.enabledPlugins || new Set())];
-                    window.localStorage.setItem("on-demand:test:enabledSnapshot", JSON.stringify(arr));
-                } catch (e) {
-                    // ignore
-                }
-            }
-            return original(id);
+            if (id !== "app:reload") return original(id);
+            const arr = [...(app.plugins.enabledPlugins || new Set())];
+            window.localStorage.setItem("on-demand:test:enabledSnapshot", JSON.stringify(arr));
+            return true;
         };
     });
 
-    // Trigger rebuild+apply which will call reload and our interceptor will save snapshot
     await pluginHandle.evaluate(async (plugin) => {
         await plugin.rebuildAndApplyCommandCache({ force: true });
     });
-
-    // Wait for reload + ready
-    await obsidian.waitReady();
 
     const raw = await obsidian.page.evaluate(() => window.localStorage.getItem("on-demand:test:enabledSnapshot"));
     expect(raw).toBeTruthy();

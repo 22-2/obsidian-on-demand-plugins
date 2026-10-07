@@ -83,7 +83,9 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     });
     await saveButton.click();
 
-    await expect(settingsPage.getByRole("button", { name: "Save changes", exact: true })).toBeDisabled();
+    // Save controls are pinned only while a draft exists, so a successful
+    // save removes the bar instead of leaving a disabled button behind.
+    await expect(settingsPage.locator(".lazy-plugin-save-controls")).toHaveCount(0);
     await expect.poll(() => pluginHandle.evaluate((plugin, pluginId) => plugin.getPluginMode(pluginId), targetPluginId)).toBe("lazyOnLayoutReady");
     expect(await page.evaluate(() => (app.commands as unknown as { __requestedReload?: boolean }).__requestedReload)).toBe(true);
 });

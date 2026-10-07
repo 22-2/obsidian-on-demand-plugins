@@ -1,7 +1,9 @@
 name: E2E Tests
 
 on:
-    push: {}
+    # Branch pushes are covered by pull_request; push only runs for main to avoid duplicate runs.
+    push:
+        branches: [main]
     pull_request: {}
     workflow_dispatch:
         inputs:
@@ -14,10 +16,17 @@ defaults:
     run:
         shell: bash
 
+# Cancel superseded runs when a PR receives a newer push.
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
 jobs:
     e2e:
         runs-on: ${{ matrix.os }}
         strategy:
+            # Let each OS finish so one platform's failure doesn't hide the other's result.
+            fail-fast: false
             matrix:
                 os: [macos-latest, windows-latest]
 

@@ -28,10 +28,16 @@ test("lineage remains unloaded after location.reload during apply", async ({ obs
 
     // Trigger rebuild+apply which will call reload; allow the reload to happen
     // so we can validate the persisted community-plugins.json is correct.
-    await pluginHandle.evaluate(async (plugin) => {
-        // Do not stub app.commands.executeCommandById — allow reload
-        await plugin.rebuildAndApplyCommandCache({ force: true });
-    });
+    // The reload can navigate before evaluate() settles, which destroys its
+    // execution context; that is the expected outcome here, not a failure.
+    try {
+        await pluginHandle.evaluate(async (plugin) => {
+            // Do not stub app.commands.executeCommandById — allow reload
+            await plugin.rebuildAndApplyCommandCache({ force: true });
+        });
+    } catch (error) {
+        if (!String(error).includes("Execution context was destroyed")) throw error;
+    }
 
     // The page may have reloaded; wait for Obsidian to be ready again
     await obsidian.waitReady();
