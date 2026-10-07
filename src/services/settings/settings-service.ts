@@ -3,7 +3,7 @@ import type { DataAdapter } from "obsidian";
 import { Notice, Platform, normalizePath } from "obsidian";
 import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, DeviceType, LazySettings, Profile } from "src/core/types";
-import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, PLUGIN_MODE, SETTINGS_SCHEMA_VERSION } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, isPluginMode } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { ProfileStorage } from "src/services/settings/profile-storage";
 
@@ -216,7 +216,7 @@ export class SettingsService {
 
     private isValidDeviceSettings(value: unknown): value is DeviceSettings {
         if (!isRecord(value)) return false;
-        if (value.defaultMode !== undefined && !Object.values(PLUGIN_MODE).includes(value.defaultMode as PLUGIN_MODE)) return false;
+        if (value.defaultMode !== undefined && !isPluginMode(value.defaultMode)) return false;
         if (value.pruneUninstalledEntries !== undefined && typeof value.pruneUninstalledEntries !== "boolean") return false;
         return ["plugins", "lazyOnViews", "lazyOnFiles"].every((key) => value[key] === undefined || isRecord(value[key]));
     }
