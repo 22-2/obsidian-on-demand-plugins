@@ -12,6 +12,9 @@ export const PLUGIN_MODE = {
 
 export type PLUGIN_MODE = (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE];
 
+/** Device class that owns a default profile. */
+export type DeviceType = "desktop" | "mobile";
+
 export const PluginModes: Record<PLUGIN_MODE, string> = {
     [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",
     [PLUGIN_MODE.LAZY]: "🤲 Lazy on demand",

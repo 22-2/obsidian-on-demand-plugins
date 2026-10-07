@@ -1,22 +1,16 @@
 import type { Menu } from "obsidian";
 import { PLUGIN_MODE, PluginModes } from "src/core/types";
-import type { PLUGIN_MODE as PluginMode } from "src/core/types";
 
 export interface PluginRowMenuOptions {
-    getMode: () => PluginMode;
+    getMode: () => PLUGIN_MODE;
     onOpenDetails: () => void;
     onOpenCommunityPage: () => void;
     onRevealInExplorer: () => void;
     onToggleEnabled: (enabled: boolean) => void;
-    onSelectMode: (mode: PluginMode) => void;
+    onSelectMode: (mode: PLUGIN_MODE) => void;
 }
 
-const MODE_ORDER: PluginMode[] = [
-    PLUGIN_MODE.ALWAYS_DISABLED,
-    PLUGIN_MODE.LAZY,
-    PLUGIN_MODE.LAZY_ON_LAYOUT_READY,
-    PLUGIN_MODE.ALWAYS_ENABLED,
-];
+const MODE_ORDER: PLUGIN_MODE[] = [PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.LAZY, PLUGIN_MODE.LAZY_ON_LAYOUT_READY, PLUGIN_MODE.ALWAYS_ENABLED];
 
 /**
  * Builds the 3-dot row menu for the plugin management list.
@@ -24,7 +18,6 @@ const MODE_ORDER: PluginMode[] = [
  * rebuild the list (which would reset scroll and break infinite scroll).
  */
 export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions): void {
-
     // Label the staged in-memory change so users know it is not persisted immediately.
     const isDisabled = options.getMode() === PLUGIN_MODE.ALWAYS_DISABLED;
     menu.addItem((item) =>
