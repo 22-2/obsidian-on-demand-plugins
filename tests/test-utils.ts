@@ -1,8 +1,7 @@
-import type { Page } from "@playwright/test";
 import type { LogLevelDesc } from "loglevel";
 import fs from "node:fs";
 import path from "node:path";
-import { test } from "obsidian-e2e-toolkit";
+import { test, type ObsidianAPI } from "obsidian-e2e-toolkit";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,18 +11,12 @@ const repoRoot = path.resolve(__dirname, "..");
 const pluginUnderTestId = "on-demand-plugins";
 const targetPluginId = "obsidian42-brat";
 const excalidrawPluginId = "obsidian-excalidraw-plugin";
-const defaultPollIntervalMs = 200;
-const defaultPollTimeoutMs = 8_000;
+const defaultWaitTimeoutMs = 8_000;
 
 type TestVaultOptions = {
     enableBrowserConsoleLogging?: boolean;
     fresh?: boolean;
     logLevel?: LogLevelDesc;
-};
-
-type ObsidianTestContext = {
-    isPluginEnabled: (pluginId: string) => Promise<boolean>;
-    page: Page;
 };
 
 export function resolveMyfilesPluginPath(pluginId: string): string {
@@ -78,76 +71,41 @@ export function ensureBuilt() {
     return true;
 }
 
-async function pollUntil(
-    condition: () => Promise<boolean>,
-    timeoutMs = defaultPollTimeoutMs,
-    intervalMs = defaultPollIntervalMs,
-): Promise<boolean> {
-    const deadline = Date.now() + timeoutMs;
-
-    // Mental model: plugin enablement and view registration complete on async workspace
-    // events, so tests should wait on observable state instead of copy-pasting spin loops.
-    while (Date.now() < deadline) {
-        if (await condition()) {
-            return true;
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+// Reason: the toolkit waiters throw on timeout, but specs branch on a boolean outcome.
+async function settles(wait: Promise<void>): Promise<boolean> {
+    try {
+        await wait;
+        return true;
+    } catch {
+        return false;
     }
-
-    return false;
 }
 
-async function waitForPluginState(
-    obsidian: ObsidianTestContext,
+export function waitForPluginEnabled(
+    obsidian: ObsidianAPI,
     pluginId: string,
-    shouldBeEnabled: boolean,
-    timeoutMs = defaultPollTimeoutMs,
-    intervalMs = defaultPollIntervalMs,
+    timeoutMs = defaultWaitTimeoutMs,
 ): Promise<boolean> {
-    return pollUntil(
-        async () => (await obsidian.isPluginEnabled(pluginId)) === shouldBeEnabled,
-        timeoutMs,
-        intervalMs,
-    );
+    return settles(obsidian.waitForPluginEnabled(pluginId, timeoutMs));
 }
 
-export async function waitForPluginEnabled(
-    obsidian: ObsidianTestContext,
+export function waitForPluginDisabled(
+    obsidian: ObsidianAPI,
     pluginId: string,
-    timeoutMs = defaultPollTimeoutMs,
-    intervalMs = defaultPollIntervalMs,
+    timeoutMs = defaultWaitTimeoutMs,
 ): Promise<boolean> {
-    return waitForPluginState(obsidian, pluginId, true, timeoutMs, intervalMs);
+    return settles(obsidian.waitForPluginDisabled(pluginId, timeoutMs));
 }
 
-export async function waitForPluginDisabled(
-    obsidian: ObsidianTestContext,
-    pluginId: string,
-    timeoutMs = defaultPollTimeoutMs,
-    intervalMs = defaultPollIntervalMs,
-): Promise<boolean> {
-    return waitForPluginState(obsidian, pluginId, false, timeoutMs, intervalMs);
-}
-
-export async function waitForViewType(
-    obsidian: ObsidianTestContext,
+export function waitForViewType(
+    obsidian: ObsidianAPI,
     viewType: string,
-    timeoutMs = defaultPollTimeoutMs,
-    intervalMs = defaultPollIntervalMs,
+    timeoutMs = defaultWaitTimeoutMs,
 ): Promise<boolean> {
-    return pollUntil(
-        () =>
-            obsidian.page.evaluate(
-                (targetViewType) => app.workspace.getLeavesOfType(targetViewType).length > 0,
-                viewType,
-            ),
-        timeoutMs,
-        intervalMs,
-    );
+    return settles(obsidian.waitForViewType(viewType, timeoutMs));
 }
 
-export async function triggerActiveLeafChange(obsidian: ObsidianTestContext): Promise<void> {
+export async function triggerActiveLeafChange(obsidian: ObsidianAPI): Promise<void> {
     await obsidian.page.evaluate(() => {
         const workspace = app.workspace as unknown as {
             activeLeaf?: unknown;
@@ -160,7 +118,7 @@ export async function triggerActiveLeafChange(obsidian: ObsidianTestContext): Pr
 }
 
 export async function findCommandByPrefix(
-    obsidian: ObsidianTestContext,
+    obsidian: ObsidianAPI,
     commandPrefix: string,
 ): Promise<string | null> {
     return obsidian.page.evaluate(
@@ -170,7 +128,7 @@ export async function findCommandByPrefix(
 }
 
 export async function findCommandByExactId(
-    obsidian: ObsidianTestContext,
+    obsidian: ObsidianAPI,
     commandId: string,
 ): Promise<string | null> {
     return obsidian.page.evaluate(
@@ -180,21 +138,13 @@ export async function findCommandByExactId(
     );
 }
 
-export async function readCommunityPlugins(obsidian: ObsidianTestContext): Promise<string[]> {
-    return obsidian.page.evaluate(async () => {
-        const vault = app.vault as unknown as {
-            adapter: {
-                read: (path: string) => Promise<string>;
-            };
-            configDir: string;
-        };
-        const raw = await vault.adapter.read(`${vault.configDir}/community-plugins.json`);
-        return JSON.parse(raw) as string[];
-    });
+export async function readCommunityPlugins(obsidian: ObsidianAPI): Promise<string[]> {
+    const configDir = await obsidian.evaluateApp(() => app.vault.configDir);
+    return JSON.parse(await obsidian.read(`${configDir}/community-plugins.json`)) as string[];
 }
 
 async function readOnDemandStorageRecord(
-    obsidian: ObsidianTestContext,
+    obsidian: ObsidianAPI,
     prefix: string,
 ): Promise<Record<string, unknown> | null> {
     return obsidian.page.evaluate((storagePrefix) => {
@@ -218,7 +168,7 @@ async function readOnDemandStorageRecord(
 }
 
 export async function readOnDemandStorageValue(
-    obsidian: ObsidianTestContext,
+    obsidian: ObsidianAPI,
     prefix: string,
     key: string,
 ): Promise<unknown> {
