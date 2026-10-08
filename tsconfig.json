@@ -23,5 +23,6 @@
         "lib": ["DOM", "ESNext"]
     },
     "include": ["**/*.ts"],
-    "exclude": ["node_modules"]
+    // myfiles holds downloaded third-party plugins that are not type-checked here
+    "exclude": ["node_modules", "myfiles"]
 }
