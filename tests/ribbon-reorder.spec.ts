@@ -108,15 +108,50 @@ for (const useRibbon of [false, true]) {
         const assertRestored = async () => {
             // Obsidian marks Plugin._loaded before awaiting async onload, so
             // reloadPlugin's enabled waiter can finish before the lazy engine initializes.
-            await expect
-                .poll(() => readRibbon(obsidian))
-                .toEqual({
-                    visibleOrder: [ids[2], ids[0]],
-                    hidden: expectedHidden,
-                    activeIds: [ids[2], ids[1], ids[0]],
-                    domCount: 3,
-                });
+            try {
+                await expect
+                    .poll(() => readRibbon(obsidian))
+                    .toEqual({
+                        visibleOrder: [ids[2], ids[0]],
+                        hidden: expectedHidden,
+                        activeIds: [ids[2], ids[1], ids[0]],
+                        domCount: 3,
+                    });
+            } catch (error) {
+                console.log(
+                    "Ribbon diagnostics",
+                    await obsidian.page.evaluate(
+                        ({ fixtureId, pluginUnderTestId }) => {
+                            const plugin = app.plugins.plugins[pluginUnderTestId] as unknown as OnDemandPlugin;
+                            const features = (
+                                plugin.features as unknown as {
+                                    features: Array<{
+                                        ribbonLoader?: {
+                                            isEnabled(id: string): boolean;
+                                            hasCaptured(id: string): boolean;
+                                            disposed: boolean;
+                                        };
+                                    }>;
+                                }
+                            ).features;
+                            const loader = features.find((feature) => feature.ribbonLoader)?.ribbonLoader;
+                            return {
+                                layoutReady: app.workspace.layoutReady,
+                                pluginSettings: plugin.settings.plugins[fixtureId],
+                                registeredManifest: plugin.manifests.find((manifest) => manifest.id === fixtureId),
+                                cache: window.localStorage.getItem(`on-demand:ribbonCache:${app.appId}`),
+                                targetLoaded: Boolean(app.plugins.plugins[fixtureId]?._loaded),
+                                loader: loader ? { enabled: loader.isEnabled(fixtureId), captured: loader.hasCaptured(fixtureId), disposed: loader.disposed } : null,
+                            };
+                        },
+                        { fixtureId, pluginUnderTestId },
+                    ),
+                );
+                throw error;
+            }
         };
+
+        if (useRibbon) await assertRestored();
 
         // Re-register the lazy engine as at startup, with inactive saved ribbon entries.
         await obsidian.reloadPlugin(pluginUnderTestId);
