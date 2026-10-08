@@ -25,15 +25,15 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
 
     // 0. Pre-load the target plugin to verify it can load in this environment.
     //    If it cannot, the subsequent assertions about real commands are meaningless.
-    await obsidian.page.evaluate(async (id) => {
+    await obsidian.evaluateApp(async (id) => {
         await app.plugins.enablePlugin(id);
     }, targetPluginId);
-    const canLoad = await obsidian.page.evaluate(
+    const canLoad = await obsidian.evaluateApp(
         (id) => Boolean((app.plugins.plugins as Record<string, { _loaded?: boolean } | undefined>)[id]?._loaded),
         targetPluginId,
     );
     expect(canLoad).toBe(true);
-    await obsidian.page.evaluate(async (id) => {
+    await obsidian.evaluateApp(async (id) => {
         await app.plugins.disablePlugin(id);
     }, targetPluginId);
 
@@ -52,7 +52,7 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
 
     // 2. Seed a stale cache: a version that no manifest reports anymore, plus a
     //    command ID the current plugin version does not register.
-    await obsidian.page.evaluate(
+    await obsidian.evaluateApp(
         ({ pluginId, fakeId }) => {
             const appWithId = app as unknown as { appId?: string };
             const appId = appWithId.appId;
@@ -63,7 +63,7 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
     );
 
     // 3. Reload the on-demand plugin so its startup path runs against the stale cache.
-    await obsidian.page.evaluate(async (id) => {
+    await obsidian.evaluateApp(async (id) => {
         await app.plugins.disablePlugin(id);
         await app.plugins.enablePlugin(id);
     }, pluginUnderTestId);
@@ -104,7 +104,7 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
 
     // 5. The background refresh (layout is already ready, so it runs immediately)
     //    rebuilds the cache against the currently installed version.
-    const manifestVersion = await obsidian.page.evaluate((id) => app.plugins.manifests?.[id]?.version ?? null, targetPluginId);
+    const manifestVersion = await obsidian.evaluateApp((id) => app.plugins.manifests?.[id]?.version ?? null, targetPluginId);
     expect(manifestVersion).toBeTruthy();
 
     // Manual poll instead of expect.poll so the debug state can be dumped on timeout.

@@ -74,7 +74,7 @@ test.skip("mfdi-open-view command should lazy-load plugin and open mfdi-view", a
     // ④ コマンド実行
     // メンタルモデル: E2E 環境では MFDI が無効化されないケースがあるため、
     // 無効化できた場合は lazy-load 経路を厳密検証し、できない場合は機能検証にフォールバックする。
-    await obsidian.page.evaluate(
+    await obsidian.evaluateApp(
         (cmd) => app.commands.executeCommandById(cmd),
         expectedCommandId,
     );
@@ -84,7 +84,7 @@ test.skip("mfdi-open-view command should lazy-load plugin and open mfdi-view", a
         const isLoaded = await waitForPluginEnabled(obsidian, MFDI_PLUGIN_ID);
         expect(isLoaded).toBe(true);
 
-        await obsidian.page.evaluate(
+        await obsidian.evaluateApp(
             (cmd) => app.commands.executeCommandById(cmd),
             expectedCommandId,
         );

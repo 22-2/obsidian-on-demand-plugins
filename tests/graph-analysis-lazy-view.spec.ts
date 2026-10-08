@@ -137,7 +137,7 @@ test("opening the graph-analysis view lazily loads the plugin", async ({ obsidia
 
     // Open a leaf with the plugin's view type; the setViewState patch should
     // trigger lazy loading even though the view type is not registered yet.
-    await obsidian.page.evaluate(async (viewType) => {
+    await obsidian.evaluateApp(async (viewType) => {
         const leaf = app.workspace.getLeaf(true);
         await leaf.setViewState({ type: viewType, active: true });
     }, graphAnalysisViewType);

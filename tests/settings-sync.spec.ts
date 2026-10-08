@@ -45,7 +45,7 @@ test("saved profiles survive a data.json-only replacement and reject stale write
     await obsidian.waitReady();
 
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const actualVaultPath = await obsidian.page.evaluate(() => {
+    const actualVaultPath = await obsidian.evaluateApp(() => {
         const adapter = app.vault.adapter as unknown as { getBasePath: () => string };
         return adapter.getBasePath();
     });
@@ -113,13 +113,13 @@ test("saved profiles survive a data.json-only replacement and reject stale write
     await copyFile(transferredDataPath, dataPath);
     expect(await pathExists(profilesPath)).toBe(false);
 
-    await obsidian.page.evaluate(async (pluginId) => {
+    await obsidian.evaluateApp(async (pluginId) => {
         await app.plugins.disablePlugin(pluginId);
         await app.plugins.enablePlugin(pluginId);
     }, pluginUnderTestId);
 
     const readLoadedSettings = async () =>
-        obsidian.page.evaluate((pluginId) => {
+        obsidian.evaluateApp((pluginId) => {
             const plugin = (app.plugins.plugins as unknown as Record<string, OnDemandPlugin>)[pluginId];
             const service = plugin.core.settingsService;
             return {
@@ -149,7 +149,7 @@ test("saved profiles survive a data.json-only replacement and reject stale write
     const receivedRaw = `${JSON.stringify(latest, null, 4)}\n`;
     await writeFile(dataPath, receivedRaw, "utf8");
 
-    const staleSave = await obsidian.page.evaluate(async (pluginId) => {
+    const staleSave = await obsidian.evaluateApp(async (pluginId) => {
         const plugin = (app.plugins.plugins as unknown as Record<string, OnDemandPlugin>)[pluginId];
         plugin.settings.defaultMode = "alwaysDisabled";
         try {
@@ -164,7 +164,7 @@ test("saved profiles survive a data.json-only replacement and reject stale write
     expect(staleSave.message).toContain("Settings changed on disk after this plugin loaded");
     expect(await readFile(dataPath, "utf8")).toBe(receivedRaw);
 
-    await obsidian.page.evaluate(async (pluginId) => {
+    await obsidian.evaluateApp(async (pluginId) => {
         await app.plugins.disablePlugin(pluginId);
         await app.plugins.enablePlugin(pluginId);
     }, pluginUnderTestId);

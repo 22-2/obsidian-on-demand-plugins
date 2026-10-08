@@ -104,7 +104,7 @@ for (const width of [320, 390]) {
         await obsidian.waitReady();
         // Install small inert plugins in the isolated vault so the real registry,
         // list pagination and scroll container are exercised without large downloads.
-        await obsidian.page.evaluate(async () => {
+        await obsidian.evaluateApp(async () => {
             for (let index = 1; index <= 36; index++) {
                 const number = String(index).padStart(2, "0");
                 const id = `mobile-ui-fixture-${number}`;
