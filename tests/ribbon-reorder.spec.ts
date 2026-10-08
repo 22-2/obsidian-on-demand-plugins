@@ -154,6 +154,9 @@ for (const { useRibbon, saveReload } of reloadCases) {
 
         if (useRibbon) await assertRestored();
 
+        // Native *AndSave calls schedule a debounced write rather than await it.
+        // Let the setup's pending save settle before taking the disk baseline.
+        await expect.poll(() => readCommunityPlugins(obsidian)).toEqual([pluginUnderTestId]);
         const savedBefore = await readCommunityPlugins(obsidian);
         const enable = async (id: string) => {
             await obsidian.page.evaluate(
@@ -177,7 +180,7 @@ for (const { useRibbon, saveReload } of reloadCases) {
         // Reload the target while it is running, through the actual native methods.
         await enable(fixtureId);
         await assertRestored();
-        if (saveReload) expect(await readCommunityPlugins(obsidian)).toContain(fixtureId);
+        if (saveReload) await expect.poll(() => readCommunityPlugins(obsidian)).toContain(fixtureId);
         else expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
         await disable(fixtureId);
         expect(await obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), fixtureId)).toBe(false);
@@ -188,7 +191,8 @@ for (const { useRibbon, saveReload } of reloadCases) {
         await obsidian.page.locator(`.side-dock-ribbon-action[aria-label="${titles[0]}"]`).click();
         expect(await obsidian.page.evaluate((id) => (app.plugins.plugins[id] as unknown as { clicks: number }).clicks, fixtureId)).toBe(1);
         await disable(fixtureId);
-        expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
+        if (saveReload) await expect.poll(() => readCommunityPlugins(obsidian)).toEqual(savedBefore);
+        else expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
         expect(
             await obsidian.page.evaluate(
                 ({ fixtureId, pluginUnderTestId }) => {
@@ -202,10 +206,11 @@ for (const { useRibbon, saveReload } of reloadCases) {
         // Re-register the lazy engine as at startup, with inactive saved ribbon entries.
         await disable(pluginUnderTestId);
         expect((await readRibbon(obsidian)).domCount).toBe(0);
-        if (saveReload) expect(await readCommunityPlugins(obsidian)).not.toContain(pluginUnderTestId);
+        if (saveReload) await expect.poll(() => readCommunityPlugins(obsidian)).not.toContain(pluginUnderTestId);
         else expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
         await enable(pluginUnderTestId);
-        expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
+        if (saveReload) await expect.poll(() => readCommunityPlugins(obsidian)).toEqual(savedBefore);
+        else expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
         expect(await obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), fixtureId)).toBe(false);
         if (useRibbon) await assertRestored();
         else expect((await readRibbon(obsidian)).domCount).toBe(0);
