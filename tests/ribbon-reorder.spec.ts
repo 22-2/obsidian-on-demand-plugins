@@ -1,6 +1,6 @@
 import { expect, test, type ObsidianAPI } from "obsidian-e2e-toolkit";
 import type OnDemandPlugin from "src/main";
-import { ensureBuilt, pluginUnderTestId, useOnDemandPluginOnly } from "./test-utils";
+import { ensureBuilt, pluginUnderTestId, readCommunityPlugins, useOnDemandPluginOnly } from "./test-utils";
 
 useOnDemandPluginOnly();
 
@@ -27,8 +27,10 @@ async function readRibbon(obsidian: ObsidianAPI) {
     }, fixtureId);
 }
 
-for (const useRibbon of [false, true]) {
-    test(`PR #2: custom ribbon order and hidden state survive lazy loading (useRibbon=${useRibbon})`, async ({ obsidian }) => {
+const reloadCases = [false, true].flatMap((useRibbon) => [false, true].map((saveReload) => ({ useRibbon, saveReload })));
+
+for (const { useRibbon, saveReload } of reloadCases) {
+    test(`PR #2: ribbon preferences survive lazy loading (useRibbon=${useRibbon}, reload=${saveReload ? "saved" : "in-memory"})`, async ({ obsidian }) => {
         if (!ensureBuilt()) return;
         await obsidian.waitReady();
         const plugin = await obsidian.plugin(pluginUnderTestId);
@@ -152,8 +154,58 @@ for (const useRibbon of [false, true]) {
 
         if (useRibbon) await assertRestored();
 
+        const savedBefore = await readCommunityPlugins(obsidian);
+        const enable = async (id: string) => {
+            await obsidian.page.evaluate(
+                async ({ id, saveReload }) => {
+                    if (saveReload) await app.plugins.enablePluginAndSave(id);
+                    else await app.plugins.enablePlugin(id);
+                },
+                { id, saveReload },
+            );
+        };
+        const disable = async (id: string) => {
+            await obsidian.page.evaluate(
+                async ({ id, saveReload }) => {
+                    if (saveReload) await app.plugins.disablePluginAndSave(id);
+                    else await app.plugins.disablePlugin(id);
+                },
+                { id, saveReload },
+            );
+        };
+
+        // Reload the target while it is running, through the actual native methods.
+        await enable(fixtureId);
+        await assertRestored();
+        if (saveReload) expect(await readCommunityPlugins(obsidian)).toContain(fixtureId);
+        else expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
+        await disable(fixtureId);
+        expect(await obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), fixtureId)).toBe(false);
+        if (useRibbon) await assertRestored();
+        else expect((await readRibbon(obsidian)).domCount).toBe(0);
+        await enable(fixtureId);
+        await assertRestored();
+        await obsidian.page.locator(`.side-dock-ribbon-action[aria-label="${titles[0]}"]`).click();
+        expect(await obsidian.page.evaluate((id) => (app.plugins.plugins[id] as unknown as { clicks: number }).clicks, fixtureId)).toBe(1);
+        await disable(fixtureId);
+        expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
+        expect(
+            await obsidian.page.evaluate(
+                ({ fixtureId, pluginUnderTestId }) => {
+                    const plugin = app.plugins.plugins[pluginUnderTestId] as unknown as OnDemandPlugin;
+                    return plugin.settings.plugins[fixtureId];
+                },
+                { fixtureId, pluginUnderTestId },
+            ),
+        ).toMatchObject({ mode: "lazy", lazyOptions: { useRibbon } });
+
         // Re-register the lazy engine as at startup, with inactive saved ribbon entries.
-        await obsidian.reloadPlugin(pluginUnderTestId);
+        await disable(pluginUnderTestId);
+        expect((await readRibbon(obsidian)).domCount).toBe(0);
+        if (saveReload) expect(await readCommunityPlugins(obsidian)).not.toContain(pluginUnderTestId);
+        else expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
+        await enable(pluginUnderTestId);
+        expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
         expect(await obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), fixtureId)).toBe(false);
         if (useRibbon) await assertRestored();
         else expect((await readRibbon(obsidian)).domCount).toBe(0);
@@ -161,10 +213,30 @@ for (const useRibbon of [false, true]) {
         if (useRibbon) {
             // Full restart must also restore preferences when there are no live plugin icons.
             await obsidian.page.evaluate(() => app.workspace.saveLayout());
-            await obsidian.page.reload();
+            if (saveReload) {
+                // Run the Save + Apply reload command, rather than simulating it with page.reload.
+                const navigation = obsidian.page.waitForEvent("domcontentloaded");
+                try {
+                    await obsidian.page.evaluate(
+                        async ({ fixtureId, pluginUnderTestId }) => {
+                            const plugin = app.plugins.plugins[pluginUnderTestId] as unknown as OnDemandPlugin;
+                            await plugin.saveSettings();
+                            await plugin.applyStartupPolicyAndRestart([fixtureId]);
+                        },
+                        { fixtureId, pluginUnderTestId },
+                    );
+                } catch (error) {
+                    // The real reload may destroy evaluate's context before it settles.
+                    if (!String(error).includes("Execution context was destroyed")) throw error;
+                }
+                await navigation;
+            } else {
+                await obsidian.page.reload();
+            }
             await obsidian.waitReady();
             expect(await obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), fixtureId)).toBe(false);
             await assertRestored();
+            expect(await readCommunityPlugins(obsidian)).toEqual(savedBefore);
         }
 
         for (let cycle = 0; cycle < 2; cycle++) {
