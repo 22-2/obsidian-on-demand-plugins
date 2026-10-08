@@ -90,6 +90,37 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     expect(await page.evaluate(() => (app.commands as unknown as { __requestedReload?: boolean }).__requestedReload)).toBe(true);
 });
 
+test("plugin actions reveal the installed plugin in Obsidian's Community plugins tab", async ({ obsidian }) => {
+    if (!ensureBuilt()) return;
+    test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
+    await obsidian.waitReady();
+    const page = obsidian.page;
+    const settingsPage = await openPluginManagement(page);
+
+    // Leave a core search that excludes the destination to verify navigation clears it.
+    await page.evaluate(() => { app.setting.openTabById("community-plugins"); });
+    const coreSearch = settingsPage.locator(".vertical-tab-content input[type='search']");
+    await coreSearch.fill("no-such-plugin");
+    await page.evaluate(() => { app.setting.openTabById("on-demand-plugins"); });
+    await settingsPage.getByText("Plugin management", { exact: true }).click();
+    await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
+    const row = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
+    await row.locator(".clickable-icon").click();
+    const title = "Show in Obsidian’s community plugins tab";
+    const menuPage = await Promise.any(page.context().pages().map(async (candidate) => {
+        await candidate.getByText(title, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+        return candidate;
+    }));
+    await menuPage.getByText(title, { exact: true }).click();
+
+    await expect(coreSearch).toBeVisible();
+    await expect(coreSearch).toHaveValue("");
+    const destination = settingsPage.locator(`.vertical-tab-content [data-plugin-id="${targetPluginId}"]`);
+    await expect(destination).toBeInViewport();
+    // The animation proves the delayed reveal ran in the settings window after layout settled.
+    await expect.poll(() => destination.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
+});
+
 test("plugin management refresh updates the live loaded badge", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 

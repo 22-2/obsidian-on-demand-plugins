@@ -5,6 +5,7 @@ export interface PluginRowMenuOptions {
     getMode: () => PLUGIN_MODE;
     onOpenDetails: () => void;
     onOpenCommunityPage: () => void;
+    onShowInCommunityPlugins: () => void;
     onRevealInExplorer: () => void;
     onToggleEnabled: (enabled: boolean) => void;
     onSelectMode: (mode: PLUGIN_MODE) => void;
@@ -48,6 +49,14 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
             .setTitle("Show in system explorer")
             .setIcon("folder-open")
             .onClick(() => options.onRevealInExplorer()),
+    );
+
+    // Name Obsidian's built-in tab explicitly to distinguish it from the community catalog.
+    menu.addItem((item) =>
+        item
+            .setTitle("Show in Obsidian’s community plugins tab")
+            .setIcon("list")
+            .onClick(() => options.onShowInCommunityPlugins()),
     );
 
     menu.addSeparator();

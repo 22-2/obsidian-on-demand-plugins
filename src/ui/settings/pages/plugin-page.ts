@@ -5,6 +5,7 @@ import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
+import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginCommunityPage, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
 
@@ -164,6 +165,7 @@ export class PluginPage extends SettingPage {
                     onOpenCommunityPage: () => {
                         void openPluginCommunityPage(manifest.id);
                     },
+                    onShowInCommunityPlugins: () => showInCommunityPlugins(this.app, manifest.id),
                     onRevealInExplorer: () => void openPluginDirectory(this.app, manifest),
                     onToggleEnabled: (enabled) => this.applyRowModeChange(manifest.id, enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED, modeBadge, enabledBadge),
                     onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, modeBadge, enabledBadge),
