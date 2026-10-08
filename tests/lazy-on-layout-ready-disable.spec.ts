@@ -40,11 +40,11 @@ test("disabling a lazyOnLayoutReady plugin should not re-enable it", async ({ ob
     }, targetPluginId);
 
     // 2. Enable the plugin (simulating that onLayoutReady loaded it)
-    await obsidian.evaluateApp((id) => app.plugins.enablePlugin(id), targetPluginId);
+    await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
     expect(await waitForPluginEnabled(obsidian, targetPluginId)).toBe(true);
 
     // 3. User manually disables the plugin
-    await obsidian.evaluateApp((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
+    await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // Wait for disable to complete
     const disabled = await waitForPluginDisabled(obsidian, targetPluginId);
@@ -76,7 +76,7 @@ test("disabling a lazyOnLayoutReady plugin preserves its lazy mode", async ({ ob
     }, targetPluginId);
 
     // 2. Enable the plugin first
-    await obsidian.evaluateApp((id) => app.plugins.enablePlugin(id), targetPluginId);
+    await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
     await waitForPluginEnabled(obsidian, targetPluginId);
 
     // 3. Disable the plugin — with the Observe & Sync strategy,
@@ -86,7 +86,7 @@ test("disabling a lazyOnLayoutReady plugin preserves its lazy mode", async ({ ob
         await plugin.saveSettings();
     });
 
-    await obsidian.evaluateApp((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
+    await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // Wait for disable to take effect
     await waitForPluginDisabled(obsidian, targetPluginId);

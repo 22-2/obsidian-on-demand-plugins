@@ -95,7 +95,7 @@ test("plugin management refresh updates the live loaded badge", async ({ obsidia
 
     await obsidian.waitReady();
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await obsidian.evaluateApp(async (pluginId) => {
+    await obsidian.page.evaluate(async (pluginId) => {
         const plugin = app.plugins.plugins["on-demand-plugins"] as typeof app.plugins.plugins[string] & {
             updatePluginSettings: (id: string, mode: "lazy") => Promise<void>;
         };
@@ -115,14 +115,14 @@ test("plugin management refresh updates the live loaded badge", async ({ obsidia
     const row = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
     await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Not loaded");
 
-    await obsidian.evaluateApp((pluginId) => app.plugins.enablePlugin(pluginId), targetPluginId);
-    await expect.poll(async () => (await obsidian.pluginState(targetPluginId)).loaded).toBe(true);
+    await obsidian.page.evaluate((pluginId) => app.plugins.enablePlugin(pluginId), targetPluginId);
+    await expect.poll(() => obsidian.page.evaluate((pluginId) => Boolean(app.plugins.plugins[pluginId]?._loaded), targetPluginId)).toBe(true);
 
     const pluginsHeading = settingsPage.locator(".setting-item-heading").filter({ hasText: "Plugins" });
     await pluginsHeading.locator(".clickable-icon").click();
     await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
 
-    await obsidian.evaluateApp(async (pluginId) => {
+    await obsidian.page.evaluate(async (pluginId) => {
         const savedPluginIds = await app.vault.readConfigJson("community-plugins");
         const savedIds = Array.isArray(savedPluginIds) ? savedPluginIds.filter((id): id is string => typeof id === "string") : [];
         await app.vault.writeConfigJson("community-plugins", [...new Set([...savedIds, pluginId])]);

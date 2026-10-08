@@ -29,7 +29,7 @@ test("capture enabled plugins snapshot before reload (lineage should be unloaded
     // Capture enabledPlugins at the moment reload is requested, then swallow the
     // reload itself: letting it navigate would destroy the evaluate() context
     // below before its promise settles, and only the snapshot matters here.
-    await obsidian.evaluateApp(() => {
+    await obsidian.page.evaluate(() => {
         const original = app.commands.executeCommandById.bind(app.commands);
         app.commands.executeCommandById = (id: string) => {
             if (id !== "app:reload") return original(id);

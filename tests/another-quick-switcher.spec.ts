@@ -45,7 +45,7 @@ test("Another Quick Switcher: should NOT be loaded at startup when set to lazy",
     expect(isEnabled).toBe(false);
 
     // 4. Double check by looking at app.plugins.plugins
-    const isInitialized = await obsidian.evaluateApp((id) => {
+    const isInitialized = await obsidian.page.evaluate((id) => {
         return id in app.plugins.plugins;
     }, targetPluginId);
     console.log(`Plugin in app.plugins.plugins: ${isInitialized}`);

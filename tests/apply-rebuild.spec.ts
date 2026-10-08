@@ -124,7 +124,7 @@ test("enabling disabled plugin syncs settings to keepEnabled", async ({ obsidian
     }, targetPluginId);
 
     // 2. Enable via Obsidian UI (triggers the patch)
-    await obsidian.evaluateApp((id) => app.plugins.enablePlugin(id), targetPluginId);
+    await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
 
     // Wait for enable to complete
     const enabled = await waitForPluginEnabled(obsidian, targetPluginId);

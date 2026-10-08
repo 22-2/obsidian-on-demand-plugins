@@ -60,7 +60,7 @@ test("my-commands duplicate-current-tab is cached and restored as a lazy wrapper
     // This distinguishes "cached but never re-registered" from "missing from cache".
     expect(registeredCommandId).toBe(duplicateCurrentTabCommandId);
 
-    const executionState = await obsidian.evaluateApp(async ({ pluginId, commandId }) => {
+    const executionState = await obsidian.page.evaluate(async ({ pluginId, commandId }) => {
         const deadline = Date.now() + 45_000;
         const before = app.commands.commands[commandId];
 
@@ -103,7 +103,7 @@ test("my-commands plugin can be manually re-enabled after lazy rebuild", async (
 
     // This isolates plugin re-enable behavior from wrapper execution so failures here point
     // at the plugin lifecycle itself rather than command replacement.
-    const enableState = await obsidian.evaluateApp(async ({ pluginId, commandId }) => {
+    const enableState = await obsidian.page.evaluate(async ({ pluginId, commandId }) => {
         const beforeCommand = app.commands.commands?.[commandId] ?? null;
 
         await app.plugins.enablePlugin(pluginId);

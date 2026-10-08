@@ -26,7 +26,7 @@ test("on-demand: lazy command enables plugin", async ({ obsidian }) => {
     expect(mode).toBe("lazy");
 
     // Attempt to disable for a stronger signal (may be overridden by Obsidian state)
-    await obsidian.evaluateApp((id) => app.plugins.disablePlugin(id), targetPluginId);
+    await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
 
     const commandId = await findCommandByPrefix(obsidian, `${targetPluginId}:`);
 

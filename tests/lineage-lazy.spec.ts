@@ -20,7 +20,7 @@ test("Lineage plugin should not be loaded at startup when configured as lazy", a
     await obsidian.waitReady();
 
     // Verify Lineage is loaded initially (since we enabled it in setup)
-    const isLoadedInitially = await obsidian.evaluateApp((id) => {
+    const isLoadedInitially = await obsidian.page.evaluate((id) => {
         return !!app.plugins.plugins[id];
     }, lineagePluginId);
     expect(isLoadedInitially).toBe(true);
@@ -52,7 +52,7 @@ test("Lineage plugin should not be loaded at startup when configured as lazy", a
     }, lineagePluginId);
 
     // Verify Lineage is disabled after rebuild
-    const isLoadedAfterRebuild = await obsidian.evaluateApp((id) => {
+    const isLoadedAfterRebuild = await obsidian.page.evaluate((id) => {
         console.log("Checking if loaded after rebuild:", id);
         console.log("Enabled plugins:", Array.from(app.plugins.enabledPlugins));
         console.log("Plugin instance:", app.plugins.plugins[id]);
@@ -65,7 +65,7 @@ test("Lineage plugin should not be loaded at startup when configured as lazy", a
     // expect(isLoadedAfterRebuild).toBe(false); // Commented out to check restart behavior
 
     // Check community-plugins.json content
-    const commPluginsJson = await obsidian.evaluateApp(async () => {
+    const commPluginsJson = await obsidian.page.evaluate(async () => {
         return await app.vault.adapter.read(app.vault.configDir + "/community-plugins.json");
     });
     
