@@ -106,11 +106,16 @@ for (const useRibbon of [false, true]) {
 
         const expectedHidden = { [ids[2]]: false, [ids[1]]: true, [ids[0]]: false };
         const assertRestored = async () => {
-            const state = await readRibbon(obsidian);
-            expect(state.visibleOrder).toEqual([ids[2], ids[0]]);
-            expect(state.hidden).toEqual(expectedHidden);
-            expect(state.activeIds).toEqual([ids[2], ids[1], ids[0]]);
-            expect(state.domCount).toBe(3);
+            // Obsidian marks Plugin._loaded before awaiting async onload, so
+            // reloadPlugin's enabled waiter can finish before the lazy engine initializes.
+            await expect
+                .poll(() => readRibbon(obsidian))
+                .toEqual({
+                    visibleOrder: [ids[2], ids[0]],
+                    hidden: expectedHidden,
+                    activeIds: [ids[2], ids[1], ids[0]],
+                    domCount: 3,
+                });
         };
 
         // Re-register the lazy engine as at startup, with inactive saved ribbon entries.
