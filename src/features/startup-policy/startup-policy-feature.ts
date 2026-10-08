@@ -10,7 +10,7 @@ import type { PluginContext } from "src/core/plugin-context";
 import { ProgressDialog } from "src/core/progress";
 import { saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
-import { isPluginEnabled, isPluginLoaded } from "src/core/utils";
+import { isPluginLoaded } from "src/core/utils";
 import type { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { patchViewRegistry } from "src/patches/view-registry";
@@ -104,7 +104,10 @@ export class StartupPolicyFeature implements AppFeature {
             progress?.setStatus(`Loading ${plugin.name}`);
             progress?.setProgress(i + 1);
 
-            let alreadyReady = isPluginLoaded(this.ctx.app, plugin.id) && isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, plugin.id);
+            // Lazy plugins can be running without belonging to the persisted
+            // enabled set. enablePlugin is a no-op for those live instances,
+            // so use runtime state when deciding whether capture needs a reload.
+            let alreadyReady = isPluginLoaded(this.ctx.app, plugin.id);
 
             // Registration patches need a fresh load to discover missing views.
             // Ribbon metadata is rebuilt on every apply to remove obsolete icons.

@@ -1,14 +1,20 @@
 import log from "loglevel";
 import { Plugin, type PluginManifest } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
+import type { FeatureManager } from "src/core/feature-manager";
+import type { EventBus } from "src/core/event-bus";
+import type { ProgressDialog } from "src/core/progress";
 import { loadLocalStorage } from "src/core/storage";
 import { isPluginLoaded } from "src/core/utils";
+import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { RibbonLazyLoader } from "src/features/lazy-engine/ribbon/ribbon-lazy-loader";
+import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
+import type { CoreContainer } from "src/services/core-container";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("src/core/storage", () => ({ loadLocalStorage: vi.fn(), saveLocalStorage: vi.fn() }));
-vi.mock("src/core/utils", () => ({ isPluginLoaded: vi.fn() }));
+vi.mock("src/core/utils", () => ({ isPluginLoaded: vi.fn(), isPluginEnabled: (enabled: Set<string>, id: string) => enabled.has(id) }));
 
 type Button = { remove: () => void; visible: boolean; attached: boolean };
 type Item = { id: string; icon: string; title: string; hidden: boolean; buttonEl?: Button; callback?: (evt: MouseEvent) => unknown };
@@ -161,6 +167,33 @@ describe("ribbon order and hidden-state regression (PR #2)", () => {
         expect(dom).toHaveLength(3);
         expect(ensurePluginLoaded).not.toHaveBeenCalled();
         expect(visibleOrder()).toEqual(["sample:Last", "sample:First"]);
+    });
+
+    it("Apply recaptures a running lazy plugin outside the persisted enabled set", async () => {
+        loaded = true;
+        registerRealIcons();
+        const before = savedState();
+        const enablePlugin = vi.fn(async () => {
+            // Native enablePlugin does not call onload again for a live instance.
+            if (loaded) return;
+            loaded = true;
+            registerRealIcons();
+        });
+        Object.assign(ctx.obsidianPlugins, { enabledPlugins: new Set(), enablePlugin });
+        Object.assign(ctx.app, { viewRegistry: { registerView: vi.fn() }, commands: { executeCommandById: vi.fn() } });
+        Object.assign(ctx, { saveSettings: vi.fn(), getData: () => ({ showConsoleLog: false }) });
+        const engine = new LazyEngineFeature();
+        Object.assign(engine, { ribbonLoader: service, commandCache: { refreshCommandCache: vi.fn() } });
+        const startup = new StartupPolicyFeature();
+        startup.onload(ctx, { registry: { writeCommunityPluginsFile: vi.fn() } } as unknown as CoreContainer, { get: () => engine } as unknown as FeatureManager, {} as EventBus);
+        const progress = { setOnCancel: vi.fn(), setTotal: vi.fn(), setStatus: vi.fn(), setProgress: vi.fn(), close: vi.fn() } as unknown as ProgressDialog;
+        await startup.applyWithProgress(progress, [manifest.id]);
+        await ctx.obsidianPlugins.disablePlugin(manifest.id);
+        expect(enablePlugin).toHaveBeenCalledTimes(1);
+        expect(service.hasCaptured(manifest.id)).toBe(true);
+        expect(dom).toHaveLength(3);
+        expect(visibleOrder()).toEqual(["sample:Last", "sample:First"]);
+        expect(savedState()).toEqual(before);
     });
 
     it("preserves state through first-click replacement and repeated disable/load cycles", async () => {

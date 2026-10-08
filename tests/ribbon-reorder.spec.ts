@@ -106,8 +106,7 @@ for (const useRibbon of [false, true]) {
 
         const expectedHidden = { [ids[2]]: false, [ids[1]]: true, [ids[0]]: false };
         const assertRestored = async () => {
-            // Obsidian marks Plugin._loaded before awaiting async onload, so
-            // reloadPlugin's enabled waiter can finish before the lazy engine initializes.
+            // Wait for UI restoration and print capture state if it fails.
             try {
                 await expect
                     .poll(() => readRibbon(obsidian))
