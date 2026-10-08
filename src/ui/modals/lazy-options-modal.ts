@@ -85,6 +85,16 @@ export class LazyOptionsModal extends Modal {
                     }),
             );
 
+        // --- Ribbon Settings ---
+        new Setting(contentEl)
+            .setName("Lazy on ribbon")
+            .setDesc("Keep this plugin's ribbon icons available and load it when an icon is clicked. Icons are collected when you apply changes.")
+            .addToggle((toggle) =>
+                toggle.setValue(this.options.useRibbon ?? false).onChange((value) => {
+                    this.options.useRibbon = value;
+                }),
+            );
+
         // --- View Settings ---
         new Setting(contentEl)
             .setName("Lazy on view")
