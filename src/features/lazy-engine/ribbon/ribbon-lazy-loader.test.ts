@@ -1,4 +1,3 @@
-import { setTimeout as delay } from "node:timers/promises";
 import { Plugin, type PluginManifest, type RibbonItem } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
 import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
@@ -122,7 +121,7 @@ describe("RibbonLazyLoader", () => {
         const plugin = realPlugin();
         ensurePluginLoaded.mockImplementation(() => {
             loaded = true;
-            void delay(25).then(() => plugin.addRibbonIcon("star", "Open", callback));
+            window.setTimeout(() => plugin.addRibbonIcon("star", "Open", callback), 25);
             return Promise.resolve(true);
         });
         items[0].callback({} as MouseEvent);

@@ -59,6 +59,9 @@ export class RibbonLazyLoader {
                 },
             }),
         );
+        // Register before workspace layout restoration so Obsidian can apply
+        // the saved order and hidden state to these buttons during startup.
+        if (this.ctx.app.workspace.layoutReady === false) this.sync();
         this.ctx.app.workspace.onLayoutReady(() => {
             if (!this.disposed) this.sync();
         });

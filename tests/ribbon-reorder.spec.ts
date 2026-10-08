@@ -119,6 +119,15 @@ for (const useRibbon of [false, true]) {
         if (useRibbon) await assertRestored();
         else expect((await readRibbon(obsidian)).domCount).toBe(0);
 
+        if (useRibbon) {
+            // Full restart must also restore preferences when there are no live plugin icons.
+            await obsidian.page.evaluate(() => app.workspace.saveLayout());
+            await obsidian.page.reload();
+            await obsidian.waitReady();
+            expect(await obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), fixtureId)).toBe(false);
+            await assertRestored();
+        }
+
         for (let cycle = 0; cycle < 2; cycle++) {
             if (useRibbon) {
                 await obsidian.page.locator(`.side-dock-ribbon-action[aria-label="${titles[0]}"]`).click();

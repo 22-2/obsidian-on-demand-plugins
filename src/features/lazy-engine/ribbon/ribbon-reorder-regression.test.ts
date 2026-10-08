@@ -153,6 +153,16 @@ describe("ribbon order and hidden-state regression (PR #2)", () => {
         expect(updateRibbonDisplay).toHaveBeenCalledTimes(1);
     });
 
+    it("registers cached icons before startup layout restoration", () => {
+        service.clear();
+        Object.assign(ctx.app.workspace, { layoutReady: false });
+        const startup = new RibbonLazyLoader(ctx, { ensurePluginLoaded });
+        startup.register();
+        expect(dom).toHaveLength(3);
+        expect(ensurePluginLoaded).not.toHaveBeenCalled();
+        expect(visibleOrder()).toEqual(["sample:Last", "sample:First"]);
+    });
+
     it("preserves state through first-click replacement and repeated disable/load cycles", async () => {
         const before = savedState();
         service.sync();
