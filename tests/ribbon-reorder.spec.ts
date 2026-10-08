@@ -156,7 +156,10 @@ for (const { useRibbon, saveReload } of reloadCases) {
 
         // Native *AndSave calls schedule a debounced write rather than await it.
         // Let the setup's pending save settle before taking the disk baseline.
-        await expect.poll(() => readCommunityPlugins(obsidian)).toEqual([pluginUnderTestId]);
+        const enabledBefore = await obsidian.page.evaluate(() => Array.from(app.plugins.enabledPlugins).sort());
+        expect(enabledBefore).toContain(pluginUnderTestId);
+        expect(enabledBefore).not.toContain(fixtureId);
+        await expect.poll(async () => (await readCommunityPlugins(obsidian)).sort()).toEqual(enabledBefore);
         const savedBefore = await readCommunityPlugins(obsidian);
         const enable = async (id: string) => {
             await obsidian.page.evaluate(
