@@ -4,7 +4,6 @@ import { PLUGIN_MODE, PluginModes } from "src/core/types";
 export interface PluginRowMenuOptions {
     getMode: () => PLUGIN_MODE;
     onOpenDetails: () => void;
-    onOpenCommunityPage: () => void;
     onShowInCommunityPlugins: () => void;
     onRevealInExplorer: () => void;
     onToggleEnabled: (enabled: boolean) => void;
@@ -39,19 +38,12 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
 
     menu.addItem((item) =>
         item
-            .setTitle("Open community page")
-            .setIcon("globe")
-            .onClick(() => options.onOpenCommunityPage()),
-    );
-
-    menu.addItem((item) =>
-        item
             .setTitle("Show in system explorer")
             .setIcon("folder-open")
             .onClick(() => options.onRevealInExplorer()),
     );
 
-    // Name Obsidian's built-in tab explicitly to distinguish it from the community catalog.
+    // Replace the external community page action with navigation to Obsidian's built-in tab.
     menu.addItem((item) =>
         item
             .setTitle("Show in Obsidian’s community plugins tab")

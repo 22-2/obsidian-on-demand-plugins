@@ -1,6 +1,6 @@
 import type { App, DropdownComponent } from "obsidian";
 import { FileSystemAdapter, Notice, Platform, normalizePath } from "obsidian";
-import { openExternalUrl, openSystemPath } from "src/core/external-open";
+import { openSystemPath } from "src/core/external-open";
 import { PLUGIN_MODE, PluginModes } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
@@ -65,15 +65,6 @@ export async function openPluginDirectory(app: App, manifest: { dir?: string; na
         if (error) new Notice(`Could not open the plugin folder: ${error}`);
     } catch (error) {
         new Notice(`Could not open the plugin folder: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-export async function openPluginCommunityPage(pluginId: string) {
-    const url = `https://obsidian.md/plugins?id=${encodeURIComponent(pluginId)}`;
-    try {
-        await openExternalUrl(url);
-    } catch (error) {
-        new Notice(`Could not open the community page: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 

@@ -7,7 +7,7 @@ import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
-import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginCommunityPage, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
 
 export class PluginPage extends SettingPage {
     private static readonly PAGE_SIZE = 24;
@@ -162,9 +162,6 @@ export class PluginPage extends SettingPage {
                             this.tab.markDirty();
                             this.tab.renderPendingControls(this.containerEl, () => this.display());
                         }).open(),
-                    onOpenCommunityPage: () => {
-                        void openPluginCommunityPage(manifest.id);
-                    },
                     onShowInCommunityPlugins: () => showInCommunityPlugins(this.app, manifest.id),
                     onRevealInExplorer: () => void openPluginDirectory(this.app, manifest),
                     onToggleEnabled: (enabled) => this.applyRowModeChange(manifest.id, enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED, modeBadge, enabledBadge),
