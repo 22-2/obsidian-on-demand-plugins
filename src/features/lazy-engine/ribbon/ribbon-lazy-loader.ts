@@ -17,7 +17,7 @@ export class RibbonLazyLoader {
     private ctx: PluginContext;
     private loader: Pick<LazyCommandRunner, "ensurePluginLoaded">;
     private cache: RibbonCache;
-    private placeholders = new Map<string, Set<string>>();
+    private placeholders = new Map<string, Map<string, HTMLElement>>();
     private captures = new WeakMap<Plugin, CachedRibbon[]>();
     private disposed = false;
 
@@ -111,14 +111,15 @@ export class RibbonLazyLoader {
         this.removePlaceholders(pluginId);
         if (this.disposed || !this.isEnabled(pluginId) || isPluginLoaded(this.ctx.app, pluginId) || !this.hasCaptured(pluginId)) return;
         const ribbon = this.ctx.app.workspace.leftRibbon;
-        const ids = new Set<string>();
-        this.placeholders.set(pluginId, ids);
+        const buttons = new Map<string, HTMLElement>();
+        this.placeholders.set(pluginId, buttons);
         for (const item of this.cache[pluginId].items) {
-            if (ribbon.items.some((real) => real.id === item.id)) continue;
-            ribbon.addRibbonItemButton(item.id, item.icon, item.title, (evt) => {
+            // Obsidian retains inactive entries to preserve order and hidden state.
+            if (ribbon.items.some((real) => real.id === item.id && real.buttonEl)) continue;
+            const button = ribbon.addRibbonItemButton(item.id, item.icon, item.title, (evt) => {
                 void this.activate(pluginId, item.id, evt);
             });
-            ids.add(item.id);
+            buttons.set(item.id, button);
         }
         this.ctx.app.updateRibbonDisplay();
     }
@@ -143,13 +144,21 @@ export class RibbonLazyLoader {
 
     private getRealItem(pluginId: string, itemId: string) {
         if (this.placeholders.get(pluginId)?.has(itemId)) return undefined;
-        return this.ctx.app.workspace.leftRibbon.items.find((item) => item.id === itemId);
+        return this.ctx.app.workspace.leftRibbon.items.find((item) => item.id === itemId && item.buttonEl && typeof item.callback === "function");
     }
 
     private removePlaceholders(pluginId: string): void {
-        const ids = this.placeholders.get(pluginId);
-        if (!ids) return;
-        for (const id of ids) this.ctx.app.workspace.leftRibbon.removeRibbonAction(id);
+        const buttons = this.placeholders.get(pluginId);
+        if (!buttons) return;
+        const ribbon = this.ctx.app.workspace.leftRibbon;
+        for (const [id, button] of buttons) {
+            // Do not unregister a real icon that has already taken over this ID.
+            if (ribbon.items.find((item) => item.id === id)?.buttonEl === button) {
+                ribbon.removeRibbonAction(id);
+            }
+            // removeRibbonAction only clears runtime references; it does not detach DOM.
+            button.remove();
+        }
         this.placeholders.delete(pluginId);
     }
 

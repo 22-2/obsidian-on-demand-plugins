@@ -25,7 +25,7 @@ describe("RibbonLazyLoader", () => {
     const ensurePluginLoaded = vi.fn();
 
     function addItem(itemId: string, icon: string, title: string, callback: (evt: MouseEvent) => unknown) {
-        const buttonEl = {} as HTMLElement;
+        const buttonEl = { remove: vi.fn() } as unknown as HTMLElement;
         items.push({ id: itemId, icon, title, callback, buttonEl, hidden: false });
         return buttonEl;
     }
