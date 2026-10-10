@@ -6,6 +6,7 @@ import type { CachedCommand, PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { isLazyMode, isPluginLoaded } from "src/core/utils";
 import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
+import { waitForPluginInitialization } from "src/patches/plugin-initialization";
 
 const logger = log.getLogger("OnDemandPlugin/CommandCacheService");
 
@@ -44,43 +45,12 @@ export class CommandCacheService {
     // Cache refresh
     // ---------------------------------------------------------------------------
 
-    async refreshCommandCache(pluginIds?: string[], force = false, onProgress?: (current: number, total: number, plugin: PluginManifest) => void): Promise<void> {
-        let lazyManifests = this.getLazyManifests();
-        if (pluginIds?.length) {
-            lazyManifests = lazyManifests.filter((p) => pluginIds.includes(p.id));
-        }
-
-        const pluginsToRefresh = force ? lazyManifests : lazyManifests.filter((p) => !this.store.isValid(p.id));
-
-        for (const plugin of pluginsToRefresh) {
-            const current = lazyManifests.indexOf(plugin) + 1;
-            await this.refreshCommandsRestoringLoadState(plugin.id);
-            onProgress?.(current, lazyManifests.length, plugin);
-        }
-    }
-
     async refreshCommandsForPlugin(pluginId: string): Promise<boolean> {
         const commands = await this.getCommandsForPlugin(pluginId);
-        if (!commands.length) return false;
+        // An empty snapshot is valid too, but a failed load must preserve the stale cache.
+        if (!commands.length && !isPluginLoaded(this.ctx.app, pluginId)) return false;
         this.store.set(pluginId, commands);
         return true;
-    }
-
-    /**
-     * Snapshot a plugin's commands, then unload it again if it was loaded only for the snapshot,
-     * so a cache rebuild does not leave lazy plugins running for the rest of the session.
-     */
-    private async refreshCommandsRestoringLoadState(pluginId: string): Promise<void> {
-        const wasLoaded = isPluginLoaded(this.ctx.app, pluginId);
-        try {
-            // Persist before unloading: the disable hook re-registers wrappers only from a
-            // cache that is stored for the current plugin version.
-            if (await this.refreshCommandsForPlugin(pluginId)) this.store.persist();
-        } finally {
-            if (!wasLoaded && isPluginLoaded(this.ctx.app, pluginId)) {
-                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
-            }
-        }
     }
 
     async getCommandsForPlugin(pluginId: string): Promise<CachedCommand[]> {
@@ -90,13 +60,15 @@ export class CommandCacheService {
             await this.ctx.obsidianPlugins.enablePlugin(pluginId);
         }
 
+        await waitForPluginInitialization(this.ctx, pluginId);
+
         if (!this.isPluginReadyForCommandSnapshot(pluginId)) {
             await this.waitForPluginReadyForCommandSnapshot(pluginId);
         }
 
         const commands = Object.values(this.ctx.obsidianCommands.commands) as CachedCommand[];
         return commands
-            .filter((cmd) => this.ctx.getCommandPluginId(cmd.id) === pluginId)
+            .filter((cmd) => this.ctx.getCommandPluginId(cmd.id) === pluginId && !this.isWrapperCommand(cmd.id))
             .map((cmd) => ({
                 id: cmd.id,
                 name: cmd.name,
@@ -107,23 +79,32 @@ export class CommandCacheService {
 
     async ensureCommandsCached(pluginId: string): Promise<void> {
         if (this.store.isValid(pluginId)) return;
-        await this.refreshCommandsForPlugin(pluginId);
-        this.store.persist();
+        if (await this.refreshCommandsForPlugin(pluginId)) this.store.persist();
     }
 
     async forceReloadPluginCache(pluginId: string): Promise<void> {
         const cachedIds = this.store.getIds(pluginId);
         const hadWrappers = cachedIds ? Array.from(cachedIds).some((commandId) => this.isWrapperCommand(commandId)) : false;
 
-        // Keep the command palette clean: if wrappers were active, remove them before rebuilding.
-        this.removeCachedCommandsForPlugin(pluginId);
-
-        await this.refreshCommandsForPlugin(pluginId);
-        this.store.persist();
-
-        if (hadWrappers) {
-            this.registerCachedCommandsForPlugin(pluginId);
+        try {
+            await this.snapshotCommandsForPlugin(pluginId);
+            this.persistCache();
+        } finally {
+            // The snapshot removes wrappers first; restore them from the previous cache on failure.
+            if (hadWrappers) {
+                this.registerCachedCommandsForPlugin(pluginId);
+            }
         }
+    }
+
+    /** Capture without serializing the entire cache; bulk rebuilds persist once at the end. */
+    async snapshotCommandsForPlugin(pluginId: string): Promise<void> {
+        this.removeCachedCommandsForPlugin(pluginId);
+        if (!(await this.refreshCommandsForPlugin(pluginId))) throw new Error(`Failed to snapshot plugin ${pluginId}`);
+    }
+
+    persistCache(): void {
+        this.store.persist();
     }
 
     // ---------------------------------------------------------------------------
@@ -162,27 +143,20 @@ export class CommandCacheService {
     async refreshStaleCacheForPlugin(pluginId: string): Promise<void> {
         const wasLoaded = isPluginLoaded(this.ctx.app, pluginId);
         let changed: boolean;
-        let pluginLoaded = false;
         try {
             changed = await this.refreshCommandsForPlugin(pluginId);
-            pluginLoaded = isPluginLoaded(this.ctx.app, pluginId);
             if (changed) {
-                // persist() also rewrites commandCacheVersions from the current manifests,
-                // which is what marks this cache valid again for future startups.
+                // Persist the version captured with this snapshot, preserving other stale versions.
                 this.store.persist();
-            } else if (pluginLoaded) {
-                // Plugin loaded successfully but has no commands. Bump the version
-                // so we do not retry on every startup.
-                this.store.markVersionCurrent(pluginId);
             }
             // If plugin did not load, do NOT bump the version. The stale cache
             // will trigger another refresh attempt on the next startup.
         } finally {
-            if (!wasLoaded && pluginLoaded) {
+            if (!wasLoaded && isPluginLoaded(this.ctx.app, pluginId)) {
                 await this.ctx.obsidianPlugins.disablePlugin(pluginId);
             }
         }
-        // Only register wrappers when the refresh actually captured fresh commands.
+        // Only register wrappers after a successful snapshot (which may be empty).
         // Registering from a stale cache (changed=false) would resurrect command IDs
         // that no longer exist in the current plugin version (issue #6).
         if (changed) {
@@ -321,7 +295,7 @@ export class CommandCacheService {
         // loaded flag, so command discovery should proceed as soon as the target commands exist.
         return Object.values(this.ctx.obsidianCommands.commands).some((command) => {
             const commandId = (command as { id?: unknown }).id;
-            return typeof commandId === "string" && this.ctx.getCommandPluginId(commandId) === pluginId;
+            return typeof commandId === "string" && this.ctx.getCommandPluginId(commandId) === pluginId && !this.isWrapperCommand(commandId);
         });
     }
 

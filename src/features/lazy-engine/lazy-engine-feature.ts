@@ -12,6 +12,7 @@ import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
 import { patchPluginLoad } from "src/patches/plugin-load";
+import { patchPluginInitialization } from "src/patches/plugin-initialization";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchPluginRegisterView } from "src/patches/view-registry";
 import { patchSetViewState } from "src/patches/view-state";
@@ -46,6 +47,7 @@ export class LazyEngineFeature implements AppFeature {
 
         // 3. Patches and Subscriptions
         ctx.register(patchPluginLoad(ctx.obsidianPlugins));
+        ctx.register(patchPluginInitialization());
         patchSetViewState({
             register: (unload) => this.ctx.register(unload),
             onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
@@ -124,13 +126,17 @@ export class LazyEngineFeature implements AppFeature {
         }
 
         if (mode === PLUGIN_MODE.LAZY) {
-            await this.commandCache.ensureCommandsCached(pluginId);
-            // Caching commands may have just loaded the plugin. enablePlugin does not add it
-            // to enabledPlugins, so check the loaded state or it would keep running this session.
-            if (isPluginLoaded(this.ctx.app, pluginId)) {
-                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+            try {
+                await this.commandCache.ensureCommandsCached(pluginId);
+            } finally {
+                // Caching commands may have just loaded the plugin, even if its initialization failed.
+                // enablePlugin does not add it to enabledPlugins, so check the loaded state or it
+                // would keep running this session.
+                if (isPluginLoaded(this.ctx.app, pluginId)) {
+                    await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+                }
+                this.commandCache.registerCachedCommandsForPlugin(pluginId);
             }
-            this.commandCache.registerCachedCommandsForPlugin(pluginId);
             return;
         }
 
