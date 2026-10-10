@@ -3,8 +3,9 @@ import { PLUGIN_MODE, PluginModes } from "src/core/types";
 
 export interface PluginRowMenuOptions {
     getMode: () => PLUGIN_MODE;
+    isEnabled: () => boolean;
     onOpenDetails: () => void;
-    onOpenCommunityPage: () => void;
+    onShowInCommunityPlugins: () => void;
     onRevealInExplorer: () => void;
     onToggleEnabled: (enabled: boolean) => void;
     onSelectMode: (mode: PLUGIN_MODE) => void;
@@ -18,29 +19,34 @@ const MODE_ORDER: PLUGIN_MODE[] = [PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.LAZY
  * rebuild the list (which would reset scroll and break infinite scroll).
  */
 export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions): void {
-    // Label the staged in-memory change so users know it is not persisted immediately.
-    const isDisabled = options.getMode() === PLUGIN_MODE.ALWAYS_DISABLED;
+    // Both states stay visible like the Mode section. These change only the runtime
+    // state (enablePlugin/disablePlugin), so the saved mode and the staged draft are untouched.
+    const isEnabled = options.isEnabled();
+    menu.addItem((item) => item.setTitle("Status (in memory only)").setDisabled(true));
     menu.addItem((item) =>
         item
-            .setTitle(isDisabled ? "Enable plugin (in memory only)" : "Disable plugin (in memory only)")
-            .setIcon(isDisabled ? "toggle-right" : "toggle-left")
-            .onClick(() => options.onToggleEnabled(!isDisabled)),
+            .setTitle("Enabled")
+            .setChecked(isEnabled)
+            .onClick(() => {
+                if (!isEnabled) options.onToggleEnabled(true);
+            }),
+    );
+    menu.addItem((item) =>
+        item
+            .setTitle("Disabled")
+            .setChecked(!isEnabled)
+            .onClick(() => {
+                if (isEnabled) options.onToggleEnabled(false);
+            }),
     );
 
     menu.addSeparator();
 
     menu.addItem((item) =>
         item
-            .setTitle("Open details")
+            .setTitle("Lazy settings")
             .setIcon("gear")
             .onClick(() => options.onOpenDetails()),
-    );
-
-    menu.addItem((item) =>
-        item
-            .setTitle("Open community page")
-            .setIcon("globe")
-            .onClick(() => options.onOpenCommunityPage()),
     );
 
     menu.addItem((item) =>
@@ -48,6 +54,14 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
             .setTitle("Show in system explorer")
             .setIcon("folder-open")
             .onClick(() => options.onRevealInExplorer()),
+    );
+
+    // Replace the external community page action with navigation to Obsidian's built-in tab.
+    menu.addItem((item) =>
+        item
+            .setTitle("Show in community plugins")
+            .setIcon("list")
+            .onClick(() => options.onShowInCommunityPlugins()),
     );
 
     menu.addSeparator();
