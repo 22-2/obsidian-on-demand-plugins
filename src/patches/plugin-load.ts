@@ -1,8 +1,11 @@
 import type { Plugins } from "@obsidian-typings/obsidian-public-latest";
 import { around } from "monkey-around";
 
-/** Share in-flight loads with CLI reloads and other callers of Obsidian's loader. */
-export function patchPluginLoad(plugins: Plugins): () => void {
+/**
+ * Share in-flight loads with CLI reloads and other callers of Obsidian's loader,
+ * and report every settled load or unload so UI can follow the runtime state.
+ */
+export function patchPluginLoad(plugins: Plugins, onLoadStateChange: (pluginId: string) => void): () => void {
     const pending = new Map<string, ReturnType<Plugins["loadPlugin"]>>();
 
     return around(plugins, {
@@ -18,9 +21,17 @@ export function patchPluginLoad(plugins: Plugins): () => void {
                 // loader, since the lazy runner's mutex cannot cover external calls.
                 const loading = Promise.resolve()
                     .then(() => next.apply(this, args))
-                    .finally(() => pending.delete(pluginId));
+                    .finally(() => {
+                        pending.delete(pluginId);
+                        onLoadStateChange(pluginId);
+                    });
                 pending.set(pluginId, loading);
                 return loading;
+            },
+        unloadPlugin: (next) =>
+            function (this: Plugins, ...args: Parameters<Plugins["unloadPlugin"]>) {
+                const [pluginId] = args;
+                return next.apply(this, args).finally(() => onLoadStateChange(pluginId));
             },
     });
 }

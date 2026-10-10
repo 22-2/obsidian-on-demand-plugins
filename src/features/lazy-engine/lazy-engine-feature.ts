@@ -1,5 +1,6 @@
 import type { WorkspaceLeaf } from "obsidian";
 import PQueue from "p-queue";
+import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";
 import type { FeatureManager } from "src/core/feature-manager";
@@ -46,7 +47,7 @@ export class LazyEngineFeature implements AppFeature {
         this.fileLoader = new FileLazyLoader(ctx, this.lazyRunner, { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") });
 
         // 3. Patches and Subscriptions
-        ctx.register(patchPluginLoad(ctx.obsidianPlugins));
+        ctx.register(patchPluginLoad(ctx.obsidianPlugins, (pluginId) => ctx.app.workspace.trigger(PLUGIN_LOAD_STATE_CHANGED_EVENT, pluginId)));
         ctx.register(patchPluginInitialization());
         patchSetViewState({
             register: (unload) => this.ctx.register(unload),

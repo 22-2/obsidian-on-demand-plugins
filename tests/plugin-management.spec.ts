@@ -168,3 +168,31 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
     await pluginsHeading.locator(".clickable-icon").click();
     await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded");
 });
+
+// Run with one worker (see the test:e2e script): sensitive to parallel Obsidian instances.
+test("plugin management follows loads made outside the page without a refresh", { tag: "@serial" }, async ({ obsidian }) => {
+    if (!ensureBuilt()) return;
+
+    await obsidian.waitReady();
+    await obsidian.page.evaluate(async (pluginId) => {
+        const plugin = app.plugins.plugins["on-demand-plugins"] as typeof app.plugins.plugins[string] & {
+            updatePluginSettings: (id: string, mode: "lazy") => Promise<void>;
+        };
+        await plugin.updatePluginSettings(pluginId, "lazy");
+        await app.plugins.disablePlugin(pluginId);
+    }, targetPluginId);
+
+    const settingsPage = await openPluginManagement(obsidian.page);
+    await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
+    const badge = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" }).locator(".lazy-plugin-enabled-badge");
+    await expect(badge).not.toHaveClass(/is-loaded/);
+
+    // A lazy trigger loads through Obsidian's loader, not through this page.
+    await obsidian.page.evaluate(async (pluginId) => {
+        await app.plugins.loadPlugin(pluginId);
+    }, targetPluginId);
+    await expect(badge).toHaveClass(/is-loaded/);
+
+    await obsidian.page.evaluate((pluginId) => app.plugins.unloadPlugin(pluginId), targetPluginId);
+    await expect(badge).not.toHaveClass(/is-loaded/);
+});

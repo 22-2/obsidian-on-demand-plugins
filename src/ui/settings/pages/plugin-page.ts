@@ -1,6 +1,7 @@
 import log from "loglevel";
-import type { App, PluginManifest } from "obsidian";
+import type { App, EventRef, PluginManifest } from "obsidian";
 import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage } from "obsidian";
+import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
@@ -23,6 +24,7 @@ export class PluginPage extends SettingPage {
     private loadedCount = 0;
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
+    private loadStateRef?: EventRef;
     constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.app = app;
@@ -31,6 +33,7 @@ export class PluginPage extends SettingPage {
     }
     display() {
         this.disconnectInfiniteScroll();
+        this.watchPluginLoadState();
         // Plugin installations can happen while the settings modal is open.
         // Refresh the registry whenever this page is entered so the count and
         // list reflect the current Obsidian plugin manifests.
@@ -85,6 +88,7 @@ export class PluginPage extends SettingPage {
     }
     hide() {
         this.disconnectInfiniteScroll();
+        this.unwatchPluginLoadState();
         this.communityPluginReadId++;
         super.hide();
     }
@@ -247,6 +251,21 @@ export class PluginPage extends SettingPage {
             this.savedCommunityPluginIds = new Set(parsed);
         }
         this.updateVisibleEnabledBadges();
+    }
+    /**
+     * Lazy loads (commands, views, files) and toggles from elsewhere happen
+     * outside this page, so follow them while the page is shown to keep the
+     * Enabled badges in sync without re-rendering the list.
+     */
+    private watchPluginLoadState() {
+        this.unwatchPluginLoadState();
+        // @ts-expect-error - Custom workspace event
+        this.loadStateRef = this.app.workspace.on(PLUGIN_LOAD_STATE_CHANGED_EVENT, () => this.updateVisibleEnabledBadges());
+    }
+    private unwatchPluginLoadState() {
+        if (!this.loadStateRef) return;
+        this.app.workspace.offref(this.loadStateRef);
+        this.loadStateRef = undefined;
     }
     private updateVisibleEnabledBadges() {
         this.containerEl.querySelectorAll<HTMLElement>(".lazy-plugin-enabled-badge").forEach((badge) => {
