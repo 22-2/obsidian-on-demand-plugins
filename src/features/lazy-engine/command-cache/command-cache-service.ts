@@ -219,12 +219,8 @@ export class CommandCacheService {
     }
 
     removeCommandWrapper(commandId: string): void {
-        const commands = this.ctx.obsidianCommands as unknown as {
-            removeCommand?: (id: string) => void;
-            commands?: Record<string, unknown>;
-        };
         const wrapper = this.wrapperCommands.get(commandId);
-        const existing = commands.commands?.[commandId];
+        const existing = this.ctx.obsidianCommands.commands[commandId];
 
         if (wrapper && existing !== wrapper) {
             this.registeredWrappers.delete(commandId);
@@ -233,11 +229,7 @@ export class CommandCacheService {
         }
 
         if (wrapper && existing === wrapper) {
-            if (typeof commands.removeCommand === "function") {
-                commands.removeCommand(commandId);
-            } else if (commands.commands?.[commandId]) {
-                delete commands.commands[commandId];
-            }
+            this.ctx.obsidianCommands.removeCommand(commandId);
         }
 
         this.registeredWrappers.delete(commandId);

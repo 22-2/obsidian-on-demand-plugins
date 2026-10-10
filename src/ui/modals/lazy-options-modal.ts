@@ -61,7 +61,7 @@ export class LazyOptionsModal extends Modal {
             .addButton((btn) =>
                 btn
                     .setButtonText("Reload this plugin cache")
-                    .setWarning()
+                    .setDestructive()
                     .onClick(() => {
                         void (async () => {
                             btn.setDisabled(true);
