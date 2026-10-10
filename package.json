@@ -7,7 +7,7 @@
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "typecheck": "tsc6 -noEmit -skipLibCheck",
-        "test:e2e": "playwright test",
+        "test:e2e": "playwright test --grep-invert @serial && playwright test --grep @serial --workers=1",
         "test:e2e:headed": "playwright test --headed",
         "test:e2e:install-browsers": "playwright install --with-deps",
         "build": "pnpm run typecheck && pnpm run build:nocheck",
@@ -52,7 +52,7 @@
         "jsonc-parser": "^3.3.1",
         "moment": "^2.31.0",
         "obsidian": "^1.13.1",
-        "obsidian-e2e-toolkit": "https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.2.3/obsidian-e2e-toolkit-1.2.3.tgz",
+        "obsidian-e2e-toolkit": "https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.0/obsidian-e2e-toolkit-1.4.0.tgz",
         "playwright": "^1.63.0",
         "prettier": "^3.9.9",
         "release-it": "^21.1.0",

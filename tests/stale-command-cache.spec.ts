@@ -25,17 +25,9 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
 
     // 0. Pre-load the target plugin to verify it can load in this environment.
     //    If it cannot, the subsequent assertions about real commands are meaningless.
-    await obsidian.page.evaluate(async (id) => {
-        await app.plugins.enablePlugin(id);
-    }, targetPluginId);
-    const canLoad = await obsidian.page.evaluate(
-        (id) => Boolean((app.plugins.plugins as Record<string, { _loaded?: boolean } | undefined>)[id]?._loaded),
-        targetPluginId,
-    );
-    expect(canLoad).toBe(true);
-    await obsidian.page.evaluate(async (id) => {
-        await app.plugins.disablePlugin(id);
-    }, targetPluginId);
+    await obsidian.evaluateApp((id) => app.plugins.enablePlugin(id), targetPluginId);
+    expect((await obsidian.pluginState(targetPluginId)).loaded).toBe(true);
+    await obsidian.evaluateApp((id) => app.plugins.disablePlugin(id), targetPluginId);
 
     // 1. Configure the target plugin as lazy so wrappers are managed for it.
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
@@ -63,12 +55,9 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
     );
 
     // 3. Reload the on-demand plugin so its startup path runs against the stale cache.
-    await obsidian.page.evaluate(async (id) => {
-        await app.plugins.disablePlugin(id);
-        await app.plugins.enablePlugin(id);
-    }, pluginUnderTestId);
+    await obsidian.reloadPlugin(pluginUnderTestId);
 
-    // The old handle points at the unloaded plugin instance; re-acquire it.
+    // reloadPlugin refreshes the handle to the new plugin instance.
     const reloadedHandle = await obsidian.plugin(pluginUnderTestId);
 
     // Introspects the lazy engine so CI failures show which stage broke:

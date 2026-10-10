@@ -257,7 +257,9 @@ async function setupExternalPlugin(pluginId, sourceValue, baseDir) {
         // Run build steps if package.json is present
         if (await fileExists(pkgPath)) {
             console.log(`[global-setup] installing/building plugin: ${pluginId}`);
-            await runCommand("pnpm", ["install", "--silent"], dest, `pnpm install (${pluginId})`);
+            // Reason: myfiles lives inside this repo's pnpm workspace, so without --ignore-workspace
+            // pnpm would install into (and prune) the root node_modules instead of the plugin's.
+            await runCommand("pnpm", ["install", "--ignore-workspace", "--silent"], dest, `pnpm install (${pluginId})`);
             await runCommand("pnpm", ["run", "build", "--silent"], dest, `pnpm build (${pluginId})`);
         }
 

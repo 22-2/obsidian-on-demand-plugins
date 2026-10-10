@@ -113,10 +113,7 @@ test("saved profiles survive a data.json-only replacement and reject stale write
     await copyFile(transferredDataPath, dataPath);
     expect(await pathExists(profilesPath)).toBe(false);
 
-    await obsidian.page.evaluate(async (pluginId) => {
-        await app.plugins.disablePlugin(pluginId);
-        await app.plugins.enablePlugin(pluginId);
-    }, pluginUnderTestId);
+    await obsidian.reloadPlugin(pluginUnderTestId);
 
     const readLoadedSettings = async () =>
         obsidian.page.evaluate((pluginId) => {
@@ -164,10 +161,7 @@ test("saved profiles survive a data.json-only replacement and reject stale write
     expect(staleSave.message).toContain("Settings changed on disk after this plugin loaded");
     expect(await readFile(dataPath, "utf8")).toBe(receivedRaw);
 
-    await obsidian.page.evaluate(async (pluginId) => {
-        await app.plugins.disablePlugin(pluginId);
-        await app.plugins.enablePlugin(pluginId);
-    }, pluginUnderTestId);
+    await obsidian.reloadPlugin(pluginUnderTestId);
 
     const afterReload = await readLoadedSettings();
     expect(afterReload.profileIds).toEqual([profileIds.desktopId, profileIds.mobileId].sort());
