@@ -88,8 +88,8 @@ describe("CommandCacheService", () => {
             expect(result[0].pluginId).toBe("test-plugin");
         });
 
-        it("should skip enabling if plugin is already enabled", async () => {
-            mockCtx.obsidianPlugins.enabledPlugins.add("test-plugin");
+        it("should skip enabling if plugin is already loaded", async () => {
+            // A lazily loaded plugin runs without being in enabledPlugins.
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
 
             await service.getCommandsForPlugin("test-plugin");
@@ -176,6 +176,15 @@ describe("CommandCacheService", () => {
     });
 
     describe("syncCommandWrappersForPlugin", () => {
+        beforeEach(() => {
+            // Wrappers are synced only from a cache stored for the current plugin version.
+            vi.mocked(storageMs.loadLocalStorage).mockImplementation((_app, key) => {
+                if (key === "commandCache") return { "test-plugin": [{ id: "cmd1", name: "Cmd 1" }] };
+                if (key === "commandCacheVersions") return { "test-plugin": "1.0.0" };
+                return null;
+            });
+        });
+
         it("should register wrapper if missing from obsidian commands", async () => {
             mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
             mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
@@ -223,6 +232,40 @@ describe("CommandCacheService", () => {
 
             expect(onProgress).toHaveBeenCalledTimes(1);
             expect(storageMs.saveLocalStorage).toHaveBeenCalled();
+        });
+
+        it("should unload a plugin that was loaded only to snapshot its commands", async () => {
+            vi.mocked(utilsMs.isLazyMode).mockReturnValue(true);
+            mockCtx.getPluginMode.mockReturnValue("lazy");
+            let loaded = false;
+            vi.mocked(utilsMs.isPluginLoaded).mockImplementation(() => loaded);
+            mockCtx.getCommandPluginId.mockImplementation((id: string) => (id === "cmd1" ? "test-plugin" : "other"));
+            mockCtx.obsidianPlugins.enablePlugin.mockImplementation(() => {
+                loaded = true;
+                mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
+            });
+            mockCtx.obsidianPlugins.disablePlugin.mockImplementation(() => {
+                loaded = false;
+            });
+
+            await service.refreshCommandCache(undefined, true);
+
+            expect(mockCtx.obsidianPlugins.enablePlugin).toHaveBeenCalledWith("test-plugin");
+            expect(mockCtx.obsidianPlugins.disablePlugin).toHaveBeenCalledWith("test-plugin");
+            // The snapshot is stored before unloading so the disable hook can restore wrappers.
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCache", { "test-plugin": [{ id: "cmd1", name: "Cmd 1", icon: undefined }] });
+        });
+
+        it("should keep a plugin running if it was already loaded", async () => {
+            vi.mocked(utilsMs.isLazyMode).mockReturnValue(true);
+            mockCtx.getPluginMode.mockReturnValue("lazy");
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
+            mockCtx.getCommandPluginId.mockImplementation((id: string) => (id === "cmd1" ? "test-plugin" : "other"));
+
+            await service.refreshCommandCache(undefined, true);
+
+            expect(mockCtx.obsidianPlugins.disablePlugin).not.toHaveBeenCalled();
         });
     });
 
@@ -282,6 +325,16 @@ describe("CommandCacheService", () => {
             mockCtx.getPluginMode.mockReturnValue("lazy");
         });
 
+        it("syncCommandWrappersForPlugin does not resurrect wrappers from a stale cache", () => {
+            // The enable hook calls this while a stale cache is being refreshed (issue #6).
+            seedStorage("0.9.0");
+            service.loadFromData();
+
+            service.syncCommandWrappersForPlugin("test-plugin");
+
+            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
+        });
+
         it("registerCachedCommands skips wrappers when the cached version mismatches", () => {
             seedStorage("0.9.0");
             service.loadFromData();
@@ -319,13 +372,16 @@ describe("CommandCacheService", () => {
             seedStorage("0.9.0");
             service.loadFromData();
 
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+            let loaded = false;
+            vi.mocked(utilsMs.isPluginLoaded).mockImplementation(() => loaded);
             mockCtx.getCommandPluginId.mockImplementation((id: string) => (id === "new-cmd" ? "test-plugin" : "other"));
             // The plugin update renamed old-cmd → new-cmd; enabling registers only the new ID.
             mockCtx.obsidianPlugins.enablePlugin.mockImplementation(() => {
+                loaded = true;
                 mockCtx.obsidianCommands.commands = { "new-cmd": { id: "new-cmd", name: "New Cmd" } };
             });
             mockCtx.obsidianPlugins.disablePlugin.mockImplementation(() => {
+                loaded = false;
                 mockCtx.obsidianCommands.commands = {};
             });
 
@@ -344,11 +400,10 @@ describe("CommandCacheService", () => {
             expect(addedIds).toEqual(["new-cmd"]);
         });
 
-        it("refreshStaleCacheForPlugin keeps the plugin enabled if it was enabled beforehand", async () => {
+        it("refreshStaleCacheForPlugin keeps the plugin running if it was loaded beforehand", async () => {
             seedStorage("0.9.0");
             service.loadFromData();
 
-            mockCtx.obsidianPlugins.enabledPlugins.add("test-plugin");
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
             mockCtx.obsidianCommands.commands = { "new-cmd": { id: "new-cmd", name: "New Cmd" } };
             mockCtx.getCommandPluginId.mockImplementation((id: string) => (id === "new-cmd" ? "test-plugin" : "other"));
@@ -362,9 +417,10 @@ describe("CommandCacheService", () => {
             seedStorage("0.9.0");
             service.loadFromData();
 
-            // 1st: isPluginReadyForCommandSnapshot → true (skip waitForPluginLoaded).
-            // 2nd: pluginLoaded check → false (plugin not actually loaded).
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValueOnce(true).mockReturnValueOnce(false);
+            // 1st: wasLoaded → false. 2nd: already-running check → false (enable is attempted).
+            // 3rd: isPluginReadyForCommandSnapshot → true (skip the readiness wait).
+            // 4th: pluginLoaded check → false (plugin not actually loaded).
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValueOnce(false).mockReturnValueOnce(false).mockReturnValueOnce(true).mockReturnValueOnce(false);
             mockCtx.getCommandPluginId.mockReturnValue("other");
 
             await service.refreshStaleCacheForPlugin("test-plugin");
