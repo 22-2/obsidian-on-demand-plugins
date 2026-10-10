@@ -27,6 +27,8 @@ concurrency:
 jobs:
     e2e:
         runs-on: ${{ matrix.os }}
+        # A normal run takes about 5 minutes. Cap hung runs instead of waiting for the 6 hour default.
+        timeout-minutes: 20
         strategy:
             # Let each OS finish so one platform's failure doesn't hide the other's result.
             fail-fast: false
