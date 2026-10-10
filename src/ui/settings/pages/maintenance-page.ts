@@ -26,7 +26,7 @@ export class MaintenancePage extends SettingPage {
         new Setting(this.containerEl).setName("Force rebuild command cache").addButton((b) =>
             b
                 .setButtonText("Rebuild cache")
-                .setWarning()
+                .setDestructive()
                 .onClick(async () => {
                     if (!f) return;
                     b.setDisabled(true);
@@ -85,7 +85,7 @@ export class MaintenancePage extends SettingPage {
             .addButton((b) =>
                 b
                     .setButtonText("Replace all")
-                    .setWarning()
+                    .setDestructive()
                     .onClick(() => {
                         if (!f || this.from === this.to) return;
                         this.plugin.updateManifests();

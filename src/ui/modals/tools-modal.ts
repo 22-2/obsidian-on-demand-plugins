@@ -97,7 +97,7 @@ export class ToolsModal extends Modal {
             .addButton((btn) =>
                 btn
                     .setButtonText("Rebuild cache")
-                    .setWarning()
+                    .setDestructive()
                     .onClick(() => {
                         void (async () => {
                             btn.setDisabled(true);
@@ -220,12 +220,12 @@ export class ToolsModal extends Modal {
                     }
 
                     if (btn.buttonEl.innerText === "Replace all") {
-                        btn.setButtonText("Click to confirm").setWarning();
+                        btn.setButtonText("Click to confirm").setDestructive();
                         // Use window timers so confirm flow remains consistent in popout windows.
                         if (this.confirmTimeout) window.clearTimeout(this.confirmTimeout);
                         this.confirmTimeout = window.setTimeout(() => {
                             btn.setButtonText("Replace all");
-                            btn.buttonEl.removeClass("mod-warning");
+                            btn.removeDestructive();
                         }, 3000);
                         return;
                     }
@@ -245,7 +245,7 @@ export class ToolsModal extends Modal {
                     }
 
                     btn.setButtonText("Replace all");
-                    btn.buttonEl.removeClass("mod-warning");
+                    btn.removeDestructive();
                 }),
         );
     }
