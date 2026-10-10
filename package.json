@@ -52,7 +52,7 @@
         "jsonc-parser": "^3.3.1",
         "moment": "^2.31.0",
         "obsidian": "^1.13.1",
-        "obsidian-e2e-toolkit": "https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.0/obsidian-e2e-toolkit-1.4.0.tgz",
+        "obsidian-e2e-toolkit": "https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.1/obsidian-e2e-toolkit-1.4.1.tgz",
         "playwright": "^1.63.0",
         "prettier": "^3.9.9",
         "release-it": "^21.1.0",

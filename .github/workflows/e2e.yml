@@ -43,9 +43,9 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v6
 
-            # The toolkit reuses cached release metadata when asked for "latest", so a restored
-            # cache would pin CI to whichever release was cached first. Resolve a concrete
-            # version here so both the cache key and the toolkit follow new releases.
+            # The toolkit re-resolves "latest" on its own, but actions/cache never overwrites an
+            # existing key: a fixed "latest" key would restore stale assets and re-download the
+            # new release on every run. Resolve a concrete version so the cache key follows releases.
             - name: Resolve Obsidian version
               env:
                   REQUESTED_VERSION: ${{ github.event.inputs.obsidian_version }}
