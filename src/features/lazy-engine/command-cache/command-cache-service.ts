@@ -45,44 +45,12 @@ export class CommandCacheService {
     // Cache refresh
     // ---------------------------------------------------------------------------
 
-    async refreshCommandCache(pluginIds?: string[], force = false, onProgress?: (current: number, total: number, plugin: PluginManifest) => void): Promise<void> {
-        let lazyManifests = this.getLazyManifests();
-        if (pluginIds?.length) {
-            lazyManifests = lazyManifests.filter((p) => pluginIds.includes(p.id));
-        }
-
-        const pluginsToRefresh = force ? lazyManifests : lazyManifests.filter((p) => !this.store.isValid(p.id));
-
-        for (const plugin of pluginsToRefresh) {
-            const current = lazyManifests.indexOf(plugin) + 1;
-            await this.refreshCommandsRestoringLoadState(plugin.id);
-            onProgress?.(current, lazyManifests.length, plugin);
-        }
-    }
-
     async refreshCommandsForPlugin(pluginId: string): Promise<boolean> {
         const commands = await this.getCommandsForPlugin(pluginId);
         // An empty snapshot is valid too, but a failed load must preserve the stale cache.
         if (!commands.length && !isPluginLoaded(this.ctx.app, pluginId)) return false;
         this.store.set(pluginId, commands);
         return true;
-    }
-
-    /**
-     * Snapshot a plugin's commands, then unload it again if it was loaded only for the snapshot,
-     * so a cache rebuild does not leave lazy plugins running for the rest of the session.
-     */
-    private async refreshCommandsRestoringLoadState(pluginId: string): Promise<void> {
-        const wasLoaded = isPluginLoaded(this.ctx.app, pluginId);
-        try {
-            // Persist before unloading: the disable hook re-registers wrappers only from a
-            // cache that is stored for the current plugin version.
-            if (await this.refreshCommandsForPlugin(pluginId)) this.store.persist();
-        } finally {
-            if (!wasLoaded && isPluginLoaded(this.ctx.app, pluginId)) {
-                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
-            }
-        }
     }
 
     async getCommandsForPlugin(pluginId: string): Promise<CachedCommand[]> {
@@ -118,11 +86,14 @@ export class CommandCacheService {
         const cachedIds = this.store.getIds(pluginId);
         const hadWrappers = cachedIds ? Array.from(cachedIds).some((commandId) => this.isWrapperCommand(commandId)) : false;
 
-        await this.snapshotCommandsForPlugin(pluginId);
-        this.persistCache();
-
-        if (hadWrappers) {
-            this.registerCachedCommandsForPlugin(pluginId);
+        try {
+            await this.snapshotCommandsForPlugin(pluginId);
+            this.persistCache();
+        } finally {
+            // The snapshot removes wrappers first; restore them from the previous cache on failure.
+            if (hadWrappers) {
+                this.registerCachedCommandsForPlugin(pluginId);
+            }
         }
     }
 
