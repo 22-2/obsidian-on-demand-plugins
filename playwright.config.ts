@@ -15,6 +15,9 @@ export default defineConfig({
     // Each test launches its own Obsidian instance with an isolated vault, so run two in parallel everywhere.
     workers: 2,
 
+    // On CI, retry up to 3 times: Windows workers have exited unexpectedly between tests (exit code 3221226505) with no assertion failure.
+    retries: process.env.CI ? 3 : 0,
+
     reporter: [["list"], ["html", { open: "never" }]],
 
     use: {
