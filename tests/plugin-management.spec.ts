@@ -172,6 +172,8 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
     await obsidian.page.evaluate(async (pluginId) => {
         const savedPluginIds = await app.vault.readConfigJson("community-plugins");
         const savedIds = Array.isArray(savedPluginIds) ? savedPluginIds.filter((id): id is string => typeof id === "string") : [];
+        // Add to the in-memory set too; a pending debounced save would otherwise overwrite this file write without the id.
+        app.plugins.enabledPlugins.add(pluginId);
         await app.vault.writeConfigJson("community-plugins", [...new Set([...savedIds, pluginId])]);
     }, targetPluginId);
     await pluginsHeading.locator(".clickable-icon").click();
