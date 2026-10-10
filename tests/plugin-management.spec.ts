@@ -90,7 +90,8 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     expect(await page.evaluate(() => (app.commands as unknown as { __requestedReload?: boolean }).__requestedReload)).toBe(true);
 });
 
-test("plugin actions reveal the installed plugin in Obsidian's Community plugins tab", async ({ obsidian }) => {
+// Run with one worker (see the test:e2e script): these two are sensitive to parallel Obsidian instances.
+test("plugin actions reveal the installed plugin in Obsidian's Community plugins tab", { tag: "@serial" }, async ({ obsidian }) => {
     if (!ensureBuilt()) return;
     test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
     await obsidian.waitReady();
@@ -121,7 +122,8 @@ test("plugin actions reveal the installed plugin in Obsidian's Community plugins
     await expect.poll(() => destination.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
 });
 
-test("plugin management refresh updates the live loaded badge", async ({ obsidian }) => {
+// Run with one worker (see the test:e2e script): these two are sensitive to parallel Obsidian instances.
+test("plugin management refresh updates the live loaded badge", { tag: "@serial" }, async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
