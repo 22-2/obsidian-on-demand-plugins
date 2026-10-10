@@ -239,16 +239,12 @@ export class PluginPage extends SettingPage {
         let parsed: unknown;
         try {
             parsed = await this.app.vault.readConfigJson("community-plugins");
-        } catch (error) {
-            // Diagnostic: a failed read leaves the saved set unknown, so badges fall back to "Loaded".
-            logger.warn("Failed to read community-plugins.json for the plugin list", error);
+        } catch {
             parsed = undefined;
         }
         if (readId !== this.communityPluginReadId) return;
         if (Array.isArray(parsed) && parsed.every((id): id is string => typeof id === "string")) {
             this.savedCommunityPluginIds = new Set(parsed);
-        } else {
-            logger.warn("community-plugins.json is not a string array", parsed);
         }
         this.updateVisibleEnabledBadges();
     }

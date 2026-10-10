@@ -156,18 +156,7 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
 
     const pluginsHeading = settingsPage.locator(".setting-item-heading").filter({ hasText: "Plugins" });
     await pluginsHeading.locator(".clickable-icon").click();
-    try {
-        await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
-    } catch (error) {
-        // Diagnostic: capture the saved list and live state at the moment the badge is wrong.
-        const diagnostics = await obsidian.page.evaluate(async (pluginId) => ({
-            saved: await app.vault.readConfigJson("community-plugins").catch((readError: unknown) => `read failed: ${String(readError)}`),
-            enabledInMemory: [...app.plugins.enabledPlugins],
-            pluginLoaded: Boolean(app.plugins.plugins[pluginId]?._loaded),
-        }), targetPluginId);
-        console.log(`[diag live-badge] ${JSON.stringify(diagnostics)}`);
-        throw error;
-    }
+    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
 
     await obsidian.page.evaluate(async (pluginId) => {
         const savedPluginIds = await app.vault.readConfigJson("community-plugins");
