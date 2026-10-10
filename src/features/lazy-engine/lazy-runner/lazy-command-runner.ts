@@ -47,6 +47,10 @@ export class LazyCommandRunner implements PluginLoader {
     }
 
     async runLazyCommand(commandId: string) {
+        // Read before the first await: the wrapper is invoked synchronously from the palette or
+        // a hotkey, so lastEvent is still the triggering event. Loading the plugin can take long
+        // enough for later input to replace it.
+        const triggerEvent = this.ctx.app.lastEvent;
         const cached = this.commandRegistry.getCachedCommand(commandId);
         if (!cached) {
             new Notice(`Command cache miss for "${commandId}". Please try rebuilding the cache from the Open tools button in settings.`);
@@ -69,7 +73,7 @@ export class LazyCommandRunner implements PluginLoader {
 
             await new Promise<void>((resolve) => {
                 queueMicrotask(() => {
-                    this.commandExecutor.executeCommandDirect(cached.id);
+                    this.commandExecutor.executeCommand(cached.id, triggerEvent);
                     resolve();
                 });
             });
