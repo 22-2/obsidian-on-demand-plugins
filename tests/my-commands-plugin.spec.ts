@@ -5,7 +5,7 @@ import {
     pluginUnderTestId,
     readOnDemandStorageValue,
     useOnDemandPluginsWithTargets,
-    waitForPluginDisabled,
+    waitForPluginUnloaded,
 } from "./test-utils";
 
 const myCommandsPluginId = "my-commands-plugin";
@@ -46,7 +46,7 @@ test("my-commands duplicate-current-tab is cached and restored as a lazy wrapper
 
     await configureMyCommandsPluginAsLazy(obsidian);
 
-    expect(await waitForPluginDisabled(obsidian, myCommandsPluginId, 15_000)).toBe(true);
+    expect(await waitForPluginUnloaded(obsidian, myCommandsPluginId, 15_000)).toBe(true);
 
     const cachedCommands = await readOnDemandStorageValue(obsidian, "commandCache", myCommandsPluginId);
 
@@ -99,7 +99,7 @@ test("my-commands plugin can be manually re-enabled after lazy rebuild", async (
 
     await configureMyCommandsPluginAsLazy(obsidian);
 
-    expect(await waitForPluginDisabled(obsidian, myCommandsPluginId, 15_000)).toBe(true);
+    expect(await waitForPluginUnloaded(obsidian, myCommandsPluginId, 15_000)).toBe(true);
 
     // This isolates plugin re-enable behavior from wrapper execution so failures here point
     // at the plugin lifecycle itself rather than command replacement.

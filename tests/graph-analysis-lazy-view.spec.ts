@@ -1,6 +1,6 @@
 import { expect, test } from "obsidian-e2e-toolkit";
 import type OnDemandPlugin from "src/main";
-import { ensureBuilt, pluginUnderTestId, useOnDemandPluginsWithTargets, waitForPluginEnabled } from "./test-utils";
+import { ensureBuilt, pluginUnderTestId, useOnDemandPluginsWithTargets, waitForPluginLoaded } from "./test-utils";
 
 /**
  * Regression tests for plugins that register their views AFTER an await in
@@ -142,6 +142,6 @@ test("opening the graph-analysis view lazily loads the plugin", async ({ obsidia
         await leaf.setViewState({ type: viewType, active: true });
     }, graphAnalysisViewType);
 
-    const enabled = await waitForPluginEnabled(obsidian, graphAnalysisId);
+    const enabled = await waitForPluginLoaded(obsidian, graphAnalysisId);
     expect(enabled).toBe(true);
 });

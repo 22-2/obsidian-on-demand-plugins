@@ -4,8 +4,8 @@ import {
     pluginUnderTestId,
     targetPluginId,
     useOnDemandPlugins,
-    waitForPluginDisabled,
-    waitForPluginEnabled
+    waitForPluginUnloaded,
+    waitForPluginLoaded
 } from "./test-utils";
 
 useOnDemandPlugins();
@@ -41,18 +41,18 @@ test("disabling a lazyOnLayoutReady plugin should not re-enable it", async ({ ob
 
     // 2. Enable the plugin (simulating that onLayoutReady loaded it)
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    expect(await waitForPluginEnabled(obsidian, targetPluginId)).toBe(true);
+    expect(await waitForPluginLoaded(obsidian, targetPluginId)).toBe(true);
 
     // 3. User manually disables the plugin
     await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // Wait for disable to complete
-    const disabled = await waitForPluginDisabled(obsidian, targetPluginId);
+    const disabled = await waitForPluginUnloaded(obsidian, targetPluginId);
     expect(disabled).toBe(true);
 
     // 4. Wait a bit and verify the plugin stays disabled (the bug would re-enable it)
     await new Promise((r) => setTimeout(r, 3000));
-    const stillDisabled = !(await obsidian.isPluginEnabled(targetPluginId));
+    const stillDisabled = !(await obsidian.isPluginLoaded(targetPluginId));
     expect(stillDisabled).toBe(true);
 });
 
@@ -77,7 +77,7 @@ test("disabling a lazyOnLayoutReady plugin preserves its lazy mode", async ({ ob
 
     // 2. Enable the plugin first
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    await waitForPluginEnabled(obsidian, targetPluginId);
+    await waitForPluginLoaded(obsidian, targetPluginId);
 
     // 3. Disable the plugin — with the Observe & Sync strategy,
     //    lazyOnLayoutReady mode is left untouched (no settings sync)
@@ -89,12 +89,12 @@ test("disabling a lazyOnLayoutReady plugin preserves its lazy mode", async ({ ob
     await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // Wait for disable to take effect
-    await waitForPluginDisabled(obsidian, targetPluginId);
+    await waitForPluginUnloaded(obsidian, targetPluginId);
 
     // 4. Verify plugin remains disabled after a delay
     await new Promise((r) => setTimeout(r, 3000));
-    const isEnabled = await obsidian.isPluginEnabled(targetPluginId);
-    expect(isEnabled).toBe(false);
+    const isLoaded = await obsidian.isPluginLoaded(targetPluginId);
+    expect(isLoaded).toBe(false);
 
     // 5. Verify the mode is still lazyOnLayoutReady (not changed to disabled)
     const mode = await pluginHandle.evaluate(async (plugin, pluginId) => {

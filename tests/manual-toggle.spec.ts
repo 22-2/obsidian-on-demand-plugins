@@ -7,8 +7,8 @@ import {
     targetPluginId,
     triggerActiveLeafChange,
     useOnDemandPlugins,
-    waitForPluginDisabled,
-    waitForPluginEnabled
+    waitForPluginUnloaded,
+    waitForPluginLoaded
 } from "./test-utils";
 
 useOnDemandPlugins();
@@ -85,11 +85,11 @@ test("manual enable/disable is stable for lazy (command)", async ({ obsidian }) 
 
     // Try to manually enable plugin (do not fail test immediately if it doesn't become enabled)
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    const enabled = await waitForPluginEnabled(obsidian, targetPluginId, 15_000);
+    const enabled = await waitForPluginLoaded(obsidian, targetPluginId, 15_000);
 
     // Attempt to disable (ensure call completes)
     await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
-    await waitForPluginDisabled(obsidian, targetPluginId);
+    await waitForPluginUnloaded(obsidian, targetPluginId);
 
     // Ensure the test environment is still responsive
     expect(await obsidian.vaultName()).toBeTruthy();
@@ -97,7 +97,7 @@ test("manual enable/disable is stable for lazy (command)", async ({ obsidian }) 
     // If wrapper command exists, invoking it should re-enable the plugin
     if (commandId) {
         await obsidian.page.evaluate((cmd) => app.commands.executeCommandById(cmd), commandId as string);
-        const reenabled = await waitForPluginEnabled(obsidian, targetPluginId, 15_000);
+        const reenabled = await waitForPluginLoaded(obsidian, targetPluginId, 15_000);
         if (reenabled) {
             expect(reenabled).toBe(true);
         }
@@ -132,17 +132,19 @@ test("manual enable/disable is stable for lazy + useView", async ({ obsidian }) 
 
     // Manually enable plugin
     await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
-    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
+    const enabled = await waitForPluginLoaded(obsidian, targetPluginId);
     expect(enabled).toBe(true);
 
     // Manually disable plugin
     await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
-    await waitForPluginDisabled(obsidian, targetPluginId);
-    // If disable didn't complete in this environment, continue — we'll verify load via view trigger below.
+    await waitForPluginUnloaded(obsidian, targetPluginId);
 
     // Trigger view change to cause lazy + useView load
+    expect(await obsidian.isPluginLoaded(targetPluginId)).toBe(false);
+    await obsidian.createNote("lazy-view-trigger.md", "");
+    await obsidian.open("lazy-view-trigger.md");
     await triggerActiveLeafChange(obsidian);
 
-    const loaded = await waitForPluginEnabled(obsidian, targetPluginId);
+    const loaded = await waitForPluginLoaded(obsidian, targetPluginId);
     expect(loaded).toBe(true);
 });

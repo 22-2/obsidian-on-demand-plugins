@@ -20,20 +20,21 @@ test("lineage not loaded when lazy-with-file-only and no matching files", async 
                 mode: "lazy",
                 userConfigured: true,
                 lazyOptions: {
-                    useView: true,
+                    useView: false,
                     viewTypes: [],
                     useFile: true,
                     fileCriteria: { suffixes: ["ginko"] },
                 },
             };
 
-            await plugin.saveSettings();
+            // Apply the mode change so the loaded fixture is unloaded before rebuilding.
+            await plugin.updatePluginSettings("lineage", "lazy");
             await plugin.rebuildAndApplyCommandCache({ force: true });
         } finally {
             app.commands.executeCommandById = original;
         }
     });
 
-    const enabled = await obsidian.isPluginEnabled("lineage");
-    expect(enabled).toBe(false);
+    const loaded = await obsidian.isPluginLoaded("lineage");
+    expect(loaded).toBe(false);
 });

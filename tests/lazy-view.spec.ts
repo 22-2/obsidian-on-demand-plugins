@@ -5,7 +5,7 @@ import {
     targetPluginId,
     triggerActiveLeafChange,
     useOnDemandPlugins,
-    waitForPluginEnabled
+    waitForPluginLoaded
 } from "./test-utils";
 
 useOnDemandPlugins();
@@ -42,9 +42,12 @@ test("lazy mode with useView loads plugin on view activation", async ({ obsidian
 
     expect(result.mode).toBe("lazy");
 
+    expect(await obsidian.isPluginLoaded(targetPluginId)).toBe(false);
+    await obsidian.createNote("lazy-view-trigger.md", "");
+    await obsidian.open("lazy-view-trigger.md");
     await triggerActiveLeafChange(obsidian);
 
-    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
+    const enabled = await waitForPluginLoaded(obsidian, targetPluginId);
 
     expect(enabled).toBe(true);
 });
