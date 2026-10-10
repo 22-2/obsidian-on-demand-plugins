@@ -126,13 +126,17 @@ export class LazyEngineFeature implements AppFeature {
         }
 
         if (mode === PLUGIN_MODE.LAZY) {
-            await this.commandCache.ensureCommandsCached(pluginId);
-            // Caching commands may have just loaded the plugin. enablePlugin does not add it
-            // to enabledPlugins, so check the loaded state or it would keep running this session.
-            if (isPluginLoaded(this.ctx.app, pluginId)) {
-                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+            try {
+                await this.commandCache.ensureCommandsCached(pluginId);
+            } finally {
+                // Caching commands may have just loaded the plugin, even if its initialization failed.
+                // enablePlugin does not add it to enabledPlugins, so check the loaded state or it
+                // would keep running this session.
+                if (isPluginLoaded(this.ctx.app, pluginId)) {
+                    await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+                }
+                this.commandCache.registerCachedCommandsForPlugin(pluginId);
             }
-            this.commandCache.registerCachedCommandsForPlugin(pluginId);
             return;
         }
 

@@ -131,4 +131,26 @@ describe("combined cache rebuild", () => {
         expect(t.reload).not.toHaveBeenCalled();
         expect(t.progress.close).toHaveBeenCalledOnce();
     });
+
+    it("still restarts when applying settings although a plugin fails to initialize", async () => {
+        const t = setup(2);
+        vi.mocked(waitForPluginInitialization).mockImplementation(async (_ctx, id) => {
+            if (id === "plugin-0") throw new Error("failed onload");
+        });
+        await t.feature.applyWithProgress(t.dialog);
+        expect(t.cache.snapshotCommandsForPlugin).toHaveBeenCalledWith("plugin-1");
+        expect(t.cache.persistCache).toHaveBeenCalledOnce();
+        expect(t.plugins.plugins).toEqual({});
+        expect(t.reload).toHaveBeenCalledWith("app:reload");
+    });
+
+    it("re-enables a running plugin when reloading it for view capture fails", async () => {
+        const t = setup(1);
+        t.settings.plugins["plugin-0"].lazyOptions = { useView: true, viewTypes: [], useFile: false, fileCriteria: {} };
+        t.plugins.plugins["plugin-0"] = { _loaded: true };
+        t.plugins.enablePlugin.mockRejectedValueOnce(new Error("failed load"));
+        await expect(t.feature.rebuildWithProgress(t.dialog, true)).rejects.toThrow("Failed to rebuild plugin caches");
+        expect(t.plugins.enablePlugin).toHaveBeenCalledTimes(2);
+        expect(t.plugins.plugins["plugin-0"]).toEqual({ _loaded: true });
+    });
 });

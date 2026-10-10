@@ -7,6 +7,7 @@ import type { PluginContext } from "src/core/plugin-context";
 type InitializationResult = { ok: true } | { ok: false; error: unknown };
 const initializations = new WeakMap<Plugin, Promise<InitializationResult>>();
 const logger = log.getLogger("OnDemandPlugin/PluginInitialization");
+const INITIALIZATION_TIMEOUT_MS = 15_000;
 
 /** Observe async onload without changing Obsidian's synchronous Component.load contract. */
 export function patchPluginInitialization(): () => void {
@@ -46,7 +47,7 @@ export async function waitForPluginInitialization(ctx: PluginContext, pluginId: 
     // Plugins loaded before our patch have already completed their normal startup.
     if (!initialization) return;
     const result = await pTimeout(initialization, {
-        milliseconds: 15_000,
+        milliseconds: INITIALIZATION_TIMEOUT_MS,
         message: `Timeout initializing plugin ${pluginId}`,
     });
     if (!result.ok) throw result.error;

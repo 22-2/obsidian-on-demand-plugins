@@ -19,6 +19,16 @@ import type { CoreContainer } from "src/services/core-container";
 import type { PluginRegistry } from "src/services/registry/plugin-registry";
 
 const logger = log.getLogger("OnDemandPlugin/StartupPolicyFeature");
+/** Bound concurrent initialization to avoid a load storm with hundreds of plugins. */
+const REBUILD_CONCURRENCY = 3;
+
+type StartupPolicyOptions = {
+    pluginIds?: string[];
+    externalProgress?: ProgressDialog | null;
+    force?: boolean;
+    /** Maintenance rebuild: report failures instead of restarting. */
+    rebuilding?: boolean;
+};
 
 /**
  * Manages plugin startup policies and lifecycle.
@@ -44,23 +54,23 @@ export class StartupPolicyFeature implements AppFeature {
 
     /** Apply startup policy reusing an externally created ProgressDialog. */
     public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[]) {
-        await this.mutex.runExclusive(() => this.executeStartupPolicy(pluginIds, progress));
+        await this.mutex.runExclusive(() => this.executeStartupPolicy({ pluginIds, externalProgress: progress }));
     }
 
     public async rebuildWithProgress(progress: ProgressDialog | null, force = false) {
-        await this.mutex.runExclusive(() => this.executeStartupPolicy(undefined, progress, force, true));
+        await this.mutex.runExclusive(() => this.executeStartupPolicy({ externalProgress: progress, force, rebuilding: true }));
     }
 
     // -------------------------------------------------------------------------
     // Core execution
     // -------------------------------------------------------------------------
 
-    private async executeStartupPolicy(pluginIds?: string[], externalProgress?: ProgressDialog | null, force = false, rebuilding = false) {
+    private async executeStartupPolicy({ pluginIds, externalProgress, force = false, rebuilding = false }: StartupPolicyOptions) {
         const targetIds = pluginIds?.length ? new Set(pluginIds) : null;
         const allManifests = this.ctx.getManifests();
         const targetManifests = targetIds ? allManifests.filter((p) => targetIds.has(p.id)) : allManifests;
         // Commands and views share one load/unload cycle, including when applying a settings draft.
-        const lazyManifests = targetManifests.filter((p) => isLazyMode(this.ctx.getPluginMode(p.id)) && (force || !this.commandCacheService.isCommandCacheValid(p.id) || (this.usesViews(p.id) && !this.hasCapturedViewTypes(p.id))));
+        const lazyManifests = targetManifests.filter((p) => this.needsRebuild(p.id, force));
 
         let cancelled = false;
         const progress = externalProgress
@@ -77,10 +87,10 @@ export class StartupPolicyFeature implements AppFeature {
                   rebuilding,
               );
 
-        let succeeded = false;
+        // null means rebuilding stopped unexpectedly rather than with per-plugin failures.
+        let failures: unknown[] | null = null;
         try {
-            await this.rebuildPlugins(lazyManifests, force, progress, () => cancelled);
-            succeeded = true;
+            failures = await this.rebuildPlugins(lazyManifests, force, progress, () => cancelled);
         } finally {
             try {
                 // Persist successful snapshots even if another plugin failed or the user cancelled.
@@ -88,24 +98,35 @@ export class StartupPolicyFeature implements AppFeature {
                 if (lazyManifests.length) this.commandCacheService.persistCache();
                 this.commandCacheService.registerCachedCommands();
             } finally {
-                await this.cleanupAndReload(succeeded && !cancelled, progress);
+                // Applying settings must still restart: a plugin that keeps failing would otherwise
+                // block every apply. Failed caches stay stale and are retried later.
+                const shouldReload = failures !== null && !cancelled && (!rebuilding || failures.length === 0);
+                await this.cleanupAndReload(shouldReload, progress);
             }
         }
+        // A maintenance rebuild reports failures to the caller instead of restarting.
+        if (rebuilding && failures?.length) throw new AggregateError(failures, "Failed to rebuild plugin caches");
     }
 
     // -------------------------------------------------------------------------
     // Plugin loading
     // -------------------------------------------------------------------------
 
+    private needsRebuild(pluginId: string, force: boolean): boolean {
+        if (!isLazyMode(this.ctx.getPluginMode(pluginId))) return false;
+        if (force || !this.commandCacheService.isCommandCacheValid(pluginId)) return true;
+        return this.usesViews(pluginId) && !this.hasCapturedViewTypes(pluginId);
+    }
+
     private usesViews(pluginId: string): boolean {
         return this.ctx.getPluginMode(pluginId) === PLUGIN_MODE.LAZY && this.ctx.getSettings().plugins[pluginId]?.lazyOptions?.useView === true;
     }
 
-    private async rebuildPlugins(manifests: PluginManifest[], force: boolean, progress: ProgressDialog, isCancelled: () => boolean) {
+    /** Rebuild each plugin's caches and return the per-plugin failures. */
+    private async rebuildPlugins(manifests: PluginManifest[], force: boolean, progress: ProgressDialog, isCancelled: () => boolean): Promise<unknown[]> {
         let next = 0;
         let completed = 0;
         const errors: unknown[] = [];
-        // Bound concurrent initialization to avoid a load storm with hundreds of plugins.
         // View ownership comes from the plugin instance, not the global loadingPluginId.
         const worker = async () => {
             while (next < manifests.length && !isCancelled()) {
@@ -120,8 +141,8 @@ export class StartupPolicyFeature implements AppFeature {
                 progress.setProgress(++completed);
             }
         };
-        await Promise.all(Array.from({ length: Math.min(3, manifests.length) }, worker));
-        if (errors.length) throw new AggregateError(errors, "Failed to rebuild plugin caches");
+        await Promise.all(Array.from({ length: Math.min(REBUILD_CONCURRENCY, manifests.length) }, worker));
+        return errors;
     }
 
     private async rebuildPlugin(pluginId: string, force: boolean) {
@@ -143,15 +164,22 @@ export class StartupPolicyFeature implements AppFeature {
             if (captureViews) await capturePluginViews(this.ctx, pluginId, snapshot);
             else await snapshot();
         } finally {
-            if (!wasLoaded && isPluginLoaded(this.ctx.app, pluginId)) {
-                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
-            }
+            await this.restoreLoadState(pluginId, wasLoaded);
         }
     }
 
+    private async restoreLoadState(pluginId: string, wasLoaded: boolean) {
+        const loaded = isPluginLoaded(this.ctx.app, pluginId);
+        // A running plugin is reloaded for view capture; bring it back even if that reload failed.
+        if (wasLoaded && !loaded) await this.ctx.obsidianPlugins.enablePlugin(pluginId);
+        if (!wasLoaded && loaded) await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+    }
+
     private hasCapturedViewTypes(pluginId: string): boolean {
+        const settings = this.ctx.getSettings();
+        if (settings.plugins[pluginId]?.lazyOptions?.viewTypes?.length) return true;
         // An empty mapping also records a completed capture for plugins with no views.
-        return (this.ctx.getSettings().plugins[pluginId]?.lazyOptions?.viewTypes ?? []).length > 0 || Array.isArray(this.ctx.getSettings().lazyOnViews?.[pluginId]);
+        return Array.isArray(settings.lazyOnViews?.[pluginId]);
     }
 
     // -------------------------------------------------------------------------
