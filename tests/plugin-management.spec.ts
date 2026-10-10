@@ -106,7 +106,7 @@ test("plugin actions reveal the installed plugin in Obsidian's Community plugins
     await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
     const row = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
     await row.locator(".clickable-icon").click();
-    const title = "Show in Community plugins";
+    const title = "Show in community plugins";
     const menuPage = await Promise.any(page.context().pages().map(async (candidate) => {
         await candidate.getByText(title, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
         return candidate;
