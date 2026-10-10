@@ -27,6 +27,7 @@ export const PluginModes: Record<PLUGIN_MODE, string> = {
 };
 
 export interface LazyOptions {
+    useRibbon?: boolean;
     useView: boolean;
     viewTypes: string[];
     useFile: boolean;

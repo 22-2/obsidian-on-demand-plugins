@@ -10,6 +10,7 @@ import { FileLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/fil
 import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
+import { RibbonLazyLoader } from "src/features/lazy-engine/ribbon/ribbon-lazy-loader";
 import { patchPluginLoad } from "src/patches/plugin-load";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchPluginRegisterView } from "src/patches/view-registry";
@@ -19,6 +20,7 @@ import type { CoreContainer } from "src/services/core-container";
 export class LazyEngineFeature implements AppFeature {
     public commandCache!: CommandCacheService;
     public lazyRunner!: LazyCommandRunner;
+    public ribbonLoader!: RibbonLazyLoader;
 
     private viewLoader!: ViewLazyLoader;
     private fileLoader!: FileLazyLoader;
@@ -50,6 +52,8 @@ export class LazyEngineFeature implements AppFeature {
             onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
         });
         patchRibbonReorder(ctx);
+        this.ribbonLoader = new RibbonLazyLoader(ctx, this.lazyRunner);
+        this.ribbonLoader.register();
         // Session-wide: attribute registerView calls to their plugin even when
         // they happen after an await in onload (loadingPluginId is gone by then).
         ctx.register(patchPluginRegisterView(ctx));
@@ -70,6 +74,7 @@ export class LazyEngineFeature implements AppFeature {
     }
 
     onunload() {
+        this.ribbonLoader?.clear();
         this.commandCache?.clear();
         this.lazyRunner?.clear();
         this.layoutReadyQueue?.clear();

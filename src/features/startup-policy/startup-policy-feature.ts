@@ -10,7 +10,7 @@ import type { PluginContext } from "src/core/plugin-context";
 import { ProgressDialog } from "src/core/progress";
 import { saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
-import { isPluginEnabled, isPluginLoaded } from "src/core/utils";
+import { isPluginLoaded } from "src/core/utils";
 import type { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { patchViewRegistry } from "src/patches/view-registry";
@@ -30,11 +30,13 @@ export class StartupPolicyFeature implements AppFeature {
     private ctx!: PluginContext;
     private commandCacheService!: CommandCacheService;
     private registry!: PluginRegistry;
+    private lazyEngine!: LazyEngineFeature;
 
     onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
         this.ctx = ctx;
         this.events = events;
         const lazyEngine = features.get(LazyEngineFeature);
+        this.lazyEngine = lazyEngine!;
         this.commandCacheService = lazyEngine!.commandCache;
         this.registry = core.registry;
     }
@@ -87,7 +89,8 @@ export class StartupPolicyFeature implements AppFeature {
         return manifests.filter((plugin) => {
             const mode = this.ctx.getPluginMode(plugin.id);
             if (mode === PLUGIN_MODE.LAZY) {
-                return this.ctx.getSettings().plugins[plugin.id]?.lazyOptions?.useView === true;
+                const options = this.ctx.getSettings().plugins[plugin.id]?.lazyOptions;
+                return options?.useView === true || options?.useRibbon === true;
             }
             return false;
         });
@@ -101,21 +104,26 @@ export class StartupPolicyFeature implements AppFeature {
             progress?.setStatus(`Loading ${plugin.name}`);
             progress?.setProgress(i + 1);
 
-            let alreadyReady = isPluginLoaded(this.ctx.app, plugin.id) && isPluginEnabled(this.ctx.obsidianPlugins.enabledPlugins, plugin.id);
+            // Lazy plugins can be running without belonging to the persisted
+            // enabled set. enablePlugin is a no-op for those live instances,
+            // so use runtime state when deciding whether capture needs a reload.
+            let alreadyReady = isPluginLoaded(this.ctx.app, plugin.id);
 
-            // View types are captured by the session-wide Plugin.registerView
-            // patch, which can only observe calls made while the plugin loads.
-            // A lazy+useView plugin that is already running but has no captured
-            // view types (e.g. it was enabled by a cache reload before it was
-            // configured as lazy) must be reloaded to give the patch a chance
-            // to see its registrations.
-            if (alreadyReady && !this.hasCapturedViewTypes(plugin.id)) {
+            // Registration patches need a fresh load to discover missing views.
+            // Ribbon metadata is rebuilt on every apply to remove obsolete icons.
+            const options = this.ctx.getSettings().plugins[plugin.id]?.lazyOptions;
+            const needsCapture = (options?.useView && !this.hasCapturedViewTypes(plugin.id)) || this.lazyEngine.ribbonLoader.isEnabled(plugin.id);
+            if (alreadyReady && needsCapture) {
                 try {
                     await this.ctx.obsidianPlugins.disablePlugin(plugin.id);
                     alreadyReady = false;
                 } catch (error) {
-                    logger.warn("Failed to reload plugin for view-type capture", plugin.id, error);
+                    logger.warn("Failed to reload plugin for activation-rule capture", plugin.id, error);
                 }
+            }
+
+            if (this.lazyEngine.ribbonLoader.isEnabled(plugin.id)) {
+                this.lazyEngine.ribbonLoader.resetCapture(plugin.id);
             }
 
             if (!alreadyReady) {
@@ -140,7 +148,7 @@ export class StartupPolicyFeature implements AppFeature {
         // plugins that await in onload (e.g. graph-analysis) register their views
         // afterwards. Give the registerView patch a bounded window to observe
         // them before cleanup disables everything again.
-        await this.waitForViewTypeCapture(manifests, 3_000, isCancelled);
+        await this.waitForActivationCapture(manifests, 3_000, isCancelled);
         progress?.setProgress(manifests.length + 1);
 
         if (isCancelled()) return;
@@ -156,14 +164,20 @@ export class StartupPolicyFeature implements AppFeature {
         return (this.ctx.getSettings().plugins[pluginId]?.lazyOptions?.viewTypes ?? []).length > 0;
     }
 
-    /** Poll until every manifest has captured view types, or timeout / cancelled. */
-    private async waitForViewTypeCapture(manifests: PluginManifest[], timeoutMs: number, isCancelled: () => boolean): Promise<void> {
+    /** Poll until every manifest has captured its configured activation metadata, or timeout / cancelled. */
+    private async waitForActivationCapture(manifests: PluginManifest[], timeoutMs: number, isCancelled: () => boolean): Promise<void> {
         if (!manifests.length) return;
         const deadline = Date.now() + timeoutMs;
         while (Date.now() < deadline && !isCancelled()) {
             // Some plugins legitimately never register a view even with useView
             // enabled, so this wait is bounded rather than mandatory.
-            if (manifests.every((p) => this.hasCapturedViewTypes(p.id))) return;
+            if (
+                manifests.every((p) => {
+                    const options = this.ctx.getSettings().plugins[p.id]?.lazyOptions;
+                    return (!options?.useView || this.hasCapturedViewTypes(p.id)) && (!options?.useRibbon || this.lazyEngine.ribbonLoader.hasCaptured(p.id));
+                })
+            )
+                return;
             await new Promise((r) => window.setTimeout(r, 100));
         }
     }
