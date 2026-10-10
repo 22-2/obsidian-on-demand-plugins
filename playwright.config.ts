@@ -12,7 +12,8 @@ export default defineConfig({
 
     expect: { timeout: 5_000 },
 
-    workers: process.env.CI ? 1 : 2,
+    // Each test launches its own Obsidian instance with an isolated vault, so run two in parallel everywhere.
+    workers: 2,
 
     reporter: [["list"], ["html", { open: "never" }]],
 

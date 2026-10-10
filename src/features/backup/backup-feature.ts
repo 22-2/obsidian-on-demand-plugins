@@ -1,7 +1,7 @@
 import log from "loglevel";
 import type { AppFeature } from "src/core/feature";
 import type { PluginContext } from "src/core/plugin-context";
-import { PLUGIN_MODE, SETTINGS_SCHEMA_VERSION } from "src/core/types";
+import { SETTINGS_SCHEMA_VERSION, isPluginMode } from "src/core/types";
 
 // Needed dynamic import from obsidian
 import { normalizePath } from "obsidian";
@@ -18,7 +18,7 @@ function hasValidInlineProfiles(value: unknown): value is { profiles: Record<str
     return Object.entries(value.profiles).every(([id, profile]) => {
         if (!isRecord(profile) || profile.id !== id || typeof profile.name !== "string" || !isRecord(profile.settings)) return false;
         const settings = profile.settings;
-        if (settings.defaultMode !== undefined && !Object.values(PLUGIN_MODE).includes(settings.defaultMode as (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE])) return false;
+        if (settings.defaultMode !== undefined && !isPluginMode(settings.defaultMode)) return false;
         if (settings.pruneUninstalledEntries !== undefined && typeof settings.pruneUninstalledEntries !== "boolean") return false;
         return ["plugins", "lazyOnViews", "lazyOnFiles"].every((key) => settings[key] === undefined || isRecord(settings[key]));
     });
@@ -309,7 +309,7 @@ export class BackupFeature implements AppFeature {
             }
             profileIds.add(profile.id);
             const settings = profile.settings;
-            if (settings.defaultMode !== undefined && !Object.values(PLUGIN_MODE).includes(settings.defaultMode as (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE])) {
+            if (settings.defaultMode !== undefined && !isPluginMode(settings.defaultMode)) {
                 return { valid: false };
             }
             if (settings.pruneUninstalledEntries !== undefined && typeof settings.pruneUninstalledEntries !== "boolean") return { valid: false };

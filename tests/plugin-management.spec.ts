@@ -51,8 +51,8 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     // The Obsidian Menu API can render from the vault window even when its Settings row lives in another window.
     const menuPage = await Promise.any(
         page.context().pages().map(async (candidate) => {
-            // Runtime toggles are labeled explicitly to distinguish them from saved mode changes.
-            await candidate.getByText("Disable plugin (in memory only)", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+            // The runtime status section is labeled explicitly to distinguish it from saved mode changes.
+            await candidate.getByText("Status (in memory only)", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
             return candidate;
         }),
     );
@@ -88,6 +88,37 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     await expect(settingsPage.locator(".lazy-plugin-save-controls")).toHaveCount(0);
     await expect.poll(() => pluginHandle.evaluate((plugin, pluginId) => plugin.getPluginMode(pluginId), targetPluginId)).toBe("lazyOnLayoutReady");
     expect(await page.evaluate(() => (app.commands as unknown as { __requestedReload?: boolean }).__requestedReload)).toBe(true);
+});
+
+test("plugin actions reveal the installed plugin in Obsidian's Community plugins tab", async ({ obsidian }) => {
+    if (!ensureBuilt()) return;
+    test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
+    await obsidian.waitReady();
+    const page = obsidian.page;
+    const settingsPage = await openPluginManagement(page);
+
+    // Leave a core search that excludes the destination to verify navigation clears it.
+    await page.evaluate(() => { app.setting.openTabById("community-plugins"); });
+    const coreSearch = settingsPage.locator(".vertical-tab-content input[type='search']");
+    await coreSearch.fill("no-such-plugin");
+    await page.evaluate(() => { app.setting.openTabById("on-demand-plugins"); });
+    await settingsPage.getByText("Plugin management", { exact: true }).click();
+    await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
+    const row = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
+    await row.locator(".clickable-icon").click();
+    const title = "Show in Obsidian’s community plugins tab";
+    const menuPage = await Promise.any(page.context().pages().map(async (candidate) => {
+        await candidate.getByText(title, { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+        return candidate;
+    }));
+    await menuPage.getByText(title, { exact: true }).click();
+
+    await expect(coreSearch).toBeVisible();
+    await expect(coreSearch).toHaveValue("");
+    const destination = settingsPage.locator(`.vertical-tab-content [data-plugin-id="${targetPluginId}"]`);
+    await expect(destination).toBeInViewport();
+    // The animation proves the delayed reveal ran in the settings window after layout settled.
+    await expect.poll(() => destination.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
 });
 
 test("plugin management refresh updates the live loaded badge", async ({ obsidian }) => {

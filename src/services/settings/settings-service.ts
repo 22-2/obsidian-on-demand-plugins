@@ -2,13 +2,17 @@ import log from "loglevel";
 import type { DataAdapter } from "obsidian";
 import { Notice, Platform, normalizePath } from "obsidian";
 import { loadLocalStorage } from "src/core/storage";
-import type { DeviceSettings, LazySettings, Profile } from "src/core/types";
-import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, PLUGIN_MODE, SETTINGS_SCHEMA_VERSION } from "src/core/types";
+import type { DeviceSettings, DeviceType, LazySettings, Profile } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, isPluginMode } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { ProfileStorage } from "src/services/settings/profile-storage";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsService");
 type SettingsSnapshot = { kind: "missing"; value?: undefined; fingerprint?: undefined } | { kind: "valid"; value: Record<string, unknown>; fingerprint: string } | { kind: "corrupt"; value?: undefined; fingerprint?: undefined };
+
+type ProfileSource = "external" | "inline" | "legacy" | "fresh";
+/** Fields older versions wrote to data.json that are no longer part of LazySettings. */
+type LegacyDeadFields = { suppressPluginManagementNotice?: unknown };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -61,19 +65,49 @@ export class SettingsService {
         this.isFirstLoad = snapshot.kind === "missing";
         this.persistedFingerprint = snapshot.fingerprint;
         const loaded = (snapshot.value ?? {}) as Partial<LazySettings>;
+        this.assertSupportedFormat(loaded);
 
+        // Deep clone defaults first so runtime edits never mutate the shared DEFAULT_SETTINGS object.
+        this.data = Object.assign(structuredClone(DEFAULT_SETTINGS), loaded);
+        const source = await this.resolveProfileSource(loaded);
+
+        // The old external-storage marker is removed as soon as we have a
+        // verified inline source; new writes always keep the full profile map.
+        delete this.data.profileStorageVersion;
+        this.data.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
+        if (typeof this.data.desktopProfileId !== "string") this.data.desktopProfileId = DEFAULT_PROFILE_ID;
+        if (typeof this.data.mobileProfileId !== "string") this.data.mobileProfileId = DEFAULT_PROFILE_ID;
+
+        // Older desktop/mobile keys can remain in mixed files, but inline profiles are the newer sync source of truth.
+        if (source === "legacy") this.migrateLegacySettings();
+
+        this.currentProfileId = this.selectActiveProfileId();
+        Object.values(this.data.profiles).forEach((profile) => this.normalizeProfileSettings(profile));
+        this.dropDeadFields();
+        this.settings = this.data.profiles[this.currentProfileId].settings;
+
+        if (source === "legacy") this.hydrateLegacyLazyOnViews();
+        if (source === "external") await this.persistExternalProfileMigration();
+    }
+
+    private assertSupportedFormat(loaded: Partial<LazySettings>) {
         if (loaded.settingsSchemaVersion !== undefined && loaded.settingsSchemaVersion !== SETTINGS_SCHEMA_VERSION) {
             this.blockSettings("These settings were saved by a newer or unsupported format. Update the plugin before changing them.");
         }
         if (loaded.profileStorageVersion !== undefined && loaded.profileStorageVersion !== 1) {
             this.blockSettings("These settings use an unsupported profile storage format. Update the plugin before changing them.");
         }
+    }
 
-        // 2. Merge with defaults (deep clone defaults first so we don't mutate
-        // the shared DEFAULT_SETTINGS object during runtime edits).
-        this.data = Object.assign(structuredClone(DEFAULT_SETTINGS), loaded);
-
-        let shouldMigrateExternalProfiles = false;
+    /**
+     * Decides where profiles come from and validates that source, populating
+     * this.data.profiles when it is not plain data.json defaults.
+     * - external: profileStorageVersion 1 without inline profiles (profiles/ folder)
+     * - inline: profiles stored in data.json (the sync source of truth)
+     * - legacy: pre-profile desktop/mobile keys that still need migration
+     * - fresh: first run with no data.json
+     */
+    private async resolveProfileSource(loaded: Partial<LazySettings>): Promise<ProfileSource> {
         const hasInlineProfiles = Object.hasOwn(loaded, "profiles");
         if (loaded.profileStorageVersion === 1 && !hasInlineProfiles) {
             const storedProfiles = await this.profileStorage.load();
@@ -82,92 +116,63 @@ export class SettingsService {
                 this.blockSettings("External profiles could not be verified. Keep the profiles folder intact and restore valid data before saving.");
             }
             this.data.profiles = storedProfiles.profiles;
-            shouldMigrateExternalProfiles = true;
-        } else if (hasInlineProfiles) {
-            // Inline profiles are the sync source of truth. Never merge local
-            // profiles/ files here, because doing so would undo synced deletions.
+            return "external";
+        }
+        if (hasInlineProfiles) {
+            // Never merge local profiles/ files here, because doing so would undo synced deletions.
             if (!this.isValidProfileMap(loaded.profiles)) {
                 this.blockSettings("The profiles in data.json are incomplete or damaged. Restore a valid backup before saving.");
             }
             this.data.profiles = loaded.profiles;
-        } else if (isRecord(loaded.desktop) || isRecord(loaded.mobile)) {
+            return "inline";
+        }
+        if (isRecord(loaded.desktop) || isRecord(loaded.mobile)) {
             if ((loaded.desktop !== undefined && !this.isValidDeviceSettings(loaded.desktop)) || (loaded.mobile !== undefined && !this.isValidDeviceSettings(loaded.mobile))) {
                 this.blockSettings("Legacy settings are incomplete or damaged. Restore a valid backup before saving.");
             }
-        } else if (!this.isFirstLoad) {
+            return "legacy";
+        }
+        if (!this.isFirstLoad) {
             this.blockSettings("The settings file has no recognized profile data. Restore a valid backup before saving.");
         }
-        const shouldMigrateLegacySettings = !hasInlineProfiles && !shouldMigrateExternalProfiles && (isRecord(loaded.desktop) || isRecord(loaded.mobile));
+        return "fresh";
+    }
 
-        // The old external-storage marker is removed as soon as we have a
-        // verified inline source; new writes always keep the full profile map.
-        delete this.data.profileStorageVersion;
-        this.data.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
-
-        if (typeof this.data.desktopProfileId !== "string") {
-            this.data.desktopProfileId = DEFAULT_PROFILE_ID;
-        }
-        if (typeof this.data.mobileProfileId !== "string") {
-            this.data.mobileProfileId = DEFAULT_PROFILE_ID;
-        }
-
-        // 3. Migration: Convert legacy format if needed
-        // Reason: older desktop/mobile keys can remain in mixed files, but inline profiles are the newer sync source of truth.
-        if (shouldMigrateLegacySettings) this.migrateLegacySettings();
-
-        // 4. Determine which profile to activate
-        // By default, pick the one assigned to the current platform
+    /** Prefer the profile assigned to this platform, falling back to the first available one. */
+    private selectActiveProfileId(): string {
         const defaultId = Platform.isMobile ? this.data.mobileProfileId : this.data.desktopProfileId;
+        if (this.data.profiles[defaultId]) return defaultId;
+        return Object.keys(this.data.profiles)[0] || DEFAULT_PROFILE_ID;
+    }
 
-        // If for some reason the ID doesn't exist, fallback to the first available or default
-        if (!this.data.profiles[defaultId]) {
-            const firstId = Object.keys(this.data.profiles)[0];
-            this.currentProfileId = firstId || DEFAULT_PROFILE_ID;
-        } else {
-            this.currentProfileId = defaultId;
-        }
+    /**
+     * Older versions persisted command-cache fields in data.json; the live cache
+     * now lives in vault-scoped storage, so any copy here is stale bloat. Runs on
+     * every load so already-migrated installs get cleaned too.
+     */
+    private dropDeadFields() {
+        const data: LazySettings & LegacyDeadFields = this.data;
+        delete data.commandCache;
+        delete data.commandCacheVersions;
+        delete data.suppressPluginManagementNotice;
+    }
 
-        // 5. Ensure all profiles have all required settings and nested maps
-        Object.values(this.data.profiles).forEach((profile) => {
-            this.normalizeProfileSettings(profile);
-        });
+    /** Legacy installs kept lazyOnViews in localStorage (store2); merge it into the migrated active profile once. */
+    private hydrateLegacyLazyOnViews() {
+        const storedViews = loadLocalStorage<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
+        if (!storedViews || Object.keys(storedViews).length === 0) return;
+        this.settings.lazyOnViews = {
+            ...(this.settings.lazyOnViews ?? {}),
+            ...storedViews,
+        };
+    }
 
-        // 5b. Drop dead command-cache fields. These were persisted in data.json by
-        // older versions; the live cache now lives in vault-scoped storage, so any
-        // copy here is stale bloat. Removed wholesale (the profiles migration's
-        // delete pattern) instead of pruned per plugin ID, and runs every load so
-        // already-migrated installs get cleaned too.
-        delete this.data.commandCache;
-        delete this.data.commandCacheVersions;
-        delete (this.data as unknown as Record<string, unknown>).suppressPluginManagementNotice;
-
-        // 6. Set the active settings reference
-        this.settings = this.data.profiles[this.currentProfileId].settings;
-
-        // 6. Legacy: Hydrate lazyOnViews from store2 (if applicable)
-        // This was logic from the previous version to sync view state across vaults?
-        // Or specific local storage? Keeping purely for backward compat if needed,
-        // but generally profiles should store this now.
-        // The original code merged `loadJSON(app, "lazyOnViews")`.
-        // We can keep this behavior for the active profile to maintain continuity.
-        // Reason: store2 is a legacy fallback and may hydrate only a recognized desktop/mobile legacy file.
-        if (shouldMigrateLegacySettings) {
-            const storedViews = loadLocalStorage<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
-            if (storedViews && Object.keys(storedViews).length > 0) {
-                this.settings.lazyOnViews = {
-                    ...(this.settings.lazyOnViews ?? {}),
-                    ...(storedViews as { [k: string]: string[] }),
-                };
-            }
-        }
-
-        if (shouldMigrateExternalProfiles) {
-            try {
-                await this.save();
-            } catch (error) {
-                if (this.writesBlocked) throw error;
-                logger.warn("Failed to migrate external profiles into data.json", error);
-            }
+    private async persistExternalProfileMigration() {
+        try {
+            await this.save();
+        } catch (error) {
+            if (this.writesBlocked) throw error;
+            logger.warn("Failed to migrate external profiles into data.json", error);
         }
     }
 
@@ -211,7 +216,7 @@ export class SettingsService {
 
     private isValidDeviceSettings(value: unknown): value is DeviceSettings {
         if (!isRecord(value)) return false;
-        if (value.defaultMode !== undefined && !Object.values(PLUGIN_MODE).includes(value.defaultMode as (typeof PLUGIN_MODE)[keyof typeof PLUGIN_MODE])) return false;
+        if (value.defaultMode !== undefined && !isPluginMode(value.defaultMode)) return false;
         if (value.pruneUninstalledEntries !== undefined && typeof value.pruneUninstalledEntries !== "boolean") return false;
         return ["plugins", "lazyOnViews", "lazyOnFiles"].every((key) => value[key] === undefined || isRecord(value[key]));
     }
@@ -395,7 +400,7 @@ export class SettingsService {
         }
     }
 
-    setDeviceDefault(profileId: string, type: "desktop" | "mobile") {
+    setDeviceDefault(profileId: string, type: DeviceType) {
         if (!this.data.profiles[profileId]) return;
 
         if (type === "desktop") {
