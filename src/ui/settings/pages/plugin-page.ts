@@ -1,5 +1,6 @@
-import type { App } from "obsidian";
-import { ExtraButtonComponent, Menu, Setting, SettingPage } from "obsidian";
+import log from "loglevel";
+import type { App, PluginManifest } from "obsidian";
+import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage } from "obsidian";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
@@ -8,6 +9,8 @@ import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+
+const logger = log.getLogger("OnDemandPlugin/PluginPage");
 
 export class PluginPage extends SettingPage {
     private static readonly PAGE_SIZE = 24;
@@ -156,6 +159,7 @@ export class PluginPage extends SettingPage {
                 const menu = new Menu();
                 addPluginRowMenuItems(menu, {
                     getMode: () => this.plugin.getPluginMode(manifest.id),
+                    isEnabled: () => isPluginLoaded(this.app, manifest.id),
                     onOpenDetails: () =>
                         new LazyOptionsModal(this.app, this.plugin, manifest.id, () => {
                             this.tab.pendingPluginIds.add(manifest.id);
@@ -164,7 +168,7 @@ export class PluginPage extends SettingPage {
                         }).open(),
                     onShowInCommunityPlugins: () => showInCommunityPlugins(this.app, manifest.id),
                     onRevealInExplorer: () => void openPluginDirectory(this.app, manifest),
-                    onToggleEnabled: (enabled) => this.applyRowModeChange(manifest.id, enabled ? PLUGIN_MODE.ALWAYS_ENABLED : PLUGIN_MODE.ALWAYS_DISABLED, modeBadge, enabledBadge),
+                    onToggleEnabled: (enabled) => void this.applyRuntimeToggle(manifest, enabled, enabledBadge),
                     onSelectMode: (mode) => this.applyRowModeChange(manifest.id, mode, modeBadge, enabledBadge),
                 });
                 const rect = anchor.getBoundingClientRect();
@@ -183,6 +187,25 @@ export class PluginPage extends SettingPage {
             });
         });
     }
+    /**
+     * Enables or disables the plugin in memory only. Unlike a mode change, this does
+     * not stage a settings draft, so it never needs "Save & apply" and resets on restart.
+     */
+    private async applyRuntimeToggle(manifest: PluginManifest, enabled: boolean, enabledBadge: HTMLElement) {
+        try {
+            if (enabled) {
+                await this.app.plugins.enablePlugin(manifest.id);
+            } else {
+                await this.app.plugins.disablePlugin(manifest.id);
+            }
+        } catch (error) {
+            logger.error(`Failed to ${enabled ? "enable" : "disable"} plugin ${manifest.id}`, error);
+            new Notice(`Failed to ${enabled ? "enable" : "disable"} ${manifest.name}`);
+        }
+        enabledBadge.setText(enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
+        enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
+    }
+
     private applyRowModeChange(pluginId: string, mode: PLUGIN_MODE, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
         // Selecting the effective mode changes nothing semantically, so skip creating
         // an explicit entry just to flip userConfigured and keep the draft clean.
