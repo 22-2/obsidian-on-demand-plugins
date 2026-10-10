@@ -13,7 +13,6 @@ import { PLUGIN_MODE } from "src/core/types";
 import { isPluginEnabled, isPluginLoaded } from "src/core/utils";
 import type { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
-import { patchViewRegistry } from "src/patches/view-registry";
 import type { CoreContainer } from "src/services/core-container";
 import type { PluginRegistry } from "src/services/registry/plugin-registry";
 
@@ -67,15 +66,11 @@ export class StartupPolicyFeature implements AppFeature {
                   cancelled = true;
               });
 
-        const lazyOnViews: Record<string, string[]> = {
-            ...(this.ctx.getSettings().lazyOnViews ?? {}),
-        };
-        const stopIntercepting = patchViewRegistry(this.ctx, lazyOnViews);
-
+        // View types are captured into settings by the session-wide Plugin.registerView patch.
         try {
             await this.loadLazyPluginsWithProgress(lazyManifests, targetIds, progress, () => cancelled);
         } finally {
-            await this.cleanupAndReload(lazyOnViews, !cancelled, progress, stopIntercepting);
+            await this.cleanupAndReload(!cancelled, progress);
         }
     }
 
@@ -184,21 +179,10 @@ export class StartupPolicyFeature implements AppFeature {
     // Cleanup & persistence
     // -------------------------------------------------------------------------
 
-    private async cleanupAndReload(lazyOnViews: Record<string, string[]>, shouldReload: boolean, progress: ProgressDialog | null, stopIntercepting: () => void) {
-        stopIntercepting();
-
-        // Persist lazyOnViews. Merge instead of overwrite: the session-wide
-        // Plugin.registerView patch may have written entries directly into
-        // settings.lazyOnViews while this apply was running with its own
-        // working copy, and those must not be clobbered.
-        const settings = this.ctx.getSettings();
-        const merged: Record<string, string[]> = { ...(settings.lazyOnViews ?? {}) };
-        for (const [pluginId, viewTypes] of Object.entries(lazyOnViews)) {
-            merged[pluginId] = Array.from(new Set([...(merged[pluginId] ?? []), ...viewTypes]));
-        }
-        settings.lazyOnViews = merged;
+    private async cleanupAndReload(shouldReload: boolean, progress: ProgressDialog | null) {
+        const lazyOnViews = this.ctx.getSettings().lazyOnViews ?? {};
         await this.ctx.saveSettings();
-        saveLocalStorage(this.ctx.app, "lazyOnViews", merged);
+        saveLocalStorage(this.ctx.app, "lazyOnViews", lazyOnViews);
 
         // Compute the desired enabled set (always-enabled + self)
         const desiredEnabled = new Set<string>(
