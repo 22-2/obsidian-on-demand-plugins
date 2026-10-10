@@ -31,7 +31,7 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
 
     menu.addItem((item) =>
         item
-            .setTitle("Open details")
+            .setTitle("Lazy settings")
             .setIcon("gear")
             .onClick(() => options.onOpenDetails()),
     );
