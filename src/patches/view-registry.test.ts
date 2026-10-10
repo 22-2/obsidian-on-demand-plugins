@@ -2,7 +2,7 @@ import { Plugin } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
 import type { DeviceSettings } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
-import { patchPluginRegisterView } from "src/patches/view-registry";
+import { capturePluginViews, patchPluginRegisterView } from "src/patches/view-registry";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("patchPluginRegisterView", () => {
@@ -104,5 +104,38 @@ describe("patchPluginRegisterView", () => {
 
         expect(saveSettings).toHaveBeenCalledTimes(1);
         expect(settings.lazyOnViews?.["lazy-plugin"]).toEqual(["lazy-view"]);
+    });
+
+    it("replaces old views only after successful capture without saving each registration", async () => {
+        const ctx = createMockCtx();
+        uninstall = patchPluginRegisterView(ctx);
+        settings.plugins["lazy-plugin"].lazyOptions!.viewTypes = ["removed"];
+        settings.lazyOnViews["lazy-plugin"] = ["removed"];
+        const plugin = createPluginInstance("lazy-plugin");
+        await capturePluginViews(ctx, "lazy-plugin", async () => {
+            plugin.registerView("new-one", vi.fn());
+            await Promise.resolve();
+            plugin.registerView("new-two", vi.fn());
+            expect(settings.lazyOnViews["lazy-plugin"]).toEqual(["removed"]);
+        });
+        expect(settings.lazyOnViews["lazy-plugin"]).toEqual(["new-one", "new-two"]);
+        expect(settings.plugins["lazy-plugin"].lazyOptions!.viewTypes).toEqual(["new-one", "new-two"]);
+        expect(saveSettings).not.toHaveBeenCalled();
+    });
+
+    it("preserves the previous view cache on initialization failure and resumes normal tracking", async () => {
+        const ctx = createMockCtx();
+        uninstall = patchPluginRegisterView(ctx);
+        settings.plugins["lazy-plugin"].lazyOptions!.viewTypes = ["previous"];
+        settings.lazyOnViews["lazy-plugin"] = ["previous"];
+        const plugin = createPluginInstance("lazy-plugin");
+        await expect(capturePluginViews(ctx, "lazy-plugin", async () => {
+            plugin.registerView("partial", vi.fn());
+            throw new Error("failed");
+        })).rejects.toThrow("failed");
+        expect(settings.lazyOnViews["lazy-plugin"]).toEqual(["previous"]);
+        plugin.registerView("later", vi.fn());
+        expect(settings.lazyOnViews["lazy-plugin"]).toEqual(["previous", "later"]);
+        expect(saveSettings).toHaveBeenCalledOnce();
     });
 });

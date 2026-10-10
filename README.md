@@ -10,6 +10,8 @@ Obsidian plugin that delays plugin activation and only loads plugins when needed
 2. Choose a loading mode for each plugin.
 3. Click **Apply changes** (Obsidian will restart automatically).
 
+To refresh cached commands and view types together, open **Maintenance → Rebuild command and view caches** and click **Rebuild caches**. View types are refreshed for lazy plugins with **lazy on view** enabled. Each plugin is loaded once, with up to three plugins initializing concurrently; plugins loaded only for rebuilding are unloaded afterwards. Obsidian restarts when the rebuild completes.
+
 ---
 
 ## Loading modes

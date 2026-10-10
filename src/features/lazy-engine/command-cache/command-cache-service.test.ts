@@ -270,7 +270,7 @@ describe("CommandCacheService", () => {
     });
 
     describe("forceReloadPluginCache", () => {
-        it("should remove and re-register wrappers when wrapper commands were active", async () => {
+        it("drops obsolete wrappers when the loaded plugin no longer registers commands", async () => {
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
 
             mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
@@ -287,7 +287,8 @@ describe("CommandCacheService", () => {
             await service.forceReloadPluginCache("test-plugin");
 
             expect(mockCtx.obsidianCommands.removeCommand).toHaveBeenCalledWith("cmd1");
-            expect(mockCtx.obsidianCommands.addCommand).toHaveBeenCalledTimes(2);
+            expect(mockCtx.obsidianCommands.addCommand).toHaveBeenCalledTimes(1);
+            expect(service.getCachedCommand("cmd1")).toBeUndefined();
             expect(storageMs.saveLocalStorage).toHaveBeenCalled();
         });
 
@@ -417,10 +418,8 @@ describe("CommandCacheService", () => {
             seedStorage("0.9.0");
             service.loadFromData();
 
-            // 1st: wasLoaded → false. 2nd: already-running check → false (enable is attempted).
-            // 3rd: isPluginReadyForCommandSnapshot → true (skip the readiness wait).
-            // 4th: pluginLoaded check → false (plugin not actually loaded).
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValueOnce(false).mockReturnValueOnce(false).mockReturnValueOnce(true).mockReturnValueOnce(false);
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
+            vi.spyOn(service, "getCommandsForPlugin").mockResolvedValue([]);
             mockCtx.getCommandPluginId.mockReturnValue("other");
 
             await service.refreshStaleCacheForPlugin("test-plugin");
@@ -447,6 +446,8 @@ describe("CommandCacheService", () => {
             // Version SHOULD be bumped when plugin loads but has no commands,
             // so we do not retry on every startup.
             expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCacheVersions", { "test-plugin": "1.0.0" });
+            expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCache", { "test-plugin": [] });
+            expect(service.getCachedCommand("old-cmd")).toBeUndefined();
             expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
         });
     });

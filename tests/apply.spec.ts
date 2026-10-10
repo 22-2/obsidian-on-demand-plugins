@@ -36,7 +36,7 @@ test("apply changes writes community-plugins.json", async ({ obsidian }) => {
     expect(parsed).toContain(targetPluginId);
 });
 
-test("automatic view type detection during Apply changes", async ({ obsidian }) => {
+test("Apply changes records an empty view snapshot for a plugin without views", async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
@@ -68,9 +68,6 @@ test("automatic view type detection during Apply changes", async ({ obsidian }) 
         }
     }, targetPluginId);
 
-    if (!detected) return;
-
-    expect(detected).toBeTruthy();
-    expect(Array.isArray(detected)).toBe(true);
-    expect(detected.length).toBeGreaterThan(0);
+    // BRAT has commands but no views. An empty snapshot must complete without a timeout.
+    expect(detected).toEqual([]);
 });

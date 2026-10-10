@@ -6,6 +6,28 @@ import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
 
 const logger = log.getLogger("OnDemandPlugin/ViewRegistryPatch");
+const captures = new WeakMap<PluginContext, Map<string, Set<string>>>();
+
+/** Replace a view snapshot only after successful initialization; persist the batch once. */
+export async function capturePluginViews(ctx: PluginContext, pluginId: string, load: () => Promise<void>): Promise<void> {
+    let active = captures.get(ctx);
+    if (!active) {
+        active = new Map();
+        captures.set(ctx, active);
+    }
+    const types = new Set<string>();
+    active.set(pluginId, types);
+    try {
+        await load();
+        const settings = ctx.getSettings();
+        const options = settings.plugins[pluginId]?.lazyOptions;
+        if (options) options.viewTypes = [...types];
+        settings.lazyOnViews ??= {};
+        settings.lazyOnViews[pluginId] = [...types];
+    } finally {
+        active.delete(pluginId);
+    }
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -76,7 +98,10 @@ export function patchPluginRegisterView(ctx: PluginContext): () => void {
                 try {
                     const pluginId = this.manifest?.id;
                     if (pluginId && type && isLazyWithUseView(ctx, pluginId)) {
-                        if (trackViewType(ctx, pluginId, type)) {
+                        const capture = captures.get(ctx)?.get(pluginId);
+                        if (capture) {
+                            capture.add(type);
+                        } else if (trackViewType(ctx, pluginId, type)) {
                             logger.debug(`registerView: attributed view type "${type}" to ${pluginId}`);
                             // Persist immediately: lazy plugins get disabled right after
                             // their capture windows (apply / cache rebuild), so deferring

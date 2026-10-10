@@ -6,6 +6,7 @@ import type { CommandCache } from "src/core/types";
 export class CommandCacheStore {
     readonly commandCache = new Map<string, CachedCommand>();
     readonly pluginCommandIndex = new Map<string, Set<string>>();
+    private snapshotVersions = new Map<string, string>();
 
     private ctx: PluginContext;
 
@@ -30,6 +31,8 @@ export class CommandCacheStore {
             ids.add(command.id);
         }
         this.pluginCommandIndex.set(pluginId, ids);
+        const manifest = this.ctx.getManifests().find((p) => p.id === pluginId);
+        if (manifest) this.snapshotVersions.set(pluginId, manifest.version ?? "");
     }
 
     getIds(pluginId: string): Set<string> | undefined {
@@ -46,6 +49,8 @@ export class CommandCacheStore {
 
         this.commandCache.clear();
         this.pluginCommandIndex.clear();
+        this.snapshotVersions.clear();
+        const versions = loadLocalStorage<Record<string, string>>(this.ctx.app, "commandCacheVersions") ?? {};
 
         Object.entries(commandCacheSource).forEach(([pluginId, commands]) => {
             const ids = new Set<string>();
@@ -60,6 +65,7 @@ export class CommandCacheStore {
                 ids.add(cached.id);
             });
             this.pluginCommandIndex.set(pluginId, ids);
+            this.snapshotVersions.set(pluginId, versions[pluginId] ?? "");
         });
     }
 
@@ -68,17 +74,17 @@ export class CommandCacheStore {
         const versions: Record<string, string> = {};
 
         this.ctx.getManifests().forEach((plugin) => {
-            const commands = Array.from(this.commandCache.values())
-                .filter((command) => command.pluginId === plugin.id)
+            const ids = this.pluginCommandIndex.get(plugin.id);
+            if (!ids) return;
+            const commands = Array.from(ids, (id) => this.commandCache.get(id)!)
                 .map((command) => ({
                     id: command.id,
                     name: command.name,
                     icon: command.icon,
                 }));
-            if (commands.length) {
-                cache[plugin.id] = commands;
-                versions[plugin.id] = plugin.version ?? "";
-            }
+            cache[plugin.id] = commands;
+            // Persisting one refreshed plugin must not validate other, still-stale snapshots.
+            versions[plugin.id] = this.snapshotVersions.get(plugin.id) ?? "";
         });
 
         saveLocalStorage(this.ctx.app, "commandCache", cache);
@@ -89,7 +95,7 @@ export class CommandCacheStore {
         if (!this.pluginCommandIndex.has(pluginId)) return false;
 
         const cached = loadLocalStorage<CommandCache>(this.ctx.app, "commandCache")?.[pluginId];
-        if (!Array.isArray(cached) || cached.length === 0) return false;
+        if (!Array.isArray(cached)) return false;
 
         const manifest = this.ctx.getManifests().find((p) => p.id === pluginId);
         if (!manifest) return false;
@@ -100,21 +106,9 @@ export class CommandCacheStore {
         return cachedVersion === (manifest.version ?? "");
     }
 
-    // Bumps the stored version for a single plugin without rewriting the command
-    // snapshot. Used when a stale-cache refresh could not capture commands (e.g.
-    // the target plugin failed to load in CI) so the cache is preserved and
-    // future startups do not retry indefinitely.
-    markVersionCurrent(pluginId: string): void {
-        const manifest = this.ctx.getManifests().find((p) => p.id === pluginId);
-        if (!manifest) return;
-
-        const versions = loadLocalStorage<Record<string, string>>(this.ctx.app, "commandCacheVersions") ?? {};
-        versions[pluginId] = manifest.version ?? "";
-        saveLocalStorage(this.ctx.app, "commandCacheVersions", versions);
-    }
-
     clear(): void {
         this.commandCache.clear();
         this.pluginCommandIndex.clear();
+        this.snapshotVersions.clear();
     }
 }
