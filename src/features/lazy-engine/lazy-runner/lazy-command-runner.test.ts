@@ -15,7 +15,7 @@ vi.mock("p-wait-for");
 describe("LazyCommandRunner", () => {
     let runner: LazyCommandRunner;
     let mockCtx: {
-        app: { workspace: { on: ReturnType<typeof vi.fn>; off: ReturnType<typeof vi.fn> } };
+        app: { lastEvent: unknown; workspace: { on: ReturnType<typeof vi.fn>; off: ReturnType<typeof vi.fn> } };
         obsidianPlugins: {
             enabledPlugins: Set<string>;
             enablePlugin: ReturnType<typeof vi.fn>;
@@ -34,6 +34,7 @@ describe("LazyCommandRunner", () => {
 
         mockCtx = {
             app: {
+                lastEvent: null,
                 workspace: {
                     on: vi.fn(),
                     off: vi.fn(),
@@ -152,13 +153,20 @@ describe("LazyCommandRunner", () => {
             vi.mocked(utilsMs.isPluginEnabled).mockReturnValue(true);
 
             // Mock executor functionality inside runner (relying on internal property access)
-            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean; executeCommandDirect: (id: string) => boolean } }).commandExecutor;
+            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean; executeCommand: (id: string, event: unknown) => boolean } }).commandExecutor;
             vi.spyOn(executor, "isCommandExecutable").mockReturnValue(true);
-            const executeSpy = vi.spyOn(executor, "executeCommandDirect").mockReturnValue(true);
+            const executeSpy = vi.spyOn(executor, "executeCommand").mockReturnValue(true);
+            const triggerEvent = { type: "keydown" };
+            mockCtx.app.lastEvent = triggerEvent;
+            vi.spyOn(runner, "ensurePluginLoaded").mockImplementation(async () => {
+                // Input that arrives while the plugin loads must not replace the triggering event.
+                mockCtx.app.lastEvent = { type: "mousemove" };
+                return true;
+            });
 
             await runner.runLazyCommand("cmd1");
 
-            expect(executeSpy).toHaveBeenCalledWith("cmd1");
+            expect(executeSpy).toHaveBeenCalledWith("cmd1", triggerEvent);
         });
 
         it("should show notice when the real command never becomes available", async () => {
