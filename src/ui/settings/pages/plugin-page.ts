@@ -159,8 +159,21 @@ export class PluginPage extends SettingPage {
             actionsButton.extraSettingsEl.addClass("lazy-plugin-row-actions-desktop");
             // Both controls open the same menu; anchor it to the visible control
             // because ExtraButtonComponent callbacks do not provide a MouseEvent.
+            // A second press on the control closes its open menu instead of opening another.
+            let openMenu: Menu | undefined;
+            // Obsidian hides a menu on an outside mousedown, so the following click
+            // would reopen it; keep that mousedown here and let the click close it.
+            const keepMenuForClick = (evt: MouseEvent) => {
+                if (openMenu) evt.stopPropagation();
+            };
             const openActions = (anchor: HTMLElement) => {
+                if (openMenu) {
+                    openMenu.hide();
+                    return;
+                }
                 const menu = new Menu();
+                menu.onHide(() => (openMenu = undefined));
+                openMenu = menu;
                 addPluginRowMenuItems(menu, {
                     getMode: () => this.plugin.getPluginMode(manifest.id),
                     isEnabled: () => isPluginLoaded(this.app, manifest.id),
@@ -180,10 +193,12 @@ export class PluginPage extends SettingPage {
                 // menu and anchor coordinates refer to the same visible surface.
                 menu.showAtPosition({ x: rect.left, y: rect.bottom }, anchor.ownerDocument);
             };
+            actionsButton.extraSettingsEl.addEventListener("mousedown", keepMenuForClick);
             actionsButton.onClick(() => openActions(actionsButton.extraSettingsEl));
             // A labeled native button makes the mobile action easier to discover
             // and press while sharing the desktop menu's behavior.
             setting.addButton((button) => {
+                button.buttonEl.addEventListener("mousedown", keepMenuForClick);
                 button.setIcon("ellipsis-vertical").onClick(() => openActions(button.buttonEl));
                 // setIcon replaces button contents, so append the label afterward.
                 button.buttonEl.createSpan({ text: "Actions" });

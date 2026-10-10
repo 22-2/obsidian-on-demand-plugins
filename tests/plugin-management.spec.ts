@@ -196,3 +196,28 @@ test("plugin management follows loads made outside the page without a refresh", 
     await obsidian.page.evaluate((pluginId) => app.plugins.unloadPlugin(pluginId), targetPluginId);
     await expect(badge).not.toHaveClass(/is-loaded/);
 });
+
+test("pressing the row actions control again closes its open menu", async ({ obsidian }) => {
+    if (!ensureBuilt()) return;
+    test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
+
+    await obsidian.waitReady();
+    const page = obsidian.page;
+    const settingsPage = await openPluginManagement(page);
+    await settingsPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
+    const actions = settingsPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" }).locator(".clickable-icon");
+
+    await actions.click();
+    // The menu can render in either window, so find whichever page shows it.
+    const menuPage = await Promise.any(
+        page.context().pages().map(async (candidate) => {
+            await candidate.getByText("Status (in memory only)", { exact: true }).waitFor({ state: "visible", timeout: 10_000 });
+            return candidate;
+        }),
+    );
+    const menu = menuPage.locator(".menu");
+    await expect(menu).toHaveCount(1);
+
+    await actions.click();
+    await expect(menu).toHaveCount(0);
+});
