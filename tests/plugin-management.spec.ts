@@ -134,6 +134,9 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
         };
         await plugin.updatePluginSettings(pluginId, "lazy");
         await app.plugins.disablePlugin(pluginId);
+        // disablePlugin keeps the id in the in-memory enabled set, and any later save would write it back.
+        // Remove it from both the set and the file so the precondition is "not saved" for both.
+        app.plugins.enabledPlugins.delete(pluginId);
         const savedPluginIds = await app.vault.readConfigJson("community-plugins");
         if (Array.isArray(savedPluginIds)) {
             await app.vault.writeConfigJson(
