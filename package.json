@@ -7,7 +7,7 @@
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "typecheck": "tsc6 -noEmit -skipLibCheck",
-        "test:e2e": "playwright test",
+        "test:e2e": "playwright test --grep-invert @serial && playwright test --grep @serial --workers=1",
         "test:e2e:headed": "playwright test --headed",
         "test:e2e:install-browsers": "playwright install --with-deps",
         "build": "pnpm run typecheck && pnpm run build:nocheck",

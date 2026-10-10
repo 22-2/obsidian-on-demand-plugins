@@ -90,7 +90,8 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     expect(await page.evaluate(() => (app.commands as unknown as { __requestedReload?: boolean }).__requestedReload)).toBe(true);
 });
 
-test("plugin actions reveal the installed plugin in Obsidian's Community plugins tab", async ({ obsidian }) => {
+// Run with one worker (see the test:e2e script): these two are sensitive to parallel Obsidian instances.
+test("plugin actions reveal the installed plugin in Obsidian's Community plugins tab", { tag: "@serial" }, async ({ obsidian }) => {
     if (!ensureBuilt()) return;
     test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
     await obsidian.waitReady();
@@ -121,7 +122,8 @@ test("plugin actions reveal the installed plugin in Obsidian's Community plugins
     await expect.poll(() => destination.evaluate((element) => element.getAnimations().length)).toBeGreaterThan(0);
 });
 
-test("plugin management refresh updates the live loaded badge", async ({ obsidian }) => {
+// Run with one worker (see the test:e2e script): these two are sensitive to parallel Obsidian instances.
+test("plugin management refresh updates the live loaded badge", { tag: "@serial" }, async ({ obsidian }) => {
     if (!ensureBuilt()) return;
 
     await obsidian.waitReady();
@@ -132,6 +134,9 @@ test("plugin management refresh updates the live loaded badge", async ({ obsidia
         };
         await plugin.updatePluginSettings(pluginId, "lazy");
         await app.plugins.disablePlugin(pluginId);
+        // disablePlugin keeps the id in the in-memory enabled set, and any later save would write it back.
+        // Remove it from both the set and the file so the precondition is "not saved" for both.
+        app.plugins.enabledPlugins.delete(pluginId);
         const savedPluginIds = await app.vault.readConfigJson("community-plugins");
         if (Array.isArray(savedPluginIds)) {
             await app.vault.writeConfigJson(
@@ -151,11 +156,24 @@ test("plugin management refresh updates the live loaded badge", async ({ obsidia
 
     const pluginsHeading = settingsPage.locator(".setting-item-heading").filter({ hasText: "Plugins" });
     await pluginsHeading.locator(".clickable-icon").click();
-    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
+    try {
+        await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
+    } catch (error) {
+        // Diagnostic: capture the saved list and live state at the moment the badge is wrong.
+        const diagnostics = await obsidian.page.evaluate(async (pluginId) => ({
+            saved: await app.vault.readConfigJson("community-plugins").catch((readError: unknown) => `read failed: ${String(readError)}`),
+            enabledInMemory: [...app.plugins.enabledPlugins],
+            pluginLoaded: Boolean(app.plugins.plugins[pluginId]?._loaded),
+        }), targetPluginId);
+        console.log(`[diag live-badge] ${JSON.stringify(diagnostics)}`);
+        throw error;
+    }
 
     await obsidian.page.evaluate(async (pluginId) => {
         const savedPluginIds = await app.vault.readConfigJson("community-plugins");
         const savedIds = Array.isArray(savedPluginIds) ? savedPluginIds.filter((id): id is string => typeof id === "string") : [];
+        // Add to the in-memory set too; a pending debounced save would otherwise overwrite this file write without the id.
+        app.plugins.enabledPlugins.add(pluginId);
         await app.vault.writeConfigJson("community-plugins", [...new Set([...savedIds, pluginId])]);
     }, targetPluginId);
     await pluginsHeading.locator(".clickable-icon").click();
