@@ -5,7 +5,7 @@ import {
     pluginUnderTestId,
     targetPluginId,
     useOnDemandPlugins,
-    waitForPluginEnabled
+    waitForPluginLoaded
 } from "./test-utils";
 
 useOnDemandPlugins();
@@ -33,5 +33,5 @@ test("on-demand: lazy command enables plugin", async ({ obsidian }) => {
     expect(commandId).toBeTruthy();
     await obsidian.command(commandId as string);
 
-    expect(await waitForPluginEnabled(obsidian, targetPluginId)).toBe(true);
+    expect(await waitForPluginLoaded(obsidian, targetPluginId)).toBe(true);
 });

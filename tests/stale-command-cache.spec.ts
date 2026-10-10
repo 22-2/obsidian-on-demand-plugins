@@ -7,7 +7,6 @@ import {
     readOnDemandStorageValue,
     targetPluginId,
     useOnDemandPlugins,
-    waitForPluginDisabled,
 } from "./test-utils";
 
 useOnDemandPlugins();
@@ -113,11 +112,11 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
     // The remaining assertions require the target plugin to have loaded during the
     // background refresh. When it could not load (e.g. flaky CI environment), the
     // version is intentionally NOT bumped so future startups retry the refresh (issue #6).
-    const debugAfterWait = await captureDebugState();
-    if (debugAfterWait.targetLoaded) {
-        expect(cachedVersion).toBe(manifestVersion);
+    // A successful refresh unloads the plugin again, so the bumped version is the signal.
+    if (cachedVersion === manifestVersion) {
         expect(await findCommandByPrefix(obsidian, `${targetPluginId}:`)).not.toBeNull();
-        expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
+        // The plugin stays in enabledPlugins (it is enabled on disk), so check the loaded flag.
+        await expect.poll(async () => (await obsidian.pluginState(targetPluginId)).loaded).toBe(false);
     } else {
         // Plugin did not load; version must NOT be bumped to allow retry on next startup.
         expect(cachedVersion).toBe("0.0.0-stale");

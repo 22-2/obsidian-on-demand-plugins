@@ -52,16 +52,10 @@ export class CommandCacheService {
 
         const pluginsToRefresh = force ? lazyManifests : lazyManifests.filter((p) => !this.store.isValid(p.id));
 
-        let hasChanges = false;
         for (const plugin of pluginsToRefresh) {
             const current = lazyManifests.indexOf(plugin) + 1;
-            const changed = await this.refreshCommandsForPlugin(plugin.id);
+            await this.refreshCommandsRestoringLoadState(plugin.id);
             onProgress?.(current, lazyManifests.length, plugin);
-            if (changed) hasChanges = true;
-        }
-
-        if (hasChanges) {
-            this.store.persist();
         }
     }
 
@@ -72,9 +66,27 @@ export class CommandCacheService {
         return true;
     }
 
+    /**
+     * Snapshot a plugin's commands, then unload it again if it was loaded only for the snapshot,
+     * so a cache rebuild does not leave lazy plugins running for the rest of the session.
+     */
+    private async refreshCommandsRestoringLoadState(pluginId: string): Promise<void> {
+        const wasLoaded = isPluginLoaded(this.ctx.app, pluginId);
+        try {
+            // Persist before unloading: the disable hook re-registers wrappers only from a
+            // cache that is stored for the current plugin version.
+            if (await this.refreshCommandsForPlugin(pluginId)) this.store.persist();
+        } finally {
+            if (!wasLoaded && isPluginLoaded(this.ctx.app, pluginId)) {
+                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+            }
+        }
+    }
+
     async getCommandsForPlugin(pluginId: string): Promise<CachedCommand[]> {
-        const wasEnabled = this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
-        if (!wasEnabled) {
+        // enablePlugin only loads the plugin and does not add it to enabledPlugins,
+        // so the loaded flag is the reliable "already running" signal.
+        if (!isPluginLoaded(this.ctx.app, pluginId)) {
             await this.ctx.obsidianPlugins.enablePlugin(pluginId);
         }
 
@@ -125,7 +137,7 @@ export class CommandCacheService {
             // no longer exist; registering those wrappers makes the first invocation fail
             // silently (issue #6). Skip them here — the startup flow refreshes stale
             // caches in the background after layout ready and registers fresh wrappers.
-            if (this.store.has(plugin.id) && !this.store.isValid(plugin.id)) continue;
+            if (this.isStaleCache(plugin.id)) continue;
             this.registerCachedCommandsForPlugin(plugin.id);
         }
     }
@@ -133,7 +145,7 @@ export class CommandCacheService {
     /** Lazy plugins whose cached commands were built for a different plugin version. */
     getStaleCachedPluginIds(): string[] {
         return this.getLazyManifests()
-            .filter((p) => this.store.has(p.id) && !this.store.isValid(p.id))
+            .filter((p) => this.isStaleCache(p.id))
             .map((p) => p.id);
     }
 
@@ -148,7 +160,7 @@ export class CommandCacheService {
      * be registered as wrappers on the next startup (issue #6).
      */
     async refreshStaleCacheForPlugin(pluginId: string): Promise<void> {
-        const wasEnabled = this.ctx.obsidianPlugins.enabledPlugins.has(pluginId);
+        const wasLoaded = isPluginLoaded(this.ctx.app, pluginId);
         let changed: boolean;
         let pluginLoaded = false;
         try {
@@ -166,7 +178,7 @@ export class CommandCacheService {
             // If plugin did not load, do NOT bump the version. The stale cache
             // will trigger another refresh attempt on the next startup.
         } finally {
-            if (!wasEnabled && pluginLoaded) {
+            if (!wasLoaded && pluginLoaded) {
                 await this.ctx.obsidianPlugins.disablePlugin(pluginId);
             }
         }
@@ -244,6 +256,11 @@ export class CommandCacheService {
     }
 
     syncCommandWrappersForPlugin(pluginId: string): void {
+        // Same rule as registerCachedCommands: a cache built for another plugin version may
+        // list removed command IDs, so never resurrect wrappers from it (issue #6). This also
+        // runs from the enable/disable hooks while a stale cache is being refreshed.
+        if (this.isStaleCache(pluginId)) return;
+
         const commandIds = this.store.getIds(pluginId);
         if (!commandIds) return;
 
@@ -284,6 +301,10 @@ export class CommandCacheService {
 
     private getLazyManifests(): PluginManifest[] {
         return this.ctx.getManifests().filter((p) => this.isLazyMode(p.id));
+    }
+
+    private isStaleCache(pluginId: string): boolean {
+        return this.store.has(pluginId) && !this.store.isValid(pluginId);
     }
 
     private isLazyMode(pluginId: string): boolean {

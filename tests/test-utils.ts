@@ -81,20 +81,20 @@ async function settles(wait: Promise<void>): Promise<boolean> {
     }
 }
 
-export function waitForPluginEnabled(
+export function waitForPluginLoaded(
     obsidian: ObsidianAPI,
     pluginId: string,
     timeoutMs = defaultWaitTimeoutMs,
 ): Promise<boolean> {
-    return settles(obsidian.waitForPluginEnabled(pluginId, timeoutMs));
+    return settles(obsidian.waitForPluginLoaded(pluginId, timeoutMs));
 }
 
-export function waitForPluginDisabled(
+export function waitForPluginUnloaded(
     obsidian: ObsidianAPI,
     pluginId: string,
     timeoutMs = defaultWaitTimeoutMs,
 ): Promise<boolean> {
-    return settles(obsidian.waitForPluginDisabled(pluginId, timeoutMs));
+    return settles(obsidian.waitForPluginUnloaded(pluginId, timeoutMs));
 }
 
 export function waitForViewType(

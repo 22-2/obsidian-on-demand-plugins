@@ -4,8 +4,8 @@ import {
     findCommandByExactId,
     pluginUnderTestId,
     useOnDemandPluginsWithTargets,
-    waitForPluginDisabled,
-    waitForPluginEnabled,
+    waitForPluginUnloaded,
+    waitForPluginLoaded,
     waitForViewType
 } from "./test-utils";
 
@@ -69,7 +69,7 @@ test.skip("mfdi-open-view command should lazy-load plugin and open mfdi-view", a
     expect(registeredCommandId).toBe(expectedCommandId);
 
     // ③ コマンド実行前にプラグインが無効化されるまで待機
-    const isDisabled = await waitForPluginDisabled(obsidian, MFDI_PLUGIN_ID, 5_000);
+    const isDisabled = await waitForPluginUnloaded(obsidian, MFDI_PLUGIN_ID, 5_000);
 
     // ④ コマンド実行
     // メンタルモデル: E2E 環境では MFDI が無効化されないケースがあるため、
@@ -81,7 +81,7 @@ test.skip("mfdi-open-view command should lazy-load plugin and open mfdi-view", a
 
     if (isDisabled) {
         // ⑤ lazy 経路: 1回目でロード、2回目で実コマンド実行
-        const isLoaded = await waitForPluginEnabled(obsidian, MFDI_PLUGIN_ID);
+        const isLoaded = await waitForPluginLoaded(obsidian, MFDI_PLUGIN_ID);
         expect(isLoaded).toBe(true);
 
         await obsidian.page.evaluate(

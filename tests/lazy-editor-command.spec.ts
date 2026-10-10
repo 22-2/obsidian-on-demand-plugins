@@ -43,11 +43,8 @@ test("lazy wrapper runs an editorCallback command in the active editor", async (
         instance.updateManifests();
         await instance.updatePluginSettings(id, "lazy");
     }, fixtureId);
-    // Caching the commands loads the plugin without adding it to enabledPlugins, so applying
-    // lazy mode can leave it running in this session. Unload it to exercise the wrapper.
-    await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), fixtureId);
-
-    // The disable hook re-registers the cached wrapper once the real command is removed.
+    // Caching the commands loads the plugin without adding it to enabledPlugins. Applying lazy
+    // mode must still unload it and leave the cached wrapper in place of the real command.
     await expect.poll(() => obsidian.page.evaluate(({ id, commandId }) => ({
         loaded: Boolean(app.plugins.plugins[id]?._loaded),
         hasWrapper: commandId in app.commands.commands,

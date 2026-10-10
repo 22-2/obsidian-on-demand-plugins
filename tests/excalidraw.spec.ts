@@ -4,7 +4,7 @@ import {
     excalidrawPluginId,
     pluginUnderTestId,
     useOnDemandPluginsWithExcalidraw,
-    waitForPluginEnabled,
+    waitForPluginLoaded,
     waitForViewType
 } from "./test-utils";
 
@@ -40,7 +40,7 @@ test("opening .excalidraw.md triggers lazy load and shows Excalidraw view", asyn
     });
 
     // wait for plugin to be enabled
-    const enabled = await waitForPluginEnabled(obsidian, excalidrawPluginId, 10_000);
+    const enabled = await waitForPluginLoaded(obsidian, excalidrawPluginId, 10_000);
 
     expect(enabled).toBe(true);
 
@@ -83,7 +83,7 @@ test("layout-restore triggers lazy load for already-open Excalidraw file", async
         workspace.trigger && workspace.trigger("layout-ready");
     });
 
-    const enabled2 = await waitForPluginEnabled(obsidian, excalidrawPluginId, 10_000);
+    const enabled2 = await waitForPluginLoaded(obsidian, excalidrawPluginId, 10_000);
 
     expect(enabled2).toBe(true);
 
