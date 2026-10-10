@@ -59,7 +59,7 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
     // Replace the external community page action with navigation to Obsidian's built-in tab.
     menu.addItem((item) =>
         item
-            .setTitle("Show in Obsidian’s community plugins tab")
+            .setTitle("Show in community plugins")
             .setIcon("list")
             .onClick(() => options.onShowInCommunityPlugins()),
     );
