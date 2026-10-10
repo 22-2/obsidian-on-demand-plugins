@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.6.3](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.6.2...3.6.3) (2026-10-10)
+
+### 🛡 Bug Fixes
+
+* **plugin-row-menu:** shorten the community plugins menu label ([7183d61](https://github.com/22-2/obsidian-on-demand-plugins/commit/7183d61c522776a08dad296eb3cd9989123c008a))
+* **plugin-row-menu:** use sentence case for the community plugins label ([f273037](https://github.com/22-2/obsidian-on-demand-plugins/commit/f273037e9d69f4c64ef85d00a9aa7a71ef45e10f))
+
 ## [3.6.2](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.6.1...3.6.2) (2026-10-10)
 
 ### ✨ Features
