@@ -1,6 +1,5 @@
 import type { App, SettingDefinitionItem } from "obsidian";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
-import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
 import { PLUGIN_MODE, PluginModes } from "src/core/types";
 import type OnDemandPlugin from "src/main";
@@ -103,6 +102,9 @@ export class SettingsTab extends PluginSettingTab {
         const count = this.getChangedPluginIds().length;
         return count > 0 ? `Save & apply (${count})` : "Save changes";
     }
+    private discardButtonText() {
+        return `Discard all (${this.describeChanges().length})`;
+    }
     configurePendingControls(setting: Setting, onRefresh?: () => void) {
         setting.setClass("lazy-plugin-save-controls");
         // Sticky positioning applies only with pending changes so the bar does not cling to the top when there is nothing to save.
@@ -114,13 +116,15 @@ export class SettingsTab extends PluginSettingTab {
         setting
             .addButton((button) =>
                 button
-                    .setButtonText(this.saveButtonText())
+                    // The ellipsis and "Review" signal that a confirmation follows, so the bar never reads as an immediate save.
+                    .setButtonText("Review & save…")
                     .setCta()
                     .setDisabled(!this.hasPendingChanges)
                     .onClick(async () => {
                         const confirmed = await showReviewChangesModal(this.app, {
+                            mode: "save",
                             getChanges: () => this.describeChanges(),
-                            getSaveLabel: () => this.saveButtonText(),
+                            getConfirmLabel: () => this.saveButtonText(),
                         });
                         // Reverts in the modal edit the draft even when the save is cancelled.
                         this.plugin.configureLogger();
@@ -131,7 +135,7 @@ export class SettingsTab extends PluginSettingTab {
             )
             .addButton((button) =>
                 button
-                    .setButtonText("Discard")
+                    .setButtonText("Discard…")
                     .setDisabled(!this.hasPendingChanges)
                     .onClick(async () => {
                         if (await this.discardChanges()) onRefresh?.();
@@ -169,7 +173,12 @@ export class SettingsTab extends PluginSettingTab {
         if (refresh) this.update();
     }
     async discardChanges(): Promise<boolean> {
-        if (!(await showConfirmModal(this.app, { message: "Discard all unsaved changes?" }))) return false;
+        const confirmed = await showReviewChangesModal(this.app, {
+            mode: "discard",
+            getChanges: () => this.describeChanges(),
+            getConfirmLabel: () => this.discardButtonText(),
+        });
+        if (!confirmed) return false;
         await this.discardPendingChanges();
         new Notice("Changes discarded");
         return true;

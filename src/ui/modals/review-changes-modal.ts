@@ -9,14 +9,20 @@ const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
 };
 
 export type ReviewChangesOptions = {
+    /** "save" offers per-item reverts before saving; "discard" only previews what will be lost. */
+    mode: "save" | "discard";
     getChanges: () => PendingChange[];
-    /** Label for the confirm button, kept identical to the bar's save button. */
-    getSaveLabel: () => string;
+    getConfirmLabel: () => string;
+};
+
+const MODE_TEXT = {
+    save: { title: "Review changes", note: "Plugin mode changes are applied when saved." },
+    discard: { title: "Discard changes", note: "These changes will be lost and the saved settings restored." },
 };
 
 /**
- * Lists the staged draft before saving so a save never applies changes the
- * user has not seen. Resolves `true` when the user confirms the save.
+ * Lists the staged draft before saving or discarding it so neither action
+ * touches changes the user has not seen. Resolves `true` when the user confirms.
  */
 export function showReviewChangesModal(app: App, options: ReviewChangesOptions): Promise<boolean> {
     return new ReviewChangesModal(app, options).openAndWait();
@@ -34,7 +40,7 @@ class ReviewChangesModal extends Modal {
 
     onOpen() {
         this.modalEl.addClass("lazy-review-changes-modal");
-        this.titleEl.setText("Review changes");
+        this.titleEl.setText(MODE_TEXT[this.options.mode].title);
         this.render();
     }
 
@@ -65,9 +71,10 @@ class ReviewChangesModal extends Modal {
             const list = contentEl.createDiv({ cls: "lazy-review-changes-list" });
             items.forEach((change) => this.renderChange(list, change));
         }
-        contentEl.createEl("p", { cls: "lazy-review-changes-note", text: "Plugin mode changes are applied when saved." });
+        contentEl.createEl("p", { cls: "lazy-review-changes-note", text: MODE_TEXT[this.options.mode].note });
         const buttons = contentEl.createDiv({ cls: "modal-button-container" });
-        buttons.createEl("button", { text: this.options.getSaveLabel(), cls: "mod-cta" }).onClickEvent(() => {
+        const confirmClass = this.options.mode === "discard" ? "mod-warning" : "mod-cta";
+        buttons.createEl("button", { text: this.options.getConfirmLabel(), cls: confirmClass }).onClickEvent(() => {
             this.confirmed = true;
             this.close();
         });
@@ -85,7 +92,8 @@ class ReviewChangesModal extends Modal {
             }),
         );
         const revert = change.revert;
-        if (!revert) return;
+        // Discarding drops every change at once, so single reverts would only add noise there.
+        if (!revert || this.options.mode === "discard") return;
         setting.addExtraButton((button) =>
             button
                 .setIcon("rotate-ccw")

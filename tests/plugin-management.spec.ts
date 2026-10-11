@@ -61,7 +61,8 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     // Exercise the real menu-to-row path: the page keeps the row mounted while it stages this edit.
     await expect(row).toBeVisible();
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
-    const saveButton = settingsPage.getByRole("button", { name: "Save & apply (1)", exact: true });
+    const saveButton = settingsPage.getByRole("button", { name: "Review & save…", exact: true });
+    await expect(settingsPage.locator(".lazy-plugin-save-controls")).toContainText("1 unsaved change · 1 plugin");
     await expect(saveButton).toBeEnabled();
 
     // Applying policies normally reloads Obsidian; intercept only that reload so CI can inspect the saved state.
