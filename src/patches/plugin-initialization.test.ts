@@ -47,6 +47,32 @@ describe("plugin initialization tracking", () => {
         expect(ready).toHaveBeenCalledOnce();
         expect(onload).toHaveBeenCalledOnce();
     });
+    it("waits for async onLayoutReady work started during onload once the layout is ready", async () => {
+        let finish!: () => void;
+        const workspace = { onLayoutReady: (callback: () => unknown) => void callback() };
+        const plugin = Object.assign(Object.create(Plugin.prototype) as Plugin, {
+            app: { workspace },
+            onload() {
+                // Mirrors Excalidraw: onload returns at once, commands arrive from the layout-ready callback.
+                this.app.workspace.onLayoutReady(
+                    () =>
+                        new Promise<void>((resolve) => {
+                            finish = resolve;
+                        }),
+                );
+            },
+        });
+        const originalOnLayoutReady = workspace.onLayoutReady;
+        plugin.load();
+        expect(workspace.onLayoutReady).toBe(originalOnLayoutReady);
+        const ready = vi.fn();
+        const waiting = waitForPluginInitialization(context(plugin), "target").then(ready);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(ready).not.toHaveBeenCalled();
+        finish();
+        await waiting;
+        expect(ready).toHaveBeenCalledOnce();
+    });
     it("propagates async initialization failure instead of treating an empty snapshot as success", async () => {
         const plugin = Object.assign(Object.create(Plugin.prototype) as Plugin, {
             onload: () => Promise.reject(new Error("initialization failed")),
