@@ -4,5 +4,3 @@ allowBuilds:
   obsidian-typings: true
 minimumReleaseAgeExclude:
   - prettier@3.9.5
-patchedDependencies:
-  obsidian-e2e-toolkit@1.4.3: patches/obsidian-e2e-toolkit@1.4.3.patch

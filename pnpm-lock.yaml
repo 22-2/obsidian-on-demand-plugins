@@ -4,11 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  obsidian-e2e-toolkit@1.4.3:
-    hash: 51e76ba7c91715ea8395c3fb36a98476dbeb7bcc292e7095aa8560314f94473d
-    path: patches/obsidian-e2e-toolkit@1.4.3.patch
-
 importers:
 
   .:
@@ -90,8 +85,8 @@ importers:
         specifier: ^1.13.1
         version: 1.13.1(@codemirror/state@6.5.0)(@codemirror/view@6.38.6)
       obsidian-e2e-toolkit:
-        specifier: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.3/obsidian-e2e-toolkit-1.4.3.tgz
-        version: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.3/obsidian-e2e-toolkit-1.4.3.tgz(patch_hash=51e76ba7c91715ea8395c3fb36a98476dbeb7bcc292e7095aa8560314f94473d)(@playwright/test@1.63.0)(electron@44.4.5(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0)
+        specifier: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.4/obsidian-e2e-toolkit-1.4.4.tgz
+        version: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.4/obsidian-e2e-toolkit-1.4.4.tgz(@playwright/test@1.63.0)(electron@44.4.5(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0)
       playwright:
         specifier: ^1.63.0
         version: 1.63.0
@@ -2246,8 +2241,8 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.3/obsidian-e2e-toolkit-1.4.3.tgz:
-    resolution: {integrity: sha512-a5Yeq+FNMXfKuXZ1k5wVy2CPxZX/U7gKRXu9bouNnRSmm+B3i7/KqjcxHdpX64S25moPwAIOV0GKQm40TOP99w==, tarball: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.3/obsidian-e2e-toolkit-1.4.3.tgz}
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.4/obsidian-e2e-toolkit-1.4.4.tgz:
+    resolution: {integrity: sha512-guIu/swxQ5yYaH9cPRu8SjZEk8GDEqvjBoq3CdW99J7/5QJ0a8sg0xXDGJTD8e4sHVGaNOoUudjtnujPAV92Mg==, tarball: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.4/obsidian-e2e-toolkit-1.4.4.tgz}
     version: 1.4.3
     engines: {node: '>=23.0.0'}
     hasBin: true
@@ -5326,7 +5321,7 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.2
 
-  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.3/obsidian-e2e-toolkit-1.4.3.tgz(patch_hash=51e76ba7c91715ea8395c3fb36a98476dbeb7bcc292e7095aa8560314f94473d)(@playwright/test@1.63.0)(electron@44.4.5(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0):
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.4/obsidian-e2e-toolkit-1.4.4.tgz(@playwright/test@1.63.0)(electron@44.4.5(supports-color@7.2.0))(playwright@1.63.0)(supports-color@7.2.0):
     dependencies:
       '@electron/asar': 4.3.0
       '@playwright/test': 1.63.0

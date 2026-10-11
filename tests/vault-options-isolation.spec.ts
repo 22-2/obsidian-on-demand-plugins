@@ -5,8 +5,8 @@ import { resolveMyfilesPluginPath, targetPluginId, useVaultPlugins } from "./tes
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 
-// Both groups must share one worker in this order: the toolkit used to merge vaultOptions into
-// its shared defaults, so a longer plugin list leaked its tail into later tests (patches/).
+// Both groups must share one worker in this order: obsidian-e2e-toolkit before 1.4.4 merged vaultOptions into
+// its shared defaults, so a longer plugin list leaked its tail into later tests.
 test.describe.configure({ mode: "serial" });
 
 test.describe("a test with a longer plugin list", () => {
