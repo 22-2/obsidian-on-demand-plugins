@@ -1,0 +1,107 @@
+import type { App } from "obsidian";
+import { Modal, Setting } from "obsidian";
+import type { PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
+
+const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
+    plugins: "Plugins",
+    settings: "Settings",
+    profiles: "Profiles",
+};
+
+export type ReviewChangesOptions = {
+    /** "save" offers per-item reverts before saving; "discard" only previews what will be lost. */
+    mode: "save" | "discard";
+    getChanges: () => PendingChange[];
+    getConfirmLabel: () => string;
+};
+
+const MODE_TEXT = {
+    save: { title: "Review changes", note: "Plugin mode changes are applied when saved." },
+    discard: { title: "Discard changes", note: "These changes will be lost and the saved settings restored." },
+};
+
+/**
+ * Lists the staged draft before saving or discarding it so neither action
+ * touches changes the user has not seen. Resolves `true` when the user confirms.
+ */
+export function showReviewChangesModal(app: App, options: ReviewChangesOptions): Promise<boolean> {
+    return new ReviewChangesModal(app, options).openAndWait();
+}
+
+class ReviewChangesModal extends Modal {
+    private readonly options: ReviewChangesOptions;
+    private confirmed = false;
+    private resolve!: (confirmed: boolean) => void;
+
+    constructor(app: App, options: ReviewChangesOptions) {
+        super(app);
+        this.options = options;
+    }
+
+    onOpen() {
+        this.modalEl.addClass("lazy-review-changes-modal");
+        this.titleEl.setText(MODE_TEXT[this.options.mode].title);
+        this.render();
+    }
+
+    onClose() {
+        super.onClose();
+        this.resolve(this.confirmed);
+    }
+
+    openAndWait(): Promise<boolean> {
+        const result = new Promise<boolean>((resolve) => (this.resolve = resolve));
+        this.open();
+        return result;
+    }
+
+    private render() {
+        const changes = this.options.getChanges();
+        // Reverting the last item leaves nothing to save, so close instead of showing an empty list.
+        if (changes.length === 0) {
+            this.close();
+            return;
+        }
+        const { contentEl } = this;
+        contentEl.empty();
+        for (const group of Object.keys(GROUP_HEADINGS) as PendingChangeGroup[]) {
+            const items = changes.filter((change) => change.group === group);
+            if (items.length === 0) continue;
+            new Setting(contentEl).setName(`${GROUP_HEADINGS[group]} (${items.length})`).setHeading();
+            const list = contentEl.createDiv({ cls: "lazy-review-changes-list" });
+            items.forEach((change) => this.renderChange(list, change));
+        }
+        contentEl.createEl("p", { cls: "lazy-review-changes-note", text: MODE_TEXT[this.options.mode].note });
+        const buttons = contentEl.createDiv({ cls: "modal-button-container" });
+        const confirmClass = this.options.mode === "discard" ? "mod-warning" : "mod-cta";
+        buttons.createEl("button", { text: this.options.getConfirmLabel(), cls: confirmClass }).onClickEvent(() => {
+            this.confirmed = true;
+            this.close();
+        });
+        buttons.createEl("button", { text: "Cancel" }).onClickEvent(() => this.close());
+    }
+
+    private renderChange(list: HTMLElement, change: PendingChange) {
+        const setting = new Setting(list).setName(change.label).setDesc(
+            createFragment((fragment) => {
+                if (change.from !== undefined) {
+                    fragment.createSpan({ cls: "lazy-review-changes-from", text: change.from });
+                    fragment.createSpan({ cls: "lazy-review-changes-arrow", text: " → " });
+                }
+                fragment.createSpan({ cls: "lazy-review-changes-to", text: change.to });
+            }),
+        );
+        const revert = change.revert;
+        // Discarding drops every change at once, so single reverts would only add noise there.
+        if (!revert || this.options.mode === "discard") return;
+        setting.addExtraButton((button) =>
+            button
+                .setIcon("rotate-ccw")
+                .setTooltip("Revert this change")
+                .onClick(() => {
+                    revert();
+                    this.render();
+                }),
+        );
+    }
+}

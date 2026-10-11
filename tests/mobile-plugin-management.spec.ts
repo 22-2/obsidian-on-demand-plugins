@@ -94,7 +94,8 @@ test("mobile plugin management remains usable at phone and tablet widths", async
     }));
     await menuPage.locator(".menu-item").filter({ hasText: "🤲 Lazy on demand" }).click();
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
-    await expect(page.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeEnabled();
+    await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
+    await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeEnabled();
 });
 
 for (const width of [320, 390]) {
@@ -147,7 +148,8 @@ for (const width of [320, 390]) {
         const beforeTop = (await row.boundingBox())!.y;
         await menu.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" }).click();
         await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
-        await expect(page.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeEnabled();
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
+        await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeEnabled();
         // Prepending the pending bar must preserve the row being edited instead of jumping to the top.
         await waitForMobileAnimations(page);
         await expect.poll(async () => Math.abs((await row.boundingBox())!.y - beforeTop)).toBeLessThanOrEqual(2);
@@ -184,7 +186,8 @@ for (const width of [320, 390]) {
             const bounds = await pinnedBounds();
             return Math.abs(bounds.topGap - bounds.expectedGap);
         }).toBeLessThanOrEqual(1);
-        await expect(page.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeInViewport();
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
+        await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeInViewport();
         await capture("scrolled-pinned");
 
         const nextRow = page.locator(".lazy-plugin-mode-row").filter({ has: page.getByText("Mobile fixture 30", { exact: true }) });
@@ -197,7 +200,8 @@ for (const width of [320, 390]) {
         await menu.locator(".menu-item").filter({ hasText: "✅ Always enabled" }).click();
         await waitForMobileAnimations(page);
         await expect(nextRow.locator(".lazy-plugin-mode-badge")).toHaveText("✅ Always enabled");
-        await expect(page.getByRole("button", { name: "Save & apply (2)", exact: true })).toBeInViewport();
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("2 plugins");
+        await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeInViewport();
         await expect.poll(async () => Math.abs((await nextRow.boundingBox())!.y - nextTop)).toBeLessThanOrEqual(2);
         await capture("scrolled-pinned-second-change");
     });

@@ -61,7 +61,8 @@ test("plugin management row menu saves and applies a mode change in place", asyn
     // Exercise the real menu-to-row path: the page keeps the row mounted while it stages this edit.
     await expect(row).toBeVisible();
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
-    const saveButton = settingsPage.getByRole("button", { name: "Save & apply (1)", exact: true });
+    const saveButton = settingsPage.getByRole("button", { name: "Review & save…", exact: true });
+    await expect(settingsPage.locator(".lazy-plugin-save-controls")).toContainText("1 unsaved change · 1 plugin");
     await expect(saveButton).toBeEnabled();
 
     // Applying policies normally reloads Obsidian; intercept only that reload so CI can inspect the saved state.
@@ -82,6 +83,16 @@ test("plugin management row menu saves and applies a mode change in place", asyn
         });
     });
     await saveButton.click();
+    // Saving opens a review of the staged draft first; it can render in whichever window holds focus.
+    const reviewPage = await Promise.any(
+        page.context().pages().map(async (candidate) => {
+            await candidate.locator(".lazy-review-changes-modal").waitFor({ state: "visible", timeout: 10_000 });
+            return candidate;
+        }),
+    );
+    const review = reviewPage.locator(".lazy-review-changes-modal");
+    await expect(review.getByText("🚀 Lazy on layout ready", { exact: true })).toBeVisible();
+    await review.getByRole("button", { name: "Save & apply (1)", exact: true }).click();
 
     // Save controls are pinned only while a draft exists, so a successful
     // save removes the bar instead of leaving a disabled button behind.

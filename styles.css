@@ -29,6 +29,35 @@
     top: 0;
     z-index: 2;
     background: var(--background-primary);
+    /* The summary fits on one line, so trim the row to keep the pinned bar from covering the list. */
+    padding-block: var(--size-4-2);
+}
+
+.lazy-plugin-save-summary {
+    color: var(--text-muted);
+    font-weight: var(--font-normal);
+}
+
+.lazy-review-changes-list .setting-item {
+    padding-block: var(--size-4-2);
+}
+
+.lazy-review-changes-from {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.lazy-review-changes-arrow {
+    color: var(--text-faint);
+}
+
+.lazy-review-changes-to {
+    color: var(--text-normal);
+}
+
+.lazy-review-changes-note {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
 }
 
 .lazy-plugin-filter-row .dropdown {
