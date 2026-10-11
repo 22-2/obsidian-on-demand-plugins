@@ -1,0 +1,24 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -1971,7 +1971,7 @@
+ 		});
+ 		const launcher = new ObsidianE2ELauncher({
+ 			paths,
+-			options: (0, es_toolkit.merge)(DEFAULT_VAULT_OPTIONS, vaultOptions),
++			options: (0, es_toolkit.merge)((0, es_toolkit.merge)({}, DEFAULT_VAULT_OPTIONS), vaultOptions),
+ 			tempUserDataDir: tempDir,
+ 			runId
+ 		});
+diff --git a/dist/index.mjs b/dist/index.mjs
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -1946,7 +1946,7 @@
+ 		});
+ 		const launcher = new ObsidianE2ELauncher({
+ 			paths,
+-			options: merge(DEFAULT_VAULT_OPTIONS, vaultOptions),
++			options: merge(merge({}, DEFAULT_VAULT_OPTIONS), vaultOptions),
+ 			tempUserDataDir: tempDir,
+ 			runId
+ 		});
