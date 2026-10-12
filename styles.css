@@ -170,8 +170,9 @@
     font-size: var(--font-ui-smaller);
 }
 
-.lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge {
-    /* The icon alone reads better without the outline box that the full label needs. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge,
+.lazy-plugin-list-body.is-compact .lazy-plugin-enabled-badge {
+    /* The icon or dot alone reads better without the outline box that the full label needs. */
     padding: 0 6px;
     border: 0;
 }
@@ -295,9 +296,14 @@
 }
 
 .lazy-plugin-enabled-badge {
+    /* Same outlined shape as the mode badge; the dot inside carries the load state. */
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    justify-self: start;
+    padding: 2px 7px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
     color: var(--text-muted);
     white-space: nowrap;
 }
