@@ -126,6 +126,7 @@ export class PluginPage extends SettingPage {
         // so its tooltip supplies the accessible name.
         const toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
         const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
+        compactControl.createSpan({ text: "Compact list" });
         new ToggleComponent(compactControl)
             .setValue(this.compact)
             .setTooltip("Compact list")
@@ -134,7 +135,6 @@ export class PluginPage extends SettingPage {
                 saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
                 this.renderInfiniteList();
             });
-        compactControl.createSpan({ text: "Compact list" });
         toolbar.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
         const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
         listEl.toggleClass("is-compact", this.compact);
