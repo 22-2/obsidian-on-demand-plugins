@@ -4,7 +4,7 @@
     {
       "label": "README: capture screenshots",
       "type": "shell",
-      "command": "Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue; pnpm run build:nocheck; $env:README_SHOT_DIR = Join-Path $env:TEMP 'readme-screenshots'; pnpm exec playwright test tests/readme-screenshots.spec.ts tests/readme-many-plugins.spec.ts tests/readme-many-changes.spec.ts --workers=1; if (Test-Path $env:README_SHOT_DIR) { Invoke-Item $env:README_SHOT_DIR }",
+      "command": "Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue; pnpm run build:nocheck; $env:README_SHOT_DIR = Join-Path $env:TEMP 'readme-screenshots'; pnpm run readme:shots; if (Test-Path $env:README_SHOT_DIR) { Invoke-Item $env:README_SHOT_DIR }",
       "options": {
         "shell": {
           "executable": "pwsh",
