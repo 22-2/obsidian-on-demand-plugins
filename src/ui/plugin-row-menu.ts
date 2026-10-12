@@ -19,26 +19,17 @@ const MODE_ORDER: PLUGIN_MODE[] = [PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.LAZY
  * rebuild the list (which would reset scroll and break infinite scroll).
  */
 export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions): void {
-    // Both states stay visible like the Mode section. These change only the runtime
-    // state (enablePlugin/disablePlugin), so the saved mode and the staged draft are untouched.
-    const isEnabled = options.isEnabled();
-    menu.addItem((item) => item.setTitle("Status (in memory only)").setDisabled(true));
-    menu.addItem((item) =>
-        item
-            .setTitle("Enabled")
-            .setChecked(isEnabled)
-            .onClick(() => {
-                if (!isEnabled) options.onToggleEnabled(true);
-            }),
-    );
-    menu.addItem((item) =>
-        item
-            .setTitle("Disabled")
-            .setChecked(!isEnabled)
-            .onClick(() => {
-                if (isEnabled) options.onToggleEnabled(false);
-            }),
-    );
+    // The saved mode comes first because it is what the user most often changes.
+    menu.addItem((item) => item.setTitle("Mode").setDisabled(true));
+    const current = options.getMode();
+    for (const mode of MODE_ORDER) {
+        menu.addItem((item) =>
+            item
+                .setTitle(PluginModes[mode])
+                .setChecked(mode === current)
+                .onClick(() => options.onSelectMode(mode)),
+        );
+    }
 
     menu.addSeparator();
 
@@ -65,14 +56,25 @@ export function addPluginRowMenuItems(menu: Menu, options: PluginRowMenuOptions)
     );
 
     menu.addSeparator();
-    menu.addItem((item) => item.setTitle("Mode").setDisabled(true));
-    const current = options.getMode();
-    for (const mode of MODE_ORDER) {
-        menu.addItem((item) =>
-            item
-                .setTitle(PluginModes[mode])
-                .setChecked(mode === current)
-                .onClick(() => options.onSelectMode(mode)),
-        );
-    }
+
+    // Both states stay visible at the bottom. These change only the runtime
+    // state (enablePlugin/disablePlugin), so the saved mode and the staged draft are untouched.
+    const isEnabled = options.isEnabled();
+    menu.addItem((item) => item.setTitle("Status (in memory only)").setDisabled(true));
+    menu.addItem((item) =>
+        item
+            .setTitle("Enabled")
+            .setChecked(isEnabled)
+            .onClick(() => {
+                if (!isEnabled) options.onToggleEnabled(true);
+            }),
+    );
+    menu.addItem((item) =>
+        item
+            .setTitle("Disabled")
+            .setChecked(!isEnabled)
+            .onClick(() => {
+                if (isEnabled) options.onToggleEnabled(false);
+            }),
+    );
 }
