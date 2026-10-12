@@ -1,6 +1,6 @@
 import log from "loglevel";
 import type { App, EventRef, PluginManifest } from "obsidian";
-import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage, ToggleComponent } from "obsidian";
+import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage, ToggleComponent, setTooltip } from "obsidian";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
@@ -22,13 +22,13 @@ function setModeBadgeText(badge: HTMLElement, label: string) {
     badge.empty();
     badge.createSpan({ cls: "lazy-plugin-badge-icon", text: icon });
     badge.createSpan({ cls: "lazy-plugin-badge-text", text: ` ${words.join(" ")}` });
-    badge.setAttr("title", label);
+    setTooltip(badge, label);
 }
 
 function setStatusBadgeText(badge: HTMLElement, text: string) {
     badge.empty();
     badge.createSpan({ cls: "lazy-plugin-badge-text", text });
-    badge.setAttr("title", text);
+    setTooltip(badge, text);
 }
 
 export class PluginPage extends SettingPage {
@@ -126,7 +126,6 @@ export class PluginPage extends SettingPage {
         // so its tooltip supplies the accessible name.
         const toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
         const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
-        compactControl.createSpan({ text: "Compact list" });
         new ToggleComponent(compactControl)
             .setValue(this.compact)
             .setTooltip("Compact list")
@@ -135,6 +134,7 @@ export class PluginPage extends SettingPage {
                 saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
                 this.renderInfiniteList();
             });
+        compactControl.createSpan({ text: "Compact list" });
         toolbar.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
         const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
         listEl.toggleClass("is-compact", this.compact);
