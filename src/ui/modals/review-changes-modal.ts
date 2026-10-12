@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { ExtraButtonComponent, Modal, Setting } from "obsidian";
+import { ExtraButtonComponent, Modal, Setting, setIcon } from "obsidian";
 import type { PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 
 const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
@@ -89,7 +89,8 @@ class ReviewChangesModal extends Modal {
         const desc = info.createDiv({ cls: "lazy-review-changes-desc" });
         if (change.from !== undefined) {
             desc.createSpan({ cls: "lazy-review-changes-from", text: change.from });
-            desc.createSpan({ cls: "lazy-review-changes-arrow", text: " → " });
+            // An icon rather than a "→" glyph: the glyph is too thin to read at this size, even when bolded.
+            setIcon(desc.createSpan({ cls: "lazy-review-changes-arrow" }), "arrow-right");
         }
         desc.createSpan({ cls: "lazy-review-changes-to", text: change.to });
         const revert = change.revert;

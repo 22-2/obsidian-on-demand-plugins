@@ -73,7 +73,16 @@
 }
 
 .lazy-review-changes-arrow {
-    color: var(--text-faint);
+    /* Full text colour so the arrow reads clearly between the two muted labels. */
+    color: var(--text-normal);
+    display: inline-flex;
+    vertical-align: middle;
+    margin-inline: 2px;
+}
+
+.lazy-review-changes-arrow svg {
+    width: 1em;
+    height: 1em;
 }
 
 .lazy-review-changes-to {
