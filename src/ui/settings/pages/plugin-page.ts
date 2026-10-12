@@ -41,7 +41,7 @@ export class PluginPage extends SettingPage {
         void this.refreshCommunityPluginSnapshot();
         this.containerEl.empty();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
-        new Setting(this.containerEl).setName("Statistics").setHeading();
+        new Setting(this.containerEl).setName("Overview").setHeading();
         new Setting(this.containerEl)
             .setName(pluginStatisticsText(this.plugin))
             .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
@@ -63,7 +63,8 @@ export class PluginPage extends SettingPage {
                         this.renderInfiniteList();
                     }),
             );
-        const filterSetting = new Setting(this.containerEl).setName("Filter");
+        // No row name: the placeholder already says what the field is, and a name column only leaves a gap.
+        const filterSetting = new Setting(this.containerEl);
         filterSetting.setClass("lazy-plugin-filter-row");
         filterSetting
             .addText((t) =>

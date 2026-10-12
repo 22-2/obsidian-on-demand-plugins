@@ -270,6 +270,22 @@
     white-space: normal;
 }
 
+.lazy-plugin-filter-row .setting-item-info {
+    display: none;
+}
+
+.lazy-plugin-filter-row .setting-item-control {
+    /* The search field takes the free width and the mode dropdown keeps its fixed width beside it. */
+    flex: 1 1 auto;
+    width: 100%;
+    gap: var(--size-4-2);
+}
+
+.lazy-plugin-filter-row input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
 .is-mobile .lazy-plugin-filter-row .setting-item-control {
     /* Equal flexible columns prevent the fixed desktop dropdown width from squeezing the search field. */
     display: grid;
