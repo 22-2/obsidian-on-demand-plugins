@@ -201,6 +201,11 @@
     font-size: var(--font-ui-small);
 }
 
+.lazy-plugin-compact-control .checkbox-container {
+    /* A compact switch fits the one-line toolbar better than the default size. */
+    zoom: 0.7;
+}
+
 .lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-description {
     /* Lets the badges become flex items of the info row instead of a separate block below the name. */
     display: contents;
