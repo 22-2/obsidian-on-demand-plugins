@@ -435,6 +435,25 @@ body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-meta-badge {
     min-width: 0;
     /* Wrap the control once the text would get narrower than this basis. */
     flex: 1 1 14rem;
+    /* The name and its version share a line; the description takes the full line below. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--size-4-2);
+}
+
+.lazy-plugin-mode-row .setting-item-info > .setting-item-description {
+    flex: 1 1 100%;
+}
+
+.lazy-plugin-mode-row .lazy-plugin-version {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-version {
+    display: none;
 }
 
 .lazy-plugin-mode-row .setting-item-name,

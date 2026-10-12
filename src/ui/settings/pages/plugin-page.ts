@@ -179,14 +179,13 @@ export class PluginPage extends SettingPage {
             setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
             enabledBadge.setAttr("data-plugin-id", manifest.id);
             enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
-            // Author names vary widely in length; keep them on a separate
-            // line and omit the attribution prefix when no author is given.
-            // The author comes first so the version sits at the end of the line.
+            // The version sits beside the plugin name, as a sibling so the name text stays exact.
+            setting.nameEl.after(createSpan({ cls: "lazy-plugin-version", text: `v${manifest.version}` }));
+            // Author names vary widely in length, so they keep their own line on the badge row.
             const author = manifest.author?.trim();
-            setting.descEl.createDiv({
-                cls: "lazy-plugin-meta-badge",
-                text: `${author ? `by ${author} · ` : ""}v${manifest.version}`,
-            });
+            if (author) {
+                setting.descEl.createDiv({ cls: "lazy-plugin-meta-badge", text: `by ${author}` });
+            }
             const actionsButton = new ExtraButtonComponent(setting.controlEl).setIcon("ellipsis-vertical").setTooltip("Plugin actions");
             actionsButton.extraSettingsEl.addClass("lazy-plugin-row-actions-desktop");
             // Both controls open the same menu; anchor it to the visible control
