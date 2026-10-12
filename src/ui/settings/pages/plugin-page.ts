@@ -67,7 +67,17 @@ export class PluginPage extends SettingPage {
             .setName(pluginStatisticsText(this.plugin))
             .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
             .setClass("lazy-plugin-statistics");
-        new Setting(this.containerEl).setName("Plugins").setHeading();
+        // Phones show the refresh control on the heading's right; desktop shows it beside the filters (see CSS).
+        new Setting(this.containerEl)
+            .setName("Plugins")
+            .setHeading()
+            .addExtraButton((button) => {
+                button.extraSettingsEl.addClass("lazy-plugin-refresh-mobile");
+                button
+                    .setIcon("refresh-cw")
+                    .setTooltip("Refresh plugin list")
+                    .onClick(() => this.refreshList());
+            });
         // No row name: the placeholder already says what the field is, and a name column only leaves a gap.
         const filterSetting = new Setting(this.containerEl);
         filterSetting.setClass("lazy-plugin-filter-row");
@@ -90,21 +100,23 @@ export class PluginPage extends SettingPage {
                 });
             })
             // Beside the filters, so the refresh control lines up with the mode dropdown instead of the heading.
-            .addExtraButton((button) =>
+            .addExtraButton((button) => {
+                button.extraSettingsEl.addClass("lazy-plugin-refresh-desktop");
                 button
                     .setIcon("refresh-cw")
                     .setTooltip("Refresh plugin list")
-                    .onClick(() => {
-                        this.plugin.updateManifests();
-                        void this.refreshCommunityPluginSnapshot();
-                        // Re-render the list directly: tab.update() does not
-                        // guarantee the open page is re-displayed, so relying
-                        // on it leaves live badges (e.g. Enabled after an
-                        // on-demand load) stale.
-                        this.renderInfiniteList();
-                    }),
-            );
+                    .onClick(() => this.refreshList());
+            });
         this.containerEl.createDiv({ cls: "lazy-plugin-infinite-host" });
+        this.renderInfiniteList();
+    }
+    private refreshList() {
+        this.plugin.updateManifests();
+        void this.refreshCommunityPluginSnapshot();
+        // Re-render the list directly: tab.update() does not
+        // guarantee the open page is re-displayed, so relying
+        // on it leaves live badges (e.g. Enabled after an
+        // on-demand load) stale.
         this.renderInfiniteList();
     }
     hide() {
@@ -231,8 +243,8 @@ export class PluginPage extends SettingPage {
             setting.addButton((button) => {
                 button.buttonEl.addEventListener("mousedown", keepMenuForClick);
                 button.setIcon("ellipsis-vertical").onClick(() => openActions(button.buttonEl));
-                // Icon only: the three dots already say what the button does, so the accessible name goes on the button.
-                button.buttonEl.setAttr("aria-label", "Actions");
+                // setIcon replaces button contents, so append the label afterward.
+                button.buttonEl.createSpan({ text: "Actions" });
                 button.buttonEl.addClass("lazy-plugin-row-actions-mobile");
             });
         });

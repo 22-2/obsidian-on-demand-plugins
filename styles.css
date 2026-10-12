@@ -497,17 +497,22 @@ body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-meta-badge {
     justify-content: flex-end;
 }
 
+/* Refresh control: phones show it on the Plugins heading, desktop beside the filters. */
+.is-mobile .lazy-plugin-refresh-desktop,
+body:not(.is-mobile) .lazy-plugin-refresh-mobile {
+    display: none;
+}
+
 .is-mobile .lazy-plugin-list-body .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-mobile {
-    /* Icon-only three-dot button: a touch-sized target, a little wider than square, with an outline. */
+    /* A labelled button aligned to the right is easier to reach and hit with a thumb. */
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0;
-    min-width: 48px;
-    width: 48px;
+    gap: var(--size-4-2);
+    min-width: 112px;
+    width: 112px;
     min-height: 44px;
-    height: 44px;
-    padding: 0;
+    padding: var(--size-4-2) var(--size-4-4);
     margin: 0;
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
