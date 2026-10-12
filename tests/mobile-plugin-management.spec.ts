@@ -146,14 +146,19 @@ for (const width of [320, 390]) {
         };
         await capture("actions-menu");
         // Opening the menu can scroll the button into view; compare against the row's settled position.
-        const beforeTop = (await row.boundingBox())!.y;
-        await menu.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" }).click();
-        await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
+        const beforeBounds = (await row.boundingBox())!;
+        // At 320px, "Lazy on layout ready" wraps the status badge onto another line.
+        // If the row's top is clipped, scroll anchoring preserves its bottom and moves
+        // the top by that extra line's height. Use a same-height mode here to isolate
+        // save-bar insertion; the phone/tablet test above covers the longest label.
+        await menu.locator(".menu-item").filter({ hasText: "🤲 Lazy on demand" }).click();
+        await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
         await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
         await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeEnabled();
         // Prepending the pending bar must preserve the row being edited instead of jumping to the top.
         await waitForMobileAnimations(page);
-        await expect.poll(async () => Math.abs((await row.boundingBox())!.y - beforeTop)).toBeLessThanOrEqual(2);
+        await expect.poll(async () => Math.abs((await row.boundingBox())!.height - beforeBounds.height)).toBeLessThanOrEqual(1);
+        await expect.poll(async () => Math.abs((await row.boundingBox())!.y - beforeBounds.y)).toBeLessThanOrEqual(2);
 
         const sticky = page.locator(".lazy-plugin-save-controls");
         const pinnedBounds = () => sticky.evaluate((bar) => {
