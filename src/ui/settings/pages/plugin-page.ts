@@ -231,8 +231,8 @@ export class PluginPage extends SettingPage {
             setting.addButton((button) => {
                 button.buttonEl.addEventListener("mousedown", keepMenuForClick);
                 button.setIcon("ellipsis-vertical").onClick(() => openActions(button.buttonEl));
-                // setIcon replaces button contents, so append the label afterward.
-                button.buttonEl.createSpan({ text: "Actions" });
+                // Icon only: the three dots already say what the button does, so the accessible name goes on the button.
+                button.buttonEl.setAttr("aria-label", "Actions");
                 button.buttonEl.addClass("lazy-plugin-row-actions-mobile");
             });
         });

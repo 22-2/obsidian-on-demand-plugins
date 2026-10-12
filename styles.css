@@ -274,13 +274,27 @@
     padding-block: var(--size-4-1);
 }
 
+/* Compact rows: centre the ⋮ button, the name and the badges on one shared line. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-control,
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row > .setting-item-info {
+    align-self: center;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-name {
+    margin: 0;
+}
+
 /* Touch target: the ⋮ button gets a 44px hit area on phones, the usual minimum for a finger. */
 .is-mobile .lazy-plugin-list-body.is-compact .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-desktop {
-    width: 44px;
-    min-width: 44px;
+    /* Same shape as the phone row button: a little wider than square, outlined. */
+    width: 48px;
+    min-width: 48px;
     height: 44px;
     align-items: center;
     justify-content: center;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--interactive-normal);
 }
 
 /* The switch keeps its normal size on phones so it is easy to hit. */
@@ -431,15 +445,16 @@
 }
 
 .is-mobile .lazy-plugin-list-body .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-mobile {
-    /* A wide button aligned to the right is easier to reach and hit with a thumb. */
+    /* Icon-only three-dot button: a touch-sized target, a little wider than square, with an outline. */
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: var(--size-4-2);
-    min-width: 112px;
-    width: 112px;
+    gap: 0;
+    min-width: 48px;
+    width: 48px;
     min-height: 44px;
-    padding: var(--size-4-2) var(--size-4-4);
+    height: 44px;
+    padding: 0;
     margin: 0;
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);

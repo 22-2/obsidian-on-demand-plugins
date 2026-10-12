@@ -75,7 +75,8 @@ test("mobile plugin management remains usable at phone and tablet widths", async
                 fits: el.scrollWidth <= el.clientWidth && r.left >= 0 && r.right <= window.innerWidth,
             };
         });
-        expect(bounds.width).toBeGreaterThanOrEqual(112);
+        // Icon-only three-dot button: a touch target at least as wide as it is tall.
+        expect(bounds.width).toBeGreaterThanOrEqual(44);
         expect(bounds.height).toBeGreaterThanOrEqual(44);
         expect(bounds.rightGap).toBeLessThanOrEqual(17);
         expect(bounds.belowDescription).toBe(true);
