@@ -1,7 +1,8 @@
 import log from "loglevel";
 import type { App, EventRef, PluginManifest } from "obsidian";
-import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage } from "obsidian";
+import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage, ToggleComponent } from "obsidian";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
+import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
@@ -12,11 +13,30 @@ import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
 
 const logger = log.getLogger("OnDemandPlugin/PluginPage");
+const COMPACT_LIST_STORAGE_KEY = "compact-plugin-list";
+
+// Badge words sit in their own span so the compact list can hide them and keep only the icon or dot.
+// The full text stays in the tooltip for the hidden words.
+function setModeBadgeText(badge: HTMLElement, label: string) {
+    const [icon, ...words] = label.split(" ");
+    badge.empty();
+    badge.createSpan({ cls: "lazy-plugin-badge-icon", text: icon });
+    badge.createSpan({ cls: "lazy-plugin-badge-text", text: ` ${words.join(" ")}` });
+    badge.setAttr("title", label);
+}
+
+function setStatusBadgeText(badge: HTMLElement, text: string) {
+    badge.empty();
+    badge.createSpan({ cls: "lazy-plugin-badge-text", text });
+    badge.setAttr("title", text);
+}
 
 export class PluginPage extends SettingPage {
     private static readonly PAGE_SIZE = 24;
     private filter = "";
     private mode?: PLUGIN_MODE;
+    // Kept in vault-scoped local storage, not in the staged settings draft, so it saves at once.
+    private compact = false;
     private app: App;
     private plugin: OnDemandPlugin;
     private tab: SettingsTab;
@@ -30,6 +50,7 @@ export class PluginPage extends SettingPage {
         this.app = app;
         this.plugin = plugin;
         this.tab = tab;
+        this.compact = loadLocalStorage<boolean>(app, COMPACT_LIST_STORAGE_KEY) === true;
     }
     display() {
         this.disconnectInfiniteScroll();
@@ -101,8 +122,22 @@ export class PluginPage extends SettingPage {
         // only the query so typing and internal spaces in plugin names stay intact.
         const query = this.filter.trim().toLowerCase();
         const plugins = this.plugin.manifests.filter((manifest) => (!query || manifest.name.toLowerCase().includes(query)) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
-        host.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
+        // The compact toggle sits at the right edge of the count line. It has no visible label,
+        // so its tooltip supplies the accessible name.
+        const toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
+        const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
+        compactControl.createSpan({ text: "Compact list" });
+        new ToggleComponent(compactControl)
+            .setValue(this.compact)
+            .setTooltip("Compact list")
+            .onChange((value) => {
+                this.compact = value;
+                saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
+                this.renderInfiniteList();
+            });
+        toolbar.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
         const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
+        listEl.toggleClass("is-compact", this.compact);
         this.loadedCount = Math.min(PluginPage.PAGE_SIZE, plugins.length);
         this.appendPluginRows(listEl, plugins, 0, this.loadedCount);
         if (this.loadedCount >= plugins.length) return;
@@ -136,16 +171,12 @@ export class PluginPage extends SettingPage {
             // an editable control; edits go through the 3-dot menu instead.
             const badges = setting.descEl.createDiv({ cls: "lazy-plugin-badges" });
             const mode = this.plugin.getPluginMode(manifest.id);
-            const modeBadge = badges.createSpan({
-                cls: "lazy-plugin-mode-badge",
-                text: pluginModeLabel(mode),
-            });
+            const modeBadge = badges.createSpan({ cls: "lazy-plugin-mode-badge" });
+            setModeBadgeText(modeBadge, pluginModeLabel(mode));
             // Show the live runtime state; the staged mode alone cannot tell
             // whether a lazy plugin is actually loaded right now.
-            const enabledBadge = badges.createSpan({
-                cls: "lazy-plugin-enabled-badge",
-                text: enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds),
-            });
+            const enabledBadge = badges.createSpan({ cls: "lazy-plugin-enabled-badge" });
+            setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
             enabledBadge.setAttr("data-plugin-id", manifest.id);
             enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
             // Author names vary widely in length; keep them on a separate
@@ -221,7 +252,7 @@ export class PluginPage extends SettingPage {
             logger.error(`Failed to ${enabled ? "enable" : "disable"} plugin ${manifest.id}`, error);
             new Notice(`Failed to ${enabled ? "enable" : "disable"} ${manifest.name}`);
         }
-        enabledBadge.setText(enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
+        setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
         enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
     }
 
@@ -242,8 +273,8 @@ export class PluginPage extends SettingPage {
         // Update only the badges in place so the row stays where it is even
         // when it no longer matches the active filter; re-filtering waits
         // until the user changes the filter conditions.
-        modeBadge.setText(pluginModeLabel(mode));
-        enabledBadge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
+        setModeBadgeText(modeBadge, pluginModeLabel(mode));
+        setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
         enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, pluginId));
         this.refreshStats();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
@@ -287,7 +318,7 @@ export class PluginPage extends SettingPage {
             const pluginId = badge.dataset.pluginId;
             if (!pluginId) return;
             const loaded = isPluginLoaded(this.app, pluginId);
-            badge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
+            setStatusBadgeText(badge, enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
             badge.toggleClass("is-loaded", loaded);
         });
     }

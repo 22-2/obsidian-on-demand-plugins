@@ -7,6 +7,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    gap: var(--size-4-3);
     min-height: var(--size-4-8);
     margin: 0;
     padding: 0 var(--size-4-2);
@@ -132,6 +133,76 @@
 
 .lazy-plugin-list-body > .lazy-plugin-mode-row + .lazy-plugin-mode-row {
     border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Compact list: the name, mode and load state share one line; the description and author line are hidden. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row {
+    /* Tighter rows: the default card padding is too loose for a one-line list. */
+    padding: var(--size-4-2) var(--size-4-3);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-name {
+    font-size: var(--font-ui-small);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row > .setting-item-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--size-4-2);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge,
+.lazy-plugin-list-body.is-compact .lazy-plugin-enabled-badge {
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge {
+    padding: 0 6px;
+}
+
+/* Compact list: keep only the mode icon and the load dot; the words stay in each badge's tooltip. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-badge-text {
+    display: none;
+}
+
+/* Push the badges to the right edge, next to the actions button. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-badges {
+    margin-left: auto;
+}
+
+.lazy-plugin-list-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--size-4-2);
+    min-height: var(--size-4-8);
+    padding: 0 var(--size-4-2);
+}
+
+.lazy-plugin-compact-control {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-description {
+    /* Lets the badges become flex items of the info row instead of a separate block below the name. */
+    display: contents;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-description,
+.lazy-plugin-list-body.is-compact .lazy-plugin-meta-badge {
+    display: none;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-2);
+    margin-top: 0;
 }
 
 .lazy-plugin-mode-row .setting-item-name {
