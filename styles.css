@@ -118,6 +118,8 @@
 .lazy-plugin-list-body > .lazy-plugin-mode-row {
     align-items: flex-start;
     flex-direction: row;
+    /* On narrow panes the control moves below the text instead of squeezing the description to nothing. */
+    flex-wrap: wrap;
     gap: var(--size-4-3);
     margin: 0;
     padding: var(--size-4-4);
@@ -196,7 +198,8 @@
 
 .lazy-plugin-mode-row .setting-item-info {
     min-width: 0;
-    flex: 1 1 auto;
+    /* Wrap the control once the text would get narrower than this basis. */
+    flex: 1 1 14rem;
 }
 
 .lazy-plugin-mode-row .setting-item-name,
