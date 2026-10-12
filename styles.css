@@ -28,7 +28,8 @@
     position: sticky;
     top: 0;
     z-index: 2;
-    background: var(--background-primary);
+    /* Use the card colour: on phones the page background is black, which made the pinned bar look like a hole. */
+    background: var(--background-secondary);
     /* The summary fits on one line, so trim the row to keep the pinned bar from covering the list. */
     padding-block: var(--size-4-2);
 }
