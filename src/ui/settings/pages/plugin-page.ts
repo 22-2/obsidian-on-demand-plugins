@@ -181,10 +181,11 @@ export class PluginPage extends SettingPage {
             enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
             // Author names vary widely in length; keep them on a separate
             // line and omit the attribution prefix when no author is given.
+            // The author comes first so the version sits at the end of the line.
             const author = manifest.author?.trim();
             setting.descEl.createDiv({
                 cls: "lazy-plugin-meta-badge",
-                text: `v${manifest.version}${author ? ` · by ${author}` : ""}`,
+                text: `${author ? `by ${author} · ` : ""}v${manifest.version}`,
             });
             const actionsButton = new ExtraButtonComponent(setting.controlEl).setIcon("ellipsis-vertical").setTooltip("Plugin actions");
             actionsButton.extraSettingsEl.addClass("lazy-plugin-row-actions-desktop");
