@@ -676,3 +676,8 @@
         transform: translateY(0);
     }
 }
+
+/* The pinned bar uses the card colour, so give its buttons an edge that stays visible in every theme. */
+.lazy-plugin-save-controls.has-pending-changes .setting-item-control button:not(.mod-cta) {
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
