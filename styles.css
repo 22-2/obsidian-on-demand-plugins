@@ -33,6 +33,19 @@
     background: var(--background-secondary);
     /* The summary fits on one line, so trim the row to keep the pinned bar from covering the list. */
     padding-block: var(--size-4-2);
+    /* Keep the summary clear of the card edge and centre it on the buttons. */
+    padding-inline: var(--size-4-4);
+    align-items: center;
+}
+
+.lazy-plugin-save-controls.has-pending-changes .setting-item-info {
+    min-width: 0;
+    overflow: visible;
+}
+
+.lazy-plugin-save-controls.has-pending-changes .setting-item-control {
+    align-self: center;
+    margin: 0;
 }
 
 .lazy-plugin-save-summary {
