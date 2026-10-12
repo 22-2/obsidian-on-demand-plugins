@@ -165,8 +165,8 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
     await obsidian.page.evaluate((pluginId) => app.plugins.enablePlugin(pluginId), targetPluginId);
     await expect.poll(() => obsidian.page.evaluate((pluginId) => Boolean(app.plugins.plugins[pluginId]?._loaded), targetPluginId)).toBe(true);
 
-    const pluginsHeading = settingsPage.locator(".setting-item-heading").filter({ hasText: "Plugins" });
-    await pluginsHeading.locator(".clickable-icon").click();
+    const refreshButton = settingsPage.locator(".lazy-plugin-filter-row .clickable-icon");
+    await refreshButton.click();
     await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
 
     await obsidian.page.evaluate(async (pluginId) => {
@@ -176,7 +176,7 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
         app.plugins.enabledPlugins.add(pluginId);
         await app.vault.writeConfigJson("community-plugins", [...new Set([...savedIds, pluginId])]);
     }, targetPluginId);
-    await pluginsHeading.locator(".clickable-icon").click();
+    await refreshButton.click();
     await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded");
 });
 

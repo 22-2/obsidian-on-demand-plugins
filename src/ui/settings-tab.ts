@@ -120,27 +120,31 @@ export class SettingsTab extends PluginSettingTab {
                     .setButtonText("Review & save…")
                     .setCta()
                     .setDisabled(!this.hasPendingChanges)
-                    .onClick(async () => {
-                        const confirmed = await showReviewChangesModal(this.app, {
-                            mode: "save",
-                            getChanges: () => this.describeChanges(),
-                            getConfirmLabel: () => this.saveButtonText(),
-                        });
-                        // Reverts in the modal edit the draft even when the save is cancelled.
-                        this.plugin.configureLogger();
-                        if (confirmed) await this.saveChanges();
-                        else this.update();
-                        onRefresh?.();
-                    }),
+                    .onClick(() => void this.reviewAndSave(onRefresh)),
             )
             .addButton((button) =>
                 button
                     .setButtonText("Discard…")
                     .setDisabled(!this.hasPendingChanges)
-                    .onClick(async () => {
-                        if (await this.discardChanges()) onRefresh?.();
-                    }),
+                    .onClick(() => void this.discardFromBar(onRefresh)),
             );
+    }
+    // Obsidian shows a loading spinner on a button while its click handler is pending, so the
+    // handlers stay synchronous and the awaiting happens here. Otherwise the spinner would stay on for the whole review.
+    private async reviewAndSave(onRefresh?: () => void) {
+        const confirmed = await showReviewChangesModal(this.app, {
+            mode: "save",
+            getChanges: () => this.describeChanges(),
+            getConfirmLabel: () => this.saveButtonText(),
+        });
+        // Reverts in the modal edit the draft even when the save is cancelled.
+        this.plugin.configureLogger();
+        if (confirmed) await this.saveChanges();
+        else this.update();
+        onRefresh?.();
+    }
+    private async discardFromBar(onRefresh?: () => void) {
+        if (await this.discardChanges()) onRefresh?.();
     }
     renderPendingControls(container: HTMLElement, onRefresh?: () => void) {
         container.querySelector(".lazy-plugin-save-controls")?.remove();

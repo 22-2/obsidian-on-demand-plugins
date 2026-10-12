@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { Modal, Setting } from "obsidian";
+import { ExtraButtonComponent, Modal, setIcon } from "obsidian";
 import type { PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 
 const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
@@ -64,15 +64,20 @@ class ReviewChangesModal extends Modal {
         }
         const { contentEl } = this;
         contentEl.empty();
+        // The list scrolls inside the body while the buttons stay pinned in the footer, so a long list
+        // never pushes the confirm and cancel buttons off the screen.
+        const body = contentEl.createDiv({ cls: "lazy-review-changes-body" });
         for (const group of Object.keys(GROUP_HEADINGS) as PendingChangeGroup[]) {
             const items = changes.filter((change) => change.group === group);
             if (items.length === 0) continue;
-            new Setting(contentEl).setName(`${GROUP_HEADINGS[group]} (${items.length})`).setHeading();
-            const list = contentEl.createDiv({ cls: "lazy-review-changes-list" });
+            // A quiet label, not a heading: a second heading-styled line would read as another dialog title.
+            body.createDiv({ cls: "lazy-review-changes-group", text: `${GROUP_HEADINGS[group]} (${items.length})` });
+            const list = body.createDiv({ cls: "lazy-review-changes-list" });
             items.forEach((change) => this.renderChange(list, change));
         }
-        contentEl.createEl("p", { cls: "lazy-review-changes-note", text: MODE_TEXT[this.options.mode].note });
-        const buttons = contentEl.createDiv({ cls: "modal-button-container" });
+        body.createEl("p", { cls: "lazy-review-changes-note", text: MODE_TEXT[this.options.mode].note });
+        const footer = contentEl.createDiv({ cls: "lazy-review-changes-footer" });
+        const buttons = footer.createDiv({ cls: "modal-button-container" });
         const confirmClass = this.options.mode === "discard" ? "mod-warning" : "mod-cta";
         buttons.createEl("button", { text: this.options.getConfirmLabel(), cls: confirmClass }).onClickEvent(() => {
             this.confirmed = true;
@@ -82,26 +87,36 @@ class ReviewChangesModal extends Modal {
     }
 
     private renderChange(list: HTMLElement, change: PendingChange) {
-        const setting = new Setting(list).setName(change.label).setDesc(
-            createFragment((fragment) => {
-                if (change.from !== undefined) {
-                    fragment.createSpan({ cls: "lazy-review-changes-from", text: change.from });
-                    fragment.createSpan({ cls: "lazy-review-changes-arrow", text: " → " });
-                }
-                fragment.createSpan({ cls: "lazy-review-changes-to", text: change.to });
-            }),
-        );
+        // A plain row rather than a Setting: mobile Setting styles stack the revert button below long text.
+        const item = list.createDiv({ cls: "lazy-review-changes-item" });
+        const info = item.createDiv({ cls: "lazy-review-changes-info" });
+        info.createDiv({ cls: "lazy-review-changes-name", text: change.label });
+        const desc = info.createDiv({ cls: "lazy-review-changes-desc" });
+        if (this.options.mode === "discard") {
+            // Discarding drops the draft value (`to`) and restores the saved one (`from`). Say so in words,
+            // since an arrow would read as a change being made.
+            desc.createSpan({ cls: "lazy-review-changes-lost", text: change.to });
+            if (change.from !== undefined) {
+                desc.createSpan({ cls: "lazy-review-changes-restore-label", text: " · restores " });
+                desc.createSpan({ cls: "lazy-review-changes-to", text: change.from });
+            }
+            // Discarding drops every change at once, so single reverts would only add noise there.
+            return;
+        }
+        if (change.from !== undefined) {
+            desc.createSpan({ cls: "lazy-review-changes-from", text: change.from });
+            // An icon rather than a "→" glyph: the glyph is too thin to read at this size, even when bolded.
+            setIcon(desc.createSpan({ cls: "lazy-review-changes-arrow" }), "arrow-right");
+        }
+        desc.createSpan({ cls: "lazy-review-changes-to", text: change.to });
         const revert = change.revert;
-        // Discarding drops every change at once, so single reverts would only add noise there.
-        if (!revert || this.options.mode === "discard") return;
-        setting.addExtraButton((button) =>
-            button
-                .setIcon("rotate-ccw")
-                .setTooltip("Revert this change")
-                .onClick(() => {
-                    revert();
-                    this.render();
-                }),
-        );
+        if (!revert) return;
+        new ExtraButtonComponent(item)
+            .setIcon("rotate-ccw")
+            .setTooltip("Revert this change")
+            .onClick(() => {
+                revert();
+                this.render();
+            });
     }
 }

@@ -75,7 +75,8 @@ test("mobile plugin management remains usable at phone and tablet widths", async
                 fits: el.scrollWidth <= el.clientWidth && r.left >= 0 && r.right <= window.innerWidth,
             };
         });
-        expect(bounds.width).toBeGreaterThanOrEqual(112);
+        // Icon-only three-dot button: a touch target at least as wide as it is tall.
+        expect(bounds.width).toBeGreaterThanOrEqual(44);
         expect(bounds.height).toBeGreaterThanOrEqual(44);
         expect(bounds.rightGap).toBeLessThanOrEqual(17);
         expect(bounds.belowDescription).toBe(true);
@@ -138,21 +139,26 @@ for (const width of [320, 390]) {
 
         const artifactDir = path.resolve(".ci-artifacts/mobile-ui");
         await mkdir(artifactDir, { recursive: true });
-        const capture = async (state: string) => {
+        const capture = async (state: string, target: Page = page) => {
             const screenshotPath = path.join(artifactDir, `mobile-${width}-${state}.png`);
-            await page.screenshot({ path: screenshotPath, animations: "disabled" });
+            await target.screenshot({ path: screenshotPath, animations: "disabled" });
             await testInfo.attach(`mobile-${width}-${state}`, { path: screenshotPath, contentType: "image/png" });
         };
         await capture("actions-menu");
         // Opening the menu can scroll the button into view; compare against the row's settled position.
-        const beforeTop = (await row.boundingBox())!.y;
-        await menu.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" }).click();
-        await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
+        const beforeBounds = (await row.boundingBox())!;
+        // At 320px, "Lazy on layout ready" wraps the status badge onto another line.
+        // If the row's top is clipped, scroll anchoring preserves its bottom and moves
+        // the top by that extra line's height. Use a same-height mode here to isolate
+        // save-bar insertion; the phone/tablet test above covers the longest label.
+        await menu.locator(".menu-item").filter({ hasText: "🤲 Lazy on demand" }).click();
+        await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
         await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
         await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeEnabled();
         // Prepending the pending bar must preserve the row being edited instead of jumping to the top.
         await waitForMobileAnimations(page);
-        await expect.poll(async () => Math.abs((await row.boundingBox())!.y - beforeTop)).toBeLessThanOrEqual(2);
+        await expect.poll(async () => Math.abs((await row.boundingBox())!.height - beforeBounds.height)).toBeLessThanOrEqual(1);
+        await expect.poll(async () => Math.abs((await row.boundingBox())!.y - beforeBounds.y)).toBeLessThanOrEqual(2);
 
         const sticky = page.locator(".lazy-plugin-save-controls");
         const pinnedBounds = () => sticky.evaluate((bar) => {
@@ -204,5 +210,20 @@ for (const width of [320, 390]) {
         await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeInViewport();
         await expect.poll(async () => Math.abs((await nextRow.boundingBox())!.y - nextTop)).toBeLessThanOrEqual(2);
         await capture("scrolled-pinned-second-change");
+
+        // The review modal opens in its own window, so find the page that shows it and match the phone layout there.
+        await page.getByRole("button", { name: "Review & save…", exact: true }).click();
+        const reviewPage = await Promise.any(page.context().pages().map(async (candidate) => {
+            await candidate.locator(".lazy-review-changes-modal").waitFor({ state: "visible" });
+            return candidate;
+        }));
+        await reviewPage.setViewportSize({ width, height: 844 });
+        await reviewPage.evaluate(() => {
+            document.body.classList.add("is-mobile", "is-phone", "is-android");
+        });
+        await expect(reviewPage.locator(".lazy-review-changes-modal")).toContainText("Plugins (2)");
+        await waitForMobileAnimations(reviewPage);
+        await capture("review-modal", reviewPage);
+        await reviewPage.locator(".lazy-review-changes-modal .modal-button-container").getByRole("button", { name: "Cancel", exact: true }).click();
     });
 }
