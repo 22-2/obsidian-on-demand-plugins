@@ -128,6 +128,8 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    /* Keep the first group heading clear of the dialog title. */
+    padding-top: var(--size-4-4);
 }
 
 .lazy-review-changes-footer {
