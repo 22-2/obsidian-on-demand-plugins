@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { Modal, Setting } from "obsidian";
+import { ExtraButtonComponent, Modal, Setting } from "obsidian";
 import type { PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 
 const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
@@ -82,26 +82,25 @@ class ReviewChangesModal extends Modal {
     }
 
     private renderChange(list: HTMLElement, change: PendingChange) {
-        const setting = new Setting(list).setName(change.label).setDesc(
-            createFragment((fragment) => {
-                if (change.from !== undefined) {
-                    fragment.createSpan({ cls: "lazy-review-changes-from", text: change.from });
-                    fragment.createSpan({ cls: "lazy-review-changes-arrow", text: " → " });
-                }
-                fragment.createSpan({ cls: "lazy-review-changes-to", text: change.to });
-            }),
-        );
+        // A plain row rather than a Setting: mobile Setting styles stack the revert button below long text.
+        const item = list.createDiv({ cls: "lazy-review-changes-item" });
+        const info = item.createDiv({ cls: "lazy-review-changes-info" });
+        info.createDiv({ cls: "lazy-review-changes-name", text: change.label });
+        const desc = info.createDiv({ cls: "lazy-review-changes-desc" });
+        if (change.from !== undefined) {
+            desc.createSpan({ cls: "lazy-review-changes-from", text: change.from });
+            desc.createSpan({ cls: "lazy-review-changes-arrow", text: " → " });
+        }
+        desc.createSpan({ cls: "lazy-review-changes-to", text: change.to });
         const revert = change.revert;
         // Discarding drops every change at once, so single reverts would only add noise there.
         if (!revert || this.options.mode === "discard") return;
-        setting.addExtraButton((button) =>
-            button
-                .setIcon("rotate-ccw")
-                .setTooltip("Revert this change")
-                .onClick(() => {
-                    revert();
-                    this.render();
-                }),
-        );
+        new ExtraButtonComponent(item)
+            .setIcon("rotate-ccw")
+            .setTooltip("Revert this change")
+            .onClick(() => {
+                revert();
+                this.render();
+            });
     }
 }

@@ -38,8 +38,33 @@
     font-weight: var(--font-normal);
 }
 
-.lazy-review-changes-list .setting-item {
+.lazy-review-changes-modal .setting-item-heading {
+    /* Align the group heading with the item names below it. */
+    padding-inline: 0;
+}
+
+.lazy-review-changes-item {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
     padding-block: var(--size-4-2);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.lazy-review-changes-info {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.lazy-review-changes-name {
+    font-weight: var(--font-medium);
+    overflow-wrap: anywhere;
+}
+
+.lazy-review-changes-desc {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    overflow-wrap: anywhere;
 }
 
 .lazy-review-changes-from {
@@ -249,6 +274,11 @@
 }
 
 @media (max-width: 500px) {
+    .is-mobile .lazy-plugin-filter-row .setting-item-control {
+        /* Two columns leave the mode label too little room on phones; stack the search and mode controls instead. */
+        grid-template-columns: minmax(0, 1fr);
+    }
+
     .lazy-plugin-badges {
         /* A narrow info column may not fit both labels; wrap at the gap
            instead of splitting the longest mode badge across words. */

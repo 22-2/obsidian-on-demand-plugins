@@ -138,9 +138,9 @@ for (const width of [320, 390]) {
 
         const artifactDir = path.resolve(".ci-artifacts/mobile-ui");
         await mkdir(artifactDir, { recursive: true });
-        const capture = async (state: string) => {
+        const capture = async (state: string, target: Page = page) => {
             const screenshotPath = path.join(artifactDir, `mobile-${width}-${state}.png`);
-            await page.screenshot({ path: screenshotPath, animations: "disabled" });
+            await target.screenshot({ path: screenshotPath, animations: "disabled" });
             await testInfo.attach(`mobile-${width}-${state}`, { path: screenshotPath, contentType: "image/png" });
         };
         await capture("actions-menu");
@@ -204,5 +204,20 @@ for (const width of [320, 390]) {
         await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeInViewport();
         await expect.poll(async () => Math.abs((await nextRow.boundingBox())!.y - nextTop)).toBeLessThanOrEqual(2);
         await capture("scrolled-pinned-second-change");
+
+        // The review modal opens in its own window, so find the page that shows it and match the phone layout there.
+        await page.getByRole("button", { name: "Review & save…", exact: true }).click();
+        const reviewPage = await Promise.any(page.context().pages().map(async (candidate) => {
+            await candidate.locator(".lazy-review-changes-modal").waitFor({ state: "visible" });
+            return candidate;
+        }));
+        await reviewPage.setViewportSize({ width, height: 844 });
+        await reviewPage.evaluate(() => {
+            document.body.classList.add("is-mobile", "is-phone", "is-android");
+        });
+        await expect(reviewPage.locator(".lazy-review-changes-modal")).toContainText("Plugins (2)");
+        await waitForMobileAnimations(reviewPage);
+        await capture("review-modal", reviewPage);
+        await reviewPage.locator(".lazy-review-changes-modal .modal-button-container").getByRole("button", { name: "Cancel", exact: true }).click();
     });
 }
