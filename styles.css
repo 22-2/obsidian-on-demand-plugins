@@ -206,6 +206,39 @@
     zoom: 0.7;
 }
 
+/* On phones the compact row keeps one line too: the ⋮ button sits at the right edge instead of a full-width footer. */
+.is-mobile .lazy-plugin-list-body.is-compact > .setting-item.lazy-plugin-mode-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact > .setting-item.lazy-plugin-mode-row > .setting-item-info {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact > .setting-item.lazy-plugin-mode-row > .setting-item-control {
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-mobile {
+    /* Matches the mobile button's own selector, which otherwise keeps it visible. */
+    display: none;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact .lazy-plugin-row-actions-desktop {
+    display: flex;
+}
+
+/* The pinned bar uses the card colour, so give its buttons an edge that stays visible in every theme. */
+.lazy-plugin-save-controls.has-pending-changes .setting-item-control button:not(.mod-cta) {
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
 .lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-description {
     /* Lets the badges become flex items of the info row instead of a separate block below the name. */
     display: contents;
@@ -346,7 +379,8 @@
     margin: 0;
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
-    background: var(--background-primary);
+    /* A regular button colour; the primary background turned black in the phone dark theme. */
+    background: var(--interactive-normal);
 }
 
 .is-mobile .lazy-plugin-badges {
@@ -675,9 +709,4 @@
         opacity: 1;
         transform: translateY(0);
     }
-}
-
-/* The pinned bar uses the card colour, so give its buttons an edge that stays visible in every theme. */
-.lazy-plugin-save-controls.has-pending-changes .setting-item-control button:not(.mod-cta) {
-    box-shadow: inset 0 0 0 1px var(--background-modifier-border);
 }
