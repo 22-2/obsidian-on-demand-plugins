@@ -407,6 +407,30 @@
     line-height: 1.4;
 }
 
+/* Desktop: the version and author sit on the badge line, right-aligned. Phones keep them on their own line. */
+body:not(.is-mobile) .lazy-plugin-mode-row .setting-item-description {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--size-4-2);
+}
+
+body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-description {
+    grid-column: 1 / -1;
+}
+
+body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-badges {
+    grid-column: 1;
+    margin-top: var(--size-4-2);
+}
+
+body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-meta-badge {
+    grid-column: 2;
+    justify-self: end;
+    margin-top: var(--size-4-2);
+    white-space: nowrap;
+}
+
 .lazy-plugin-mode-row .setting-item-info {
     min-width: 0;
     /* Wrap the control once the text would get narrower than this basis. */
