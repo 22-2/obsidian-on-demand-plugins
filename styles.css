@@ -171,7 +171,9 @@
 }
 
 .lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge {
+    /* The icon alone reads better without the outline box that the full label needs. */
     padding: 0 6px;
+    border: 0;
 }
 
 /* Compact list: keep only the mode icon and the load dot; the words stay in each badge's tooltip. */
