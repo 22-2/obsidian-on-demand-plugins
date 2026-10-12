@@ -64,15 +64,19 @@ class ReviewChangesModal extends Modal {
         }
         const { contentEl } = this;
         contentEl.empty();
+        // The list scrolls inside the body while the buttons stay pinned in the footer, so a long list
+        // never pushes the confirm and cancel buttons off the screen.
+        const body = contentEl.createDiv({ cls: "lazy-review-changes-body" });
         for (const group of Object.keys(GROUP_HEADINGS) as PendingChangeGroup[]) {
             const items = changes.filter((change) => change.group === group);
             if (items.length === 0) continue;
-            new Setting(contentEl).setName(`${GROUP_HEADINGS[group]} (${items.length})`).setHeading();
-            const list = contentEl.createDiv({ cls: "lazy-review-changes-list" });
+            new Setting(body).setName(`${GROUP_HEADINGS[group]} (${items.length})`).setHeading();
+            const list = body.createDiv({ cls: "lazy-review-changes-list" });
             items.forEach((change) => this.renderChange(list, change));
         }
-        contentEl.createEl("p", { cls: "lazy-review-changes-note", text: MODE_TEXT[this.options.mode].note });
-        const buttons = contentEl.createDiv({ cls: "modal-button-container" });
+        body.createEl("p", { cls: "lazy-review-changes-note", text: MODE_TEXT[this.options.mode].note });
+        const footer = contentEl.createDiv({ cls: "lazy-review-changes-footer" });
+        const buttons = footer.createDiv({ cls: "modal-button-container" });
         const confirmClass = this.options.mode === "discard" ? "mod-warning" : "mod-cta";
         buttons.createEl("button", { text: this.options.getConfirmLabel(), cls: confirmClass }).onClickEvent(() => {
             this.confirmed = true;
