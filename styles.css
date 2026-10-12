@@ -269,6 +269,30 @@
     display: flex;
 }
 
+/* The 44px touch target already sets the row height, so the padding around it can be smaller. */
+.is-mobile .lazy-plugin-list-body.is-compact .lazy-plugin-mode-row {
+    padding-block: var(--size-4-1);
+}
+
+/* Touch target: the ⋮ button gets a 44px hit area on phones, the usual minimum for a finger. */
+.is-mobile .lazy-plugin-list-body.is-compact .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-desktop {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+}
+
+/* The switch keeps its normal size on phones so it is easy to hit. */
+.is-mobile .lazy-plugin-compact-control .checkbox-container {
+    zoom: 1;
+}
+
+/* The info column must not take the desktop basis as a height: on phones the rows stack vertically. */
+.is-mobile .lazy-plugin-list-body > .setting-item.lazy-plugin-mode-row > .setting-item-info {
+    flex: 0 0 auto;
+}
+
 /* The pinned bar uses the card colour, so give its buttons an edge that stays visible in every theme. */
 .lazy-plugin-save-controls.has-pending-changes .setting-item-control button:not(.mod-cta) {
     box-shadow: inset 0 0 0 1px var(--background-modifier-border);
