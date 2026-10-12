@@ -278,6 +278,7 @@
     /* The search field takes the free width and the mode dropdown keeps its fixed width beside it. */
     flex: 1 1 auto;
     width: 100%;
+    align-items: center;
     gap: var(--size-4-2);
 }
 
@@ -287,11 +288,17 @@
 }
 
 .is-mobile .lazy-plugin-filter-row .setting-item-control {
-    /* Equal flexible columns prevent the fixed desktop dropdown width from squeezing the search field. */
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    /* The search field gets its own line; the mode dropdown and refresh button share the next one. */
+    flex-wrap: wrap;
     gap: var(--size-4-2);
-    width: 100%;
+}
+
+.is-mobile .lazy-plugin-filter-row input {
+    flex-basis: 100%;
+}
+
+.is-mobile .lazy-plugin-filter-row .dropdown {
+    flex: 1 1 0;
 }
 
 .is-mobile .lazy-plugin-filter-row input,
@@ -302,11 +309,6 @@
 }
 
 @media (max-width: 500px) {
-    .is-mobile .lazy-plugin-filter-row .setting-item-control {
-        /* Two columns leave the mode label too little room on phones; stack the search and mode controls instead. */
-        grid-template-columns: minmax(0, 1fr);
-    }
-
     .lazy-plugin-badges {
         /* A narrow info column may not fit both labels; wrap at the gap
            instead of splitting the longest mode badge across words. */
