@@ -1,5 +1,5 @@
 import type { App } from "obsidian";
-import { ExtraButtonComponent, Modal, Setting, setIcon } from "obsidian";
+import { ExtraButtonComponent, Modal, setIcon } from "obsidian";
 import type { PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 
 const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
@@ -70,7 +70,8 @@ class ReviewChangesModal extends Modal {
         for (const group of Object.keys(GROUP_HEADINGS) as PendingChangeGroup[]) {
             const items = changes.filter((change) => change.group === group);
             if (items.length === 0) continue;
-            new Setting(body).setName(`${GROUP_HEADINGS[group]} (${items.length})`).setHeading();
+            // A quiet label, not a heading: a second heading-styled line would read as another dialog title.
+            body.createDiv({ cls: "lazy-review-changes-group", text: `${GROUP_HEADINGS[group]} (${items.length})` });
             const list = body.createDiv({ cls: "lazy-review-changes-list" });
             items.forEach((change) => this.renderChange(list, change));
         }
