@@ -87,6 +87,16 @@
     text-decoration: line-through;
 }
 
+/* Discard: the draft value is lost, so it is struck through in the error colour and labelled as restored below. */
+.lazy-review-changes-lost {
+    color: var(--text-error);
+    text-decoration: line-through;
+}
+
+.lazy-review-changes-restore-label {
+    color: var(--text-muted);
+}
+
 .lazy-review-changes-arrow {
     /* Full text colour so the arrow reads clearly between the two muted labels. */
     color: var(--text-normal);

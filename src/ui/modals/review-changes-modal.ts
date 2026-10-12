@@ -92,6 +92,17 @@ class ReviewChangesModal extends Modal {
         const info = item.createDiv({ cls: "lazy-review-changes-info" });
         info.createDiv({ cls: "lazy-review-changes-name", text: change.label });
         const desc = info.createDiv({ cls: "lazy-review-changes-desc" });
+        if (this.options.mode === "discard") {
+            // Discarding drops the draft value (`to`) and restores the saved one (`from`). Say so in words,
+            // since an arrow would read as a change being made.
+            desc.createSpan({ cls: "lazy-review-changes-lost", text: change.to });
+            if (change.from !== undefined) {
+                desc.createSpan({ cls: "lazy-review-changes-restore-label", text: " · restores " });
+                desc.createSpan({ cls: "lazy-review-changes-to", text: change.from });
+            }
+            // Discarding drops every change at once, so single reverts would only add noise there.
+            return;
+        }
         if (change.from !== undefined) {
             desc.createSpan({ cls: "lazy-review-changes-from", text: change.from });
             // An icon rather than a "→" glyph: the glyph is too thin to read at this size, even when bolded.
@@ -99,8 +110,7 @@ class ReviewChangesModal extends Modal {
         }
         desc.createSpan({ cls: "lazy-review-changes-to", text: change.to });
         const revert = change.revert;
-        // Discarding drops every change at once, so single reverts would only add noise there.
-        if (!revert || this.options.mode === "discard") return;
+        if (!revert) return;
         new ExtraButtonComponent(item)
             .setIcon("rotate-ccw")
             .setTooltip("Revert this change")
