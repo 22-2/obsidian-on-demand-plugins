@@ -275,10 +275,10 @@
 }
 
 .lazy-plugin-badges {
-    /* Reserve the same mode column in every row so runtime indicators do
-       not shift with label length. Long author names live outside this grid. */
+    /* Each badge takes its own width so the load badge sits right beside the mode badge.
+       Long author names live outside this grid. */
     display: grid;
-    grid-template-columns: minmax(0, 28ch) max-content;
+    grid-template-columns: max-content max-content;
     align-items: center;
     gap: var(--size-4-1) var(--size-4-2);
     margin-top: var(--size-4-2);
