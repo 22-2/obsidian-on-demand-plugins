@@ -80,8 +80,9 @@ test("enabling disabled plugin syncs settings to keepEnabled", async ({ obsidian
         }, targetPluginId),
     );
 
-    // 2. Enable via Obsidian UI (triggers the patch)
-    await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
+    // 2. Enable the way the Community plugins toggle and the CLI do (triggers the patch).
+    // A plain enablePlugin call is a runtime load, which must leave the saved mode alone.
+    await obsidian.page.evaluate((id) => app.plugins.enablePluginAndSave(id), targetPluginId);
 
     // Wait for enable to complete
     await obsidian.waitForPluginLoaded(targetPluginId);
