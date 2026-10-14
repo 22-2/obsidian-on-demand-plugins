@@ -1,7 +1,7 @@
 import type { ObsidianAPI } from "obsidian-e2e-toolkit";
 import type OnDemandPlugin from "src/main";
 import { expect, test } from "./fixtures";
-import { pluginUnderTestId, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
+import { pluginUnderTestId, reloadWithLazyPlugins, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
 
 const notebookNavigatorId = "notebook-navigator";
 const notebookNavigatorViewType = "notebook-navigator";
@@ -51,7 +51,7 @@ test("expanding a collapsed sidebar loads the lazy plugin behind its restored vi
     });
 
     // Only the plugin under test loads at startup; Notebook Navigator stays lazy.
-    await obsidian.reload({ expectLoaded: [pluginUnderTestId] });
+    await reloadWithLazyPlugins(obsidian, [pluginUnderTestId]);
     expect(await obsidian.isPluginLoaded(notebookNavigatorId)).toBe(false);
     expect(await readNavigatorLeaf(obsidian)).toEqual({ viewType: notebookNavigatorViewType, rendered: false, visible: false });
 
