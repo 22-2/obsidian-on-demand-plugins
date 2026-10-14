@@ -1,9 +1,9 @@
 name: E2E Tests
 
 on:
-    # Branch pushes are covered by pull_request; push only runs for main to avoid duplicate runs.
+    # PRs cover branch changes; push runs on main after merge.
     push:
-        branches: [main, dev]
+        branches: [main]
     pull_request: {}
     workflow_dispatch:
         inputs:
