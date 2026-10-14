@@ -114,7 +114,9 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
 
     const refreshButton = settingsPage.locator(".lazy-plugin-filter-row .clickable-icon");
     await refreshButton.click();
-    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded (in memory only)");
+    const enabledBadge = row.locator(".lazy-plugin-enabled-badge");
+    await expect(enabledBadge).toHaveText("Loaded (in memory only)");
+    await expect(enabledBadge).toHaveClass(/is-memory-only/);
 
     await obsidian.page.evaluate(async (pluginId) => {
         const savedPluginIds = await app.vault.readConfigJson("community-plugins");
@@ -124,7 +126,8 @@ test("plugin management refresh updates the live loaded badge", { tag: "@serial"
         await app.vault.writeConfigJson("community-plugins", [...new Set([...savedIds, pluginId])]);
     }, targetPluginId);
     await refreshButton.click();
-    await expect(row.locator(".lazy-plugin-enabled-badge")).toHaveText("Loaded");
+    await expect(enabledBadge).toHaveText("Loaded");
+    await expect(enabledBadge).not.toHaveClass(/is-memory-only/);
 });
 
 // Run with one worker (see the test:e2e script): sensitive to parallel Obsidian instances.

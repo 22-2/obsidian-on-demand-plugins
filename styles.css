@@ -412,6 +412,10 @@
     background: var(--color-green);
 }
 
+.lazy-plugin-enabled-badge.is-memory-only::before {
+    background: var(--text-warning);
+}
+
 .lazy-plugin-meta-badge {
     margin-top: var(--size-4-1);
     color: var(--text-faint);
