@@ -1,6 +1,6 @@
 import type { LogLevelDesc } from "loglevel";
 import path from "node:path";
-import type { ObsidianAPI } from "obsidian-e2e-toolkit";
+import type { ObsidianAPI, ReloadOptions } from "obsidian-e2e-toolkit";
 import { fileURLToPath } from "url";
 import { test } from "./fixtures";
 
@@ -70,6 +70,11 @@ export async function withReloadRecorded<T>(obsidian: ObsidianAPI, action: () =>
     } finally {
         await reload.restore();
     }
+}
+
+/** Reload after a policy change, waiting only for the plugins this scenario expects at startup. */
+export async function reloadWithLazyPlugins(obsidian: ObsidianAPI, expectLoaded: readonly string[], options: Omit<ReloadOptions, "expectLoaded"> = {}): Promise<void> {
+    await obsidian.reload({ ...options, expectLoaded: [...expectLoaded] });
 }
 
 export async function triggerActiveLeafChange(obsidian: ObsidianAPI): Promise<void> {

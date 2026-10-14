@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { pluginUnderTestId, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
+import { pluginUnderTestId, reloadWithLazyPlugins, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
 
 const targetPluginId = "obsidian-another-quick-switcher";
 
@@ -17,7 +17,7 @@ test("Another Quick Switcher: should NOT be loaded at startup when set to lazy",
     );
 
     // 2. Restart Obsidian to check startup state
-    await obsidian.reload();
+    await reloadWithLazyPlugins(obsidian, [pluginUnderTestId]);
 
     // 3. Verify it is NOT enabled
     const isEnabled = await obsidian.isPluginEnabled(targetPluginId);

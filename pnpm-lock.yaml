@@ -88,8 +88,8 @@ importers:
         specifier: ^1.14.4
         version: 1.14.4(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)
       obsidian-e2e-toolkit:
-        specifier: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.7.0/obsidian-e2e-toolkit-1.7.0.tgz
-        version: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.7.0/obsidian-e2e-toolkit-1.7.0.tgz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0)
+        specifier: https://github.com/22-2/obsidian-e2e-toolkit/archive/607fc973a06ffd948228fafa7ddb4666c2ece365.tar.gz
+        version: https://github.com/22-2/obsidian-e2e-toolkit/archive/607fc973a06ffd948228fafa7ddb4666c2ece365.tar.gz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0)
       playwright:
         specifier: ^1.64.0
         version: 1.64.0
@@ -2305,8 +2305,8 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.7.0/obsidian-e2e-toolkit-1.7.0.tgz:
-    resolution: {integrity: sha512-L44n5v2cedqV65SpNCIK5lJwY+ZWO6MNBYL4uT6nkxtvd678jvvNLIuMEwO2Vav3dwAttC76hqBTCavbB057ew==, tarball: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.7.0/obsidian-e2e-toolkit-1.7.0.tgz}
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/archive/607fc973a06ffd948228fafa7ddb4666c2ece365.tar.gz:
+    resolution: {integrity: sha512-N9+Uq+skm2IVbNAv9NaWM8D9NK/TpfzmXwRNJ5IekmwChT1YrQ7VVAXQU1qixERI/BdWCSyfQQFrrSNjo5nahQ==, tarball: https://github.com/22-2/obsidian-e2e-toolkit/archive/607fc973a06ffd948228fafa7ddb4666c2ece365.tar.gz}
     version: 1.7.0
     engines: {node: '>=23.0.0'}
     hasBin: true
@@ -5439,7 +5439,7 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.2
 
-  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.7.0/obsidian-e2e-toolkit-1.7.0.tgz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0):
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/archive/607fc973a06ffd948228fafa7ddb4666c2ece365.tar.gz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0):
     dependencies:
       '@electron/asar': 4.3.1
       '@playwright/test': 1.64.0

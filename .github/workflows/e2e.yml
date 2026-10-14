@@ -47,15 +47,14 @@ jobs:
             - name: Checkout
               uses: actions/checkout@v6
 
-            # The toolkit re-resolves "latest" on its own, but actions/cache never overwrites an
-            # existing key: a fixed "latest" key would restore stale assets and re-download the
-            # new release on every run. Resolve a concrete version so the cache key follows releases.
+            # Ordinary CI uses the local E2E pin; scheduled runs check the newest desktop release.
+            # Resolve latest to a concrete cache key before setup downloads the assets.
             - name: Resolve Obsidian version
               env:
-                  REQUESTED_VERSION: ${{ github.event.inputs.obsidian_version }}
+                  REQUESTED_VERSION: ${{ github.event_name == 'schedule' && 'latest' || github.event.inputs.obsidian_version }}
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
-                  version="${REQUESTED_VERSION:-latest}"
+                  version="${REQUESTED_VERSION:-$(cat tests/obsidian-version.txt)}"
                   if [ "$version" = "latest" ]; then
                       # Skip mobile-only releases, which lack the desktop assets the toolkit needs.
                       version=$(gh api repos/obsidianmd/obsidian-releases/releases --jq '[.[] | select(.prerelease | not) | select(any(.assets[]; .name | endswith(".tar.gz")) and any(.assets[]; .name | endswith(".asar.gz")))][0].tag_name')
@@ -100,16 +99,8 @@ jobs:
                   git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
                   pnpm install --frozen-lockfile
 
-            - name: Verify Electron installation
-              # The toolkit declares Electron as a peer dependency, so keep it
-              # direct in this project and fail before Playwright if its binary is missing.
-              run: pnpm exec electron --version
-
             - name: Build plugin under test
               run: pnpm run build
-
-            - name: Ensure toolkit Obsidian is installed
-              run: node node_modules/obsidian-e2e-toolkit/scripts/setup.mjs
 
             - name: Run E2E tests
               env:
@@ -130,7 +121,10 @@ jobs:
               uses: actions/upload-artifact@v7
               with:
                   name: playwright-report-${{ matrix.os }}-${{ matrix.shard }}
-                  path: playwright-report
+                  path: |
+                      playwright-report
+                      blob-report
+                      test-results
 
     coverage:
         # Merge every shard's E2E coverage with the unit coverage into one report.
