@@ -52,9 +52,13 @@ pnpm run test:e2e:coverage
 pnpm run test:coverage:all
 ```
 
-Unit tests use `@vitest/coverage-v8`. E2E tests use the toolkit's `coverageOptions` fixture and coverage report API to collect V8 coverage from the Obsidian renderer before plugins are enabled. E2E coverage requires Windows or macOS and uses the same parallel/serial split as `test:e2e`.
+Unit tests use `@vitest/coverage-v8`. E2E tests use the toolkit's `coverageOptions` fixture and coverage report API to collect V8 coverage from the Obsidian renderer before plugins are enabled. CI runs E2E on Windows and macOS, using the same parallel/serial split as `test:e2e`. Headless Linux needs Xvfb and Electron's OS dependencies.
+
+Local E2E and ordinary CI share the Obsidian desktop version in `tests/obsidian-version.txt`. Setup downloads pinned Obsidian and plugin assets directly from public releases without GitHub API lookups. Set `OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION` to override the version; scheduled CI checks the latest desktop release. Runtime assets are prepared by E2E setup, while the toolkit prepares Electron at launch.
 
 Open `coverage/unit/index.html` or `coverage/e2e/index.html` for the separate HTML reports. `test:coverage:all` runs both suites and merges their results into `coverage/combined/index.html`. Each report also includes `lcov.info` and `coverage-final.json`. Reports exclude tests, mocks, declarations, and dependencies. E2E reports cover source files included in the plugin bundle and map them back to TypeScript through inline source maps. The coverage command restores the normal production bundle afterwards.
+
+Both `test:e2e` and `test:e2e:coverage` preserve the parallel and serial phases separately under `test-results/` and `blob-report/`. The combined HTML report is `playwright-report/index.html`, with machine-readable results in `playwright-report/results.json`. A failure in either phase still fails the command, and CI uploads both phases' diagnostics.
 
 To merge existing results from the same source revision without rerunning tests, use `pnpm run test:coverage:merge`.
 

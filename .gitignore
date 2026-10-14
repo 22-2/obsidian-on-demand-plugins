@@ -29,7 +29,9 @@ myfiles/*
 data copy.json
 repomix-output.md
 .obsidian-e2e-toolkit/
+obsidian-e2e-toolkit-assets/
 playwright-report/
+blob-report/
 test-results/
 coverage/
 .env

@@ -7,7 +7,8 @@
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "typecheck": "tsc6 -noEmit -skipLibCheck",
-        "test:e2e": "playwright test --grep-invert @serial && playwright test --grep @serial --workers=1",
+        "test:e2e": "node scripts/run-e2e.mjs",
+        "test:e2e:runner": "node --test scripts/run-e2e.test.mjs",
         "test:e2e:coverage": "node scripts/e2e-coverage.mjs",
         "readme:shots": "playwright test --config playwright.readme.config.ts --workers=1",
         "ui:shots:pc": "node scripts/ui-screenshots.mjs pc",
@@ -61,7 +62,7 @@
         "jsonc-parser": "^3.3.1",
         "moment": "^2.31.0",
         "obsidian": "^1.14.4",
-        "obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#1848400d6d60b4a8e46a3c3c55a38fe4b8364438",
+        "obsidian-e2e-toolkit": "https://github.com/22-2/obsidian-e2e-toolkit/archive/607fc973a06ffd948228fafa7ddb4666c2ece365.tar.gz",
         "playwright": "^1.64.0",
         "prettier": "^3.9.10",
         "release-it": "^21.1.1",

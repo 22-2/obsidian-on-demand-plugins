@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { execFile } from "node:child_process";
+import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { preparePlugins } from "obsidian-e2e-toolkit";
 
@@ -35,9 +36,9 @@ async function fileExists(filePath) {
  * @param {string} cwd - Working directory.
  * @param {string} label - Context label for logging.
  */
-async function runCommand(command, args, cwd, label) {
+async function runCommand(command, args, cwd, label, env = {}) {
     try {
-        await execFileP(command, args, { cwd });
+        await execFileP(command, args, { cwd, env: { ...process.env, ...env }, windowsHide: true });
     } catch (err) {
         const details = [err?.message, err?.stdout, err?.stderr].filter((value) => typeof value === "string" && value.length > 0).join("\n");
 
@@ -69,6 +70,16 @@ async function readPluginSources() {
  * Main global setup function for Playwright/E2E testing.
  */
 export default async function globalSetup() {
+    const toolkitRoot = path.resolve(path.dirname(createRequire(import.meta.url).resolve("obsidian-e2e-toolkit")), "..");
+    const version = process.env.OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION || process.env.OBSIDIAN_VERSION ||
+        (await readFile(path.join(repoRoot, "tests", "obsidian-version.txt"), "utf8")).trim();
+    if (!version) throw new Error("[global-setup] Obsidian version must not be empty");
+    // Prepare assets only for E2E, using the same explicit version locally and in CI.
+    await runCommand(process.execPath, [path.join(toolkitRoot, "scripts", "setup.mjs")], repoRoot, "Obsidian setup", {
+        OBSIDIAN_E2E_TOOLKIT_HOME: repoRoot,
+        OBSIDIAN_E2E_TOOLKIT_OBSIDIAN_VERSION: version,
+    });
+
     // 1. Ensure the main project is built. Only this repo's own main.js is built here;
     // the external fixture plugins are fetched by the toolkit below.
     const mainJsPath = path.resolve(repoRoot, "main.js");
