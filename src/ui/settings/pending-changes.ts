@@ -7,7 +7,8 @@ type DraftSource = {
     readonly currentProfileId: string;
 };
 
-export type PendingChangeGroup = "plugins" | "settings" | "profiles";
+/** "external" lists edits made outside On-Demand that saving overwrites; they are never part of the draft. */
+export type PendingChangeGroup = "plugins" | "settings" | "profiles" | "external";
 
 export type PendingChange = {
     group: PendingChangeGroup;

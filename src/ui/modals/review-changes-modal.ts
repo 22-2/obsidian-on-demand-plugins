@@ -6,6 +6,7 @@ const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
     plugins: "Plugins",
     settings: "Settings",
     profiles: "Profiles",
+    external: "Changed outside On-Demand (overwritten on save)",
 };
 
 export type ReviewChangesOptions = {

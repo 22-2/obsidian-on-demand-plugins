@@ -37,6 +37,8 @@ Obsidian プラグインの起動を遅延させ、必要なときだけ読み�
 
 設定変更時、`.obsidian/community-plugins.json` が自動的に書き換えられます。変更のたびに最大 3 世代のバックアップが自動作成されますが、念のためご自身でもバックアップを取ることを推奨します。
 
+`community-plugins.json` が On-Demand Plugins 以外（Sync、Git、手動編集、Obsidian CLI、他のプラグインなど）で書き換えられた場合は、起動時に通知が表示され、変更を適用する前に上書きしてよいか確認されます。外部の変更を残したい場合は **Maintenance › Sync settings** で On-Demand の設定に取り込んでください。
+
 ---
 
 ## 仕組み

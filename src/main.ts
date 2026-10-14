@@ -8,6 +8,7 @@ import type { DeviceSettings, LazySettings } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 import { toggleLoggerBy } from "src/core/utils";
 import { BackupFeature } from "src/features/backup/backup-feature";
+import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 import { ManualToggleFeature } from "src/features/manual-toggle/manual-toggle-feature";
@@ -37,6 +38,7 @@ export default class OnDemandPlugin extends Plugin {
         this.features = new FeatureManager(ctx, this.core, this.events);
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
+        this.features.register(new CommunityPluginsDriftFeature());
         this.features.register(new ManualToggleFeature());
         this.features.register(new LazyEngineFeature());
         this.features.register(new StartupPolicyFeature());
@@ -78,10 +80,10 @@ export default class OnDemandPlugin extends Plugin {
             await policyFeature?.rebuildWithProgress(null, options?.force ?? false);
         });
 
-        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[] }) => {
+        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[]; externalChangesConfirmed?: boolean }) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
             if (policyFeature) {
-                await policyFeature.applyWithProgress(null, options?.pluginIds);
+                await policyFeature.applyWithProgress(null, options?.pluginIds, { externalChangesConfirmed: options?.externalChangesConfirmed });
             }
         });
     }
@@ -221,12 +223,17 @@ export default class OnDemandPlugin extends Plugin {
         }
     }
 
-    async switchProfile(profileId: string) {
+    /** Resolves false when the user keeps the profile because applying it would overwrite external edits. */
+    async switchProfile(profileId: string): Promise<boolean> {
+        // Ask before switching: cancelling after the save would leave a saved profile that was never applied.
+        const drift = this.features.get(CommunityPluginsDriftFeature);
+        if (drift && !(await drift.confirmOverwrite())) return false;
         this.core.settingsService.switchProfile(profileId);
         this.settings = this.core.settingsService.settings;
         await this.saveSettings();
         const policyFeature = this.features.get(StartupPolicyFeature);
-        await policyFeature?.applyWithProgress(null);
+        await policyFeature?.applyWithProgress(null, undefined, { externalChangesConfirmed: true });
+        return true;
     }
 
     updateManifests() {

@@ -36,6 +36,8 @@ To refresh cached commands and view types together, open **Maintenance → Rebui
 
 When settings change, `.obsidian/community-plugins.json` is updated automatically. Up to three generations of backups are created; please keep your own backups as well.
 
+If `community-plugins.json` is changed outside On-Demand Plugins (by Sync, Git, a manual edit, the Obsidian CLI or another plugin), a notice appears at startup, and applying changes asks before overwriting those edits. To keep them instead, use **Maintenance › Sync settings** to copy them into the On-Demand settings.
+
 ### How it works
 
 Instead of loading the plugin code at startup, this project registers "dummy commands" that cache command metadata. The actual plugin is loaded only when its command or a configured view/file is used. Internally it monkey-patches parts of Obsidian's core, so updates to Obsidian may break behavior.

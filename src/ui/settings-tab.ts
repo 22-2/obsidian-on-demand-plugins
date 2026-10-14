@@ -3,6 +3,8 @@ import { Notice, PluginSettingTab, Setting } from "obsidian";
 import { FeatureEvents } from "src/core/event-bus";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE, PluginModes } from "src/core/types";
 import { BackupFeature } from "src/features/backup/backup-feature";
+import type { CommunityPluginsDrift } from "src/features/community-plugins-drift/community-plugins-drift";
+import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import type OnDemandPlugin from "src/main";
 import { showReviewChangesModal } from "src/ui/modals/review-changes-modal";
 import { pluginManagementSummary } from "src/ui/settings/helpers";
@@ -110,6 +112,21 @@ export class SettingsTab extends PluginSettingTab {
             fallbackMode: (pluginId, settings) => (this.plugin.isPluginEnabledOnDisk(pluginId) ? PLUGIN_MODE.ALWAYS_ENABLED : settings.defaultMode),
         });
     }
+    private async detectExternalChanges(): Promise<CommunityPluginsDrift | null> {
+        try {
+            return (await this.plugin.features.get(CommunityPluginsDriftFeature)?.detect()) ?? null;
+        } catch {
+            return null;
+        }
+    }
+    private describeExternalChanges(drift: CommunityPluginsDrift): PendingChange[] {
+        const nameOf = (pluginId: string) => this.plugin.manifests.find((manifest) => manifest.id === pluginId)?.name ?? pluginId;
+        const removed = (label: string): PendingChange => ({ group: "external", label, from: "Enabled outside On-Demand", to: "Removed from community-plugins.json" });
+        const readded = (label: string): PendingChange => ({ group: "external", label, from: "Disabled outside On-Demand", to: "Re-added to community-plugins.json" });
+        const changes = [...drift.enabledExternally.map((id) => removed(nameOf(id))), ...drift.disabledExternally.map((id) => readded(nameOf(id)))];
+        if (drift.selfMissing) changes.push(readded("On-Demand Plugins"));
+        return changes;
+    }
     private saveButtonText() {
         const count = this.getChangedPluginIds().length;
         return count > 0 ? `Save & apply (${count})` : "Save changes";
@@ -144,14 +161,19 @@ export class SettingsTab extends PluginSettingTab {
     // Obsidian shows a loading spinner on a button while its click handler is pending, so the
     // handlers stay synchronous and the awaiting happens here. Otherwise the spinner would stay on for the whole review.
     private async reviewAndSave(onRefresh?: () => void) {
+        const drift = await this.detectExternalChanges();
         const confirmed = await showReviewChangesModal(this.app, {
             mode: "save",
-            getChanges: () => this.describeChanges(),
+            // Only an apply rewrites community-plugins.json, so external edits matter only while plugin changes remain.
+            getChanges: () => {
+                const changes = this.describeChanges();
+                return drift && this.getChangedPluginIds().length > 0 ? [...changes, ...this.describeExternalChanges(drift)] : changes;
+            },
             getConfirmLabel: () => this.saveButtonText(),
         });
         // Reverts in the modal edit the draft even when the save is cancelled.
         this.plugin.configureLogger();
-        if (confirmed) await this.saveChanges();
+        if (confirmed) await this.saveChanges({ externalChangesConfirmed: true });
         else this.update();
         onRefresh?.();
     }
@@ -169,13 +191,13 @@ export class SettingsTab extends PluginSettingTab {
     resetPending() {
         this.pending.reset();
     }
-    async saveChanges() {
+    async saveChanges(options?: { externalChangesConfirmed?: boolean }) {
         await this.waitForImmediateSaves();
         if (!this.hasPendingChanges) return;
         const pluginIds = this.getChangedPluginIds();
         await this.plugin.saveSettings();
         if (pluginIds.length > 0) {
-            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds });
+            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds, externalChangesConfirmed: options?.externalChangesConfirmed });
         }
         this.resetPending();
         new Notice(pluginIds.length > 0 ? "Settings saved and applied" : "Settings saved");
@@ -207,6 +229,7 @@ const GROUP_NOUNS: Record<PendingChangeGroup, [string, string]> = {
     plugins: ["plugin", "plugins"],
     settings: ["setting", "settings"],
     profiles: ["profile change", "profile changes"],
+    external: ["external change", "external changes"],
 };
 
 function pendingSummary(changes: PendingChange[]): DocumentFragment {
