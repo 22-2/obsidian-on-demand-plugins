@@ -20,6 +20,7 @@
         "test:coverage": "vitest run --coverage",
         "test:coverage:merge": "node scripts/merge-coverage.mjs",
         "test:coverage:all": "pnpm run test:coverage && pnpm run test:e2e:coverage && pnpm run test:coverage:merge",
+        "release:check": "pnpm run lint && pnpm test --run && pnpm run typecheck",
         "lint": "pnpm exec eslint ./src",
         "format": "pnpm run lint --fix && pnpm exec prettier --editorconfig --write ./src && pnpx organize-imports-cli tsconfig.json",
         "release": "release-it",

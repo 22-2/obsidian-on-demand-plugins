@@ -1,6 +1,7 @@
 {
     "extends": "./.release-it.mjs",
     "hooks": {
+        "before:init": ["gh auth status", "pnpm run release:check"],
         "after:bump": "node scripts/update-release-versions.mjs ${version}"
     }
 }

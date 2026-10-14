@@ -45,8 +45,7 @@ export default {
         },
     },
     hooks: {
-        "before:init": ["gh auth status", "pnpm run lint", "pnpm test --run"],
-        "before:release": "pnpm run typecheck",
+        "before:init": ["gh auth status", "pnpm run release:check"],
         "after:release": ["git push --atomic origin HEAD:refs/heads/main refs/tags/${version}:refs/tags/${version}", "gh workflow run release.yml --repo 22-2/obsidian-on-demand-plugins --ref main --field version=${version}"],
     },
 };
