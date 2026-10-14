@@ -91,7 +91,7 @@ describe("settings helpers", () => {
 
         await openBackupDirectory(plugin);
 
-        expect(adapter.mkdir).toHaveBeenCalledWith("plugins/sample/backups");
+        expect(adapter.mkdir.mock.calls).toContainEqual(["plugins/sample/backups"]);
         expect(openSystemPath).toHaveBeenCalledWith("vault/plugins/sample/backups");
     });
 

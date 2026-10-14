@@ -3,7 +3,6 @@ import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { isLeafVisible, isPluginLoaded } from "src/core/utils";
 import { resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
-import type { LeafResource, LockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,7 +37,7 @@ function createHarness(layoutReady = true, leaves: WorkspaceLeaf[] = []) {
     const pluginLoader = { ensurePluginLoaded: vi.fn().mockResolvedValue(true) };
     const commandRegistry = { syncCommandWrappersForPlugin: vi.fn() };
     const unlock = vi.fn();
-    const lockStrategy = { lock: vi.fn().mockResolvedValue({ unlock }) } as unknown as LockStrategy<LeafResource>;
+    const lockStrategy = { lock: vi.fn().mockResolvedValue({ unlock }) };
     const loader = new ViewLazyLoader(ctx, pluginLoader as unknown as ConstructorParameters<typeof ViewLazyLoader>[1], commandRegistry as unknown as CommandRegistry, lockStrategy);
 
     return { commandRegistry, ctx, eventHandlers, layoutReadyCallbacks, loader, lockStrategy, pluginLoader, unlock, workspace };
@@ -56,13 +55,13 @@ describe("ViewLazyLoader", () => {
         const hiddenLeaf = createLeaf("leaf-hidden", "canvas");
         const harness = createHarness(false);
         await harness.loader.initializeLazyViewForLeaf(hiddenLeaf);
-        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
+        expect(harness.lockStrategy.lock.mock.calls).toHaveLength(0);
 
         harness.workspace.layoutReady = true;
         vi.mocked(isLeafVisible).mockReturnValue(false);
         await harness.loader.initializeLazyViewForLeaf(hiddenLeaf);
 
-        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
+        expect(harness.lockStrategy.lock.mock.calls).toHaveLength(0);
         expect(harness.commandRegistry.syncCommandWrappersForPlugin).not.toHaveBeenCalled();
     });
 
@@ -71,7 +70,7 @@ describe("ViewLazyLoader", () => {
 
         await harness.loader.initializeLazyViewForLeaf(null as unknown as WorkspaceLeaf);
 
-        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
+        expect(harness.lockStrategy.lock.mock.calls).toHaveLength(0);
         expect(resolvePluginForViewType).not.toHaveBeenCalled();
     });
 
@@ -81,7 +80,7 @@ describe("ViewLazyLoader", () => {
 
         await harness.loader.initializeLazyViewForLeaf(leaf);
 
-        expect(harness.lockStrategy.lock).toHaveBeenCalledWith({ leaf, viewType: "canvas" });
+        expect(harness.lockStrategy.lock.mock.calls).toContainEqual([{ leaf, viewType: "canvas" }]);
         expect(resolvePluginForViewType).toHaveBeenCalledWith(harness.ctx, "canvas");
         expect(harness.pluginLoader.ensurePluginLoaded).toHaveBeenCalledWith("view-plugin");
         expect(harness.commandRegistry.syncCommandWrappersForPlugin).toHaveBeenCalledWith("view-plugin");
@@ -139,7 +138,7 @@ describe("ViewLazyLoader", () => {
         const harness = createHarness(true, [leaf]);
         harness.loader.registerActiveLeafReload();
         harness.eventHandlers.get("active-leaf-change")?.(null);
-        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
+        expect(harness.lockStrategy.lock.mock.calls).toHaveLength(0);
         harness.eventHandlers.get("active-leaf-change")?.(leaf);
         harness.layoutReadyCallbacks[0]?.();
 

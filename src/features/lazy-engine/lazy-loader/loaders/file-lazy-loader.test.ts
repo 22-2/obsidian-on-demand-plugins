@@ -153,7 +153,7 @@ describe("FileLazyLoader", () => {
     it("scans file-backed leaves after layout is ready", async () => {
         const file = createFile("folder/initial.canvas.md");
         const { leaf } = createLeaf("leaf-1", undefined);
-        vi.mocked(leaf.view.getState).mockReturnValue({ file: file.path });
+        vi.spyOn(leaf.view, "getState").mockReturnValue({ file: file.path });
         const harness = createHarness([leaf]);
         harness.vault.getAbstractFileByPath.mockReturnValue(file);
         harness.loader.register();
@@ -171,9 +171,9 @@ describe("FileLazyLoader", () => {
         const nonFileLeaf = createLeaf("non-file").leaf;
         const throwingLeaf = createLeaf("throwing").leaf;
         (noStateLeaf.view as unknown as { getState?: () => { file?: string } }).getState = undefined;
-        vi.mocked(emptyLeaf.view.getState).mockReturnValue({});
-        vi.mocked(nonFileLeaf.view.getState).mockReturnValue({ file: "folder/not-a-file" });
-        vi.mocked(throwingLeaf.view.getState).mockImplementation(() => {
+        vi.spyOn(emptyLeaf.view, "getState").mockReturnValue({});
+        vi.spyOn(nonFileLeaf.view, "getState").mockReturnValue({ file: "folder/not-a-file" });
+        vi.spyOn(throwingLeaf.view, "getState").mockImplementation(() => {
             throw new Error("state unavailable");
         });
         const harness = createHarness([emptyLeaf, noStateLeaf, nonFileLeaf, throwingLeaf]);
