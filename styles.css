@@ -332,7 +332,7 @@
     display: none;
 }
 
-.lazy-plugin-list-body.is-compact .lazy-plugin-badges {
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .lazy-plugin-badges {
     display: flex;
     flex-wrap: wrap;
     gap: var(--size-4-2);
