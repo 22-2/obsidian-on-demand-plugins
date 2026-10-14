@@ -51,7 +51,7 @@ export class LazyEngineFeature implements AppFeature {
         ctx.register(patchPluginInitialization());
         patchSetViewState({
             register: (unload) => this.ctx.register(unload),
-            onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
+            onViewType: (viewType: string, leaf: WorkspaceLeaf) => this.viewLoader.checkViewTypeForLazyLoading(viewType, leaf),
         });
         patchRibbonReorder(ctx);
         // Session-wide: attribute registerView calls to their plugin even when

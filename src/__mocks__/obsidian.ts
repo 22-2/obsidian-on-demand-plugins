@@ -5,11 +5,21 @@ export const Plugin = class {};
 export const Setting = class {};
 export const Notice = class {
     static messages: string[] = [];
+    hidden = false;
 
     constructor(message?: string) {
         if (typeof message === "string") {
             Notice.messages.push(message);
         }
+    }
+
+    setMessage(message: string) {
+        Notice.messages.push(message);
+        return this;
+    }
+
+    hide() {
+        this.hidden = true;
     }
 
     static clearMessages() {

@@ -7,7 +7,7 @@ const logger = log.getLogger("OnDemandPlugin/ViewStatePatch");
 
 interface PatchViewStateDeps {
     register: (unload: () => void) => void;
-    onViewType: (viewType: string) => Promise<void>;
+    onViewType: (viewType: string, leaf: WorkspaceLeaf) => Promise<void>;
 }
 
 // ── Patch ────────────────────────────────────────────────────────────────────
@@ -26,7 +26,7 @@ export function patchSetViewState(deps: PatchViewStateDeps): void {
                     if (viewState?.type) {
                         // Patch hook failures should not block Obsidian's view transition.
                         try {
-                            await onViewType(viewState.type);
+                            await onViewType(viewState.type, this);
                         } catch (error) {
                             // Intentionally log every failure so repeated instability remains visible.
                             logger.warn("setViewState hook failed:", error);

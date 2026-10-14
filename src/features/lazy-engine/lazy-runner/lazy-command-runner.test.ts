@@ -205,7 +205,26 @@ describe("LazyCommandRunner", () => {
             await runner.runLazyCommand("cmd1");
 
             expect(executeSpy).not.toHaveBeenCalled();
-            expect((Notice as unknown as { messages: string[] }).messages).toHaveLength(0);
+            expect((Notice as unknown as { messages: string[] }).messages).toEqual(["Loading test-plugin…", "Failed to load test-plugin"]);
+        });
+
+        it("reports loading and the result in one notice while an unloaded plugin loads", async () => {
+            mockRegistry.getCachedCommand.mockReturnValue({ id: "cmd1", pluginId: "test-plugin" });
+            (mockCtx.obsidianPlugins as unknown as { manifests: Record<string, { name: string }> }).manifests = { "test-plugin": { name: "Test Plugin" } };
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
+            const messages = (Notice as unknown as { messages: string[] }).messages;
+            vi.spyOn(runner, "ensurePluginLoaded").mockImplementation(async () => {
+                // The loading message must be visible for the whole load.
+                expect(messages).toEqual(["Loading Test Plugin…"]);
+                return true;
+            });
+            vi.spyOn(runner, "waitForCommand").mockResolvedValue(true);
+            const executor = (runner as unknown as { commandExecutor: { executeCommand: (id: string, event: unknown) => boolean } }).commandExecutor;
+            vi.spyOn(executor, "executeCommand").mockReturnValue(true);
+
+            await runner.runLazyCommand("cmd1");
+
+            expect(messages).toEqual(["Loading Test Plugin…", "Test Plugin loaded"]);
         });
 
         it("should log and swallow command readiness errors when console logging is enabled", async () => {
