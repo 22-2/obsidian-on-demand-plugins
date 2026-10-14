@@ -22,6 +22,12 @@ export const DropdownComponent = class {};
 export const ButtonComponent = class {};
 export const setIcon = () => {};
 
+export class FileSystemAdapter {
+    getBasePath() {
+        return "vault";
+    }
+}
+
 export class TFile {
     basename = "";
     name = "";
@@ -39,6 +45,7 @@ export function normalizePath(path: string): string {
 export const Platform = {
     isDesktop: true,
     isMobile: false,
+    isDesktopApp: false,
 };
 
 export const MarkdownView = class {
