@@ -115,6 +115,81 @@ describe("BackupFeature", () => {
         expect(mockAdapter.write).not.toHaveBeenCalled();
     });
 
+    it.each(["null", "[]", '"settings"'])("should skip backup when data.json contains a non-object value: %s", async (dataContent) => {
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return dataContent;
+            return "[]";
+        });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when asked to create a backup before loading", async () => {
+        const backupFeature = new BackupFeature();
+
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.read).not.toHaveBeenCalled();
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when initial backup setup runs before loading", async () => {
+        const backupFeature = new BackupFeature();
+
+        await (backupFeature as unknown as { createInitialInstallBackupIfNeeded: () => Promise<void> }).createInitialInstallBackupIfNeeded();
+
+        expect(mockAdapter.exists).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['{"profiles":{"Default":{"id":"Wrong","name":"Default","settings":{}}}}', "mismatched profile id"],
+        ['{"profiles":{"Default":{"id":"Default","name":"Default","settings":{"defaultMode":"future"}}}}', "unknown default mode"],
+        ['{"profiles":{"Default":{"id":"Default","name":"Default","settings":{"pruneUninstalledEntries":"yes"}}}}', "invalid prune flag"],
+        ['{"profiles":{"Default":{"id":"Default","name":"Default","settings":{"plugins":[]}}}}', "invalid settings map"],
+        ['{"profiles":{}}', "empty profile map"],
+        ['{"settingsSchemaVersion":999,"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}', "unsupported schema version"],
+        ['{"profileStorageVersion":2}', "unsupported external profile version"],
+    ])("should skip backup for invalid settings data: %s", async (dataContent) => {
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return dataContent;
+            return "[]";
+        });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
+    it("should skip backup when either source file cannot be read", async () => {
+        mockAdapter.read.mockRejectedValueOnce(new Error("data unavailable"));
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
+    it("should skip backup when community plugin data is malformed JSON", async () => {
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
+            if (path.includes("community-plugins.json")) return "{broken";
+            return "";
+        });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
     it("should skip backup if community-plugins.json is not an array", async () => {
         mockAdapter.exists.mockResolvedValue(true);
         mockAdapter.read.mockImplementation((path: string) => {
@@ -183,6 +258,61 @@ describe("BackupFeature", () => {
         expect(profileWriteCall![1]).toContain(JSON.stringify(profileContent));
     });
 
+    it("includes only valid external profile JSON files in the snapshot", async () => {
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profileStorageVersion":1}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return '{"id":"Work profile","name":"Work","settings":{"defaultMode":"lazy","plugins":{}}}';
+        });
+        mockAdapter.list.mockImplementation((path: string) => {
+            if (path === "mock/plugin/dir/profiles") {
+                return { folders: [], files: ["mock/plugin/dir/profiles/Work%20profile.json", "mock/plugin/dir/profiles/Work%20profile.json.bak"] };
+            }
+            return { folders: [], files: [] };
+        });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        const profileWriteCall = mockAdapter.write.mock.calls.find((call: unknown[]) => String(call[0]).includes("profiles_"));
+        expect(profileWriteCall?.[1]).toContain('"Work%20profile.json"');
+        expect(profileWriteCall?.[1]).not.toContain(".json.bak");
+    });
+
+    it.each([
+        { folders: [], files: [] },
+        { folders: [], files: ["mock/plugin/dir/profiles/Default.json.bak"] },
+    ])("skips legacy external backups when there are no usable profile files", async (listing) => {
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profileStorageVersion":1}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return '{"id":"Default","name":"Default","settings":{}}';
+        });
+        mockAdapter.list.mockResolvedValue(listing);
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
+    it("skips legacy external backups when the profile folder is missing", async () => {
+        mockAdapter.exists.mockImplementation((path: string) => path !== "mock/plugin/dir/profiles");
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profileStorageVersion":1}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return '{"id":"Default","name":"Default","settings":{}}';
+        });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
     it("does not snapshot stale local profiles when the current data is inline", async () => {
         mockAdapter.exists.mockResolvedValue(true);
         const validData = '{"profiles":{"Default":{"id":"Default","name":"Default","settings":{}}}}';
@@ -216,6 +346,36 @@ describe("BackupFeature", () => {
 
         expect(mockAdapter.write).not.toHaveBeenCalled();
         expect(mockAdapter.remove).not.toHaveBeenCalled();
+    });
+
+    it.each(['{"id":"Other","name":"Default","settings":{}}', '{"id":"Default","name":"Default","settings":{"defaultMode":"future"}}', '{"id":"Default","name":"Default","settings":{"pruneUninstalledEntries":"yes"}}', '{"id":"Default","name":"Default","settings":{"lazyOnFiles":[]}}'])("skips external profile snapshots with invalid content %s", async (profileContent) => {
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profileStorageVersion":1}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return profileContent;
+        });
+        mockAdapter.list.mockResolvedValue({ folders: [], files: ["mock/plugin/dir/profiles/Default.json"] });
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
+    });
+
+    it("skips external profile snapshots when listing the profiles folder fails", async () => {
+        mockAdapter.read.mockImplementation((path: string) => {
+            if (path.includes("data.json")) return '{"profileStorageVersion":1}';
+            if (path.includes("community-plugins.json")) return "[]";
+            return '{"id":"Default","name":"Default","settings":{}}';
+        });
+        mockAdapter.list.mockRejectedValueOnce(new Error("profiles folder unavailable"));
+
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).not.toHaveBeenCalled();
     });
 
     it("creates distinct backups for concurrent requests with the same clock time", async () => {
@@ -324,5 +484,74 @@ describe("BackupFeature", () => {
         expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/data_20260309-110000.json");
         expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/community-plugins_20260309-100000.json");
         expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/community-plugins_20260309-110000.json");
+    });
+
+    it("covers skipped and failed removals for each rotated backup type", async () => {
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        const backups = ["100000", "110000", "120000", "130000", "140000", "150000"];
+        mockAdapter.list.mockResolvedValue({
+            folders: [],
+            files: [...backups.map((time) => `mock/plugin/dir/backups/data_${time}.json`), ...backups.map((time) => `mock/plugin/dir/backups/community-plugins_${time}.json`), ...backups.map((time) => `mock/plugin/dir/backups/profiles_${time}.json`), "mock/plugin/dir/backups/data_notes.txt", "mock/plugin/dir/backups/profiles_notes.txt"],
+        });
+        mockAdapter.exists.mockImplementation((path: string) => !path.endsWith("100000.json"));
+        mockAdapter.remove.mockRejectedValueOnce({ code: "ENOENT" }).mockRejectedValueOnce(new Error("data remove failed")).mockRejectedValueOnce({ code: "ENOENT" }).mockRejectedValueOnce({ code: "ENOENT" }).mockRejectedValueOnce(new Error("community remove failed")).mockRejectedValueOnce(new Error("profile remove failed")).mockRejectedValueOnce({ code: "ENOENT" });
+
+        await (backupFeature as unknown as { rotateBackups: () => Promise<void> }).rotateBackups();
+
+        expect(mockAdapter.remove).toHaveBeenCalledTimes(7);
+        expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/data_100000.json");
+        expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/data_110000.json");
+        expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/community-plugins_110000.json");
+        expect(mockAdapter.remove).toHaveBeenCalledWith("mock/plugin/dir/backups/profiles_110000.json");
+    });
+
+    it("keeps backup requests working when rotation listing or writes fail", async () => {
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        mockAdapter.list.mockRejectedValueOnce(new Error("cannot list"));
+        await backupFeature.createBackup();
+
+        mockAdapter.write.mockRejectedValueOnce(new Error("disk full"));
+        await backupFeature.createBackup();
+
+        expect(mockAdapter.write).toHaveBeenCalled();
+    });
+
+    it("uses a UUID timestamp fallback when backup listing fails", async () => {
+        const format = vi.fn().mockReturnValue("20261014-120000-000");
+        const momentSpy = vi.spyOn(window, "moment").mockReturnValue({ format } as never);
+        const uuidSpy = vi.spyOn(window.crypto, "randomUUID").mockReturnValue("00000000-0000-0000-0000-000000000001");
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        mockAdapter.list.mockRejectedValueOnce(new Error("cannot list"));
+
+        try {
+            await backupFeature.createBackup();
+        } finally {
+            momentSpy.mockRestore();
+            uuidSpy.mockRestore();
+        }
+
+        expect(mockAdapter.write).toHaveBeenCalledWith("mock/plugin/dir/backups/data_20261014-120000-000-00000000-0000-0000-0000-000000000001.json", expect.any(String));
+    });
+
+    it("advances the timestamp when an existing backup already uses it", async () => {
+        const format = vi.fn().mockReturnValue("20261014-120000-000");
+        const momentSpy = vi.spyOn(window, "moment").mockReturnValue({ format } as never);
+        const backupFeature = new BackupFeature();
+        await backupFeature.onload(mockCtx as never);
+        mockAdapter.list.mockResolvedValueOnce({
+            folders: [],
+            files: ["mock/plugin/dir/backups/data_20261014-120000-000.json", "mock/plugin/dir/backups/profiles_20261014-120000-000-01.json"],
+        });
+
+        try {
+            await backupFeature.createBackup();
+        } finally {
+            momentSpy.mockRestore();
+        }
+
+        expect(mockAdapter.write).toHaveBeenCalledWith("mock/plugin/dir/backups/data_20261014-120000-000-02.json", expect.any(String));
     });
 });

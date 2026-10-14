@@ -203,8 +203,7 @@ export class BackupFeature implements AppFeature {
         const profileBackups = result.files.filter((f) => f.includes("profiles_") && f.endsWith(".json")).sort();
 
         while (dataBackups.length > 3) {
-            const oldest = dataBackups.shift();
-            if (!oldest) continue;
+            const oldest = dataBackups.shift()!;
 
             // Reason: Another process or a previous operation may have already removed the file,
             // and `adapter.remove` may throw ENOENT which would lead to an unhandled Promise rejection.
@@ -222,8 +221,7 @@ export class BackupFeature implements AppFeature {
         }
 
         while (communityBackups.length > 3) {
-            const oldest = communityBackups.shift();
-            if (!oldest) continue;
+            const oldest = communityBackups.shift()!;
 
             // Same handling as above: ignore ENOENT if the file was already removed, and log other errors.
             try {
@@ -241,8 +239,7 @@ export class BackupFeature implements AppFeature {
         }
 
         while (profileBackups.length > 3) {
-            const oldest = profileBackups.shift();
-            if (!oldest) continue;
+            const oldest = profileBackups.shift()!;
 
             try {
                 if (await adapter.exists(oldest)) {
