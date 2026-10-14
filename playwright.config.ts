@@ -9,8 +9,9 @@ export default defineObsidianConfig({
     expect: { timeout: 5_000 },
 
     // Each test launches its own Obsidian instance with an isolated vault, so run them in parallel.
-    // Locally two workers; CI runners have 3-4 vCPUs, so use three there.
-    workers: process.env.CI ? 3 : 2,
+    // CI Windows runners have 4 vCPUs and can take three. The 3-vCPU macOS runner slows down with three,
+    // so it keeps two, as does a local machine.
+    workers: process.env.CI && process.platform === "win32" ? 3 : 2,
 
     // On CI, retry up to 3 times: Windows workers have exited unexpectedly between tests (exit code 3221226505) with no assertion failure.
     retries: process.env.CI ? 3 : 0,
