@@ -59,27 +59,35 @@
 }
 
 .lazy-review-changes-item {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: var(--size-4-2);
+    column-gap: var(--size-4-2);
     padding-block: var(--size-4-2);
     border-bottom: 1px solid var(--background-modifier-border);
 }
 
 .lazy-review-changes-info {
-    flex: 1 1 0;
-    min-width: 0;
+    /* Share the name's grid row with the revert button, independently of the description height. */
+    display: contents;
 }
 
 .lazy-review-changes-name {
+    grid-column: 1;
     font-weight: var(--font-medium);
     overflow-wrap: anywhere;
 }
 
 .lazy-review-changes-desc {
+    grid-column: 1 / -1;
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     overflow-wrap: anywhere;
+}
+
+.lazy-review-changes-item > .extra-setting-button {
+    grid-area: 1 / 2;
+    margin: 0;
 }
 
 .lazy-review-changes-from {
