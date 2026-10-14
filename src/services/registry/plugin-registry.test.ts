@@ -14,6 +14,7 @@ describe("PluginRegistry", () => {
     let mockApp: {
         vault: {
             configDir: string;
+            getConfigFile: ReturnType<typeof vi.fn>;
             readConfigJson: ReturnType<typeof vi.fn>;
             writeConfigJson: ReturnType<typeof vi.fn>;
         };
@@ -29,6 +30,7 @@ describe("PluginRegistry", () => {
         mockApp = {
             vault: {
                 configDir: "config",
+                getConfigFile: vi.fn().mockReturnValue({ path: "config/community-plugins.json" }),
                 readConfigJson: vi.fn(),
                 writeConfigJson: vi.fn(),
             },
@@ -73,7 +75,7 @@ describe("PluginRegistry", () => {
 
     describe("loadEnabledPluginsFromDisk", () => {
         it("should load list from config json", async () => {
-            mockApp.vault.readConfigJson.mockResolvedValue(["plugin-a", "plugin-c"]);
+            mockApp.vault.readConfigJson.mockResolvedValue(["plugin-a", 42, null, "plugin-c"]);
 
             await registry.loadEnabledPluginsFromDisk();
 
@@ -82,12 +84,34 @@ describe("PluginRegistry", () => {
             expect(registry.enabledPluginsFromDisk.has("plugin-c")).toBe(true);
         });
 
+        it("should ignore config values that are not arrays", async () => {
+            mockApp.vault.readConfigJson.mockResolvedValue({ enabled: ["plugin-a"] });
+
+            await registry.loadEnabledPluginsFromDisk();
+
+            expect(registry.enabledPluginsFromDisk.size).toBe(0);
+        });
+
         it("should handle error gracefully", async () => {
             mockApp.vault.readConfigJson.mockRejectedValue(new Error("Disk Error"));
 
             await registry.loadEnabledPluginsFromDisk(true);
 
             expect(registry.enabledPluginsFromDisk.size).toBe(0);
+        });
+
+        it("should handle read errors without logging when console logging is disabled", async () => {
+            mockApp.vault.readConfigJson.mockRejectedValue(new Error("Disk Error"));
+
+            await expect(registry.loadEnabledPluginsFromDisk()).resolves.toBeUndefined();
+            expect(registry.enabledPluginsFromDisk.size).toBe(0);
+        });
+    });
+
+    describe("getCommunityPluginsConfigFilePath", () => {
+        it("should return the community plugins config file", () => {
+            expect(registry.getCommunityPluginsConfigFilePath()).toEqual({ path: "config/community-plugins.json" });
+            expect(mockApp.vault.getConfigFile).toHaveBeenCalledWith("community-plugins");
         });
     });
 
@@ -104,6 +128,13 @@ describe("PluginRegistry", () => {
         it("should use writeConfigJson", async () => {
             await registry.writeCommunityPluginsFile(["plugin-a"]);
             expect(mockApp.vault.writeConfigJson).toHaveBeenCalledWith("community-plugins", ["plugin-a"]);
+        });
+
+        it("should handle write errors with and without console logging", async () => {
+            mockApp.vault.writeConfigJson.mockRejectedValue(new Error("Disk Error"));
+
+            await expect(registry.writeCommunityPluginsFile(["plugin-a"])).resolves.toBeUndefined();
+            await expect(registry.writeCommunityPluginsFile(["plugin-a"], true)).resolves.toBeUndefined();
         });
     });
 
