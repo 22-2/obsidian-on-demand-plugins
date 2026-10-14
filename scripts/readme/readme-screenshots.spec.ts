@@ -1,13 +1,12 @@
 import type { Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
 import { pluginUnderTestId, useOnDemandPluginsWithTargets } from "../../tests/test-utils";
 
 // Captures the README screenshots of the settings window, its review and discard dialogs, and the phone layout.
 // Run with `pnpm readme:shots`. Set README_SHOT_DIR to choose the output folder (default: the OS temp directory).
-const outDir = process.env.README_SHOT_DIR ?? path.join(os.tmpdir(), "readme-screenshots");
+const outDir = process.env.README_SHOT_DIR ?? path.resolve(".ci-artifacts/ui-screenshots/readme");
 
 useOnDemandPluginsWithTargets(["obsidian42-brat", "obsidian-excalidraw-plugin", "obsidian-linter", "notebook-navigator"]);
 

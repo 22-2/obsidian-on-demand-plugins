@@ -10,6 +10,8 @@
         "test:e2e": "playwright test --grep-invert @serial && playwright test --grep @serial --workers=1",
         "test:e2e:coverage": "node scripts/e2e-coverage.mjs",
         "readme:shots": "playwright test --config playwright.readme.config.ts --workers=1",
+        "ui:shots:pc": "node scripts/ui-screenshots.mjs pc",
+        "ui:shots:mobile": "node scripts/ui-screenshots.mjs mobile",
         "test:e2e:headed": "playwright test --headed",
         "test:e2e:install-browsers": "playwright install --with-deps",
         "build": "pnpm run typecheck && pnpm run build:nocheck",

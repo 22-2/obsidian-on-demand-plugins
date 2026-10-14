@@ -20,7 +20,7 @@ test("mobile plugin management remains usable at phone and tablet widths", async
     // The longest mode label exposes wrapping and dropdown overflow at narrow widths.
     await plugin.evaluate((instance, id) => instance.updatePluginSettings(id, "lazyOnLayoutReady"), targetPluginId);
     const page = await openMobilePluginManagement(obsidian);
-    const artifactDir = path.resolve(".ci-artifacts/mobile-ui");
+    const artifactDir = path.resolve(".ci-artifacts/ui-screenshots/mobile/plugin-management");
     await mkdir(artifactDir, { recursive: true });
 
     for (const width of [390, 320, 768]) {
@@ -126,7 +126,7 @@ for (const width of [320, 390]) {
             }),
         ).toBe(true);
 
-        const artifactDir = path.resolve(".ci-artifacts/mobile-ui");
+        const artifactDir = path.resolve(".ci-artifacts/ui-screenshots/mobile/plugin-management");
         await mkdir(artifactDir, { recursive: true });
         const capture = async (state: string, target: Page = page) => {
             const screenshotPath = path.join(artifactDir, `mobile-${width}-${state}.png`);

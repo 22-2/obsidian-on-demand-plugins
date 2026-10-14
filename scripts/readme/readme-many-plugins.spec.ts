@@ -1,12 +1,11 @@
 import type { Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
 import { pluginUnderTestId, useOnDemandPlugins } from "../../tests/test-utils";
 
 // Captures a long plugin list on desktop and phone, normal and compact. Run with `pnpm readme:shots`.
-const outDir = process.env.README_SHOT_DIR ?? path.join(os.tmpdir(), "readme-screenshots");
+const outDir = process.env.README_SHOT_DIR ?? path.resolve(".ci-artifacts/ui-screenshots/readme");
 
 useOnDemandPlugins();
 
