@@ -681,7 +681,7 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     gap: 8px;
 }
 
-.lazy-profile-page .lazy-profile-sync-notice {
+.lazy-settings-notice {
     background: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
     border-left: 3px solid var(--text-warning);
@@ -690,13 +690,13 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     padding: var(--size-4-3) var(--size-4-4);
 }
 
-.lazy-profile-page .lazy-profile-sync-notice p {
+.lazy-settings-notice p {
     /* Contrast keeps key sync instructions clear without emphasizing the whole paragraph. */
     color: var(--text-muted);
     margin: 0;
 }
 
-.lazy-profile-page .lazy-profile-sync-notice strong {
+.lazy-settings-notice strong {
     color: var(--text-normal);
 }
 

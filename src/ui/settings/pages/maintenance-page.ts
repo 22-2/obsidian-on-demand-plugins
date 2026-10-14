@@ -5,6 +5,7 @@ import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature
 import type OnDemandPlugin from "src/main";
 import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions } from "src/ui/settings/helpers";
+import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 export class MaintenancePage extends SettingPage {
     private plugin: OnDemandPlugin;
@@ -122,6 +123,9 @@ export class MaintenancePage extends SettingPage {
                     .setValue(this.to)
                     .onChange((v) => (this.to = v as PLUGIN_MODE)),
             );
+        createSettingsNotice(advancedContent, "lazy-batch-changes-notice", (text) => {
+            text.setText("Batch changes apply only after you select save in the review dialog.");
+        });
         new Setting(advancedContent).setName("Debug options").setHeading();
         new Setting(advancedContent).setName("Debug log output").addToggle((t) =>
             t.setValue(this.plugin.data.showConsoleLog).onChange(async (v) => {

@@ -39,6 +39,10 @@ describe("MaintenancePage", () => {
         expect(advanced.contains(setting("Sync direction").settingEl)).toBe(true);
         expect(advanced.contains(setting("To mode").settingEl)).toBe(true);
         expect(advanced.contains(setting("Debug log output").settingEl)).toBe(true);
+        const batchNotice = elements(advanced, "lazy-batch-changes-notice")[0];
+        expect(batchNotice.children[0].text).toBe("Batch changes apply only after you select save in the review dialog.");
+        expect(batchNotice.parent?.children.indexOf(batchNotice)).toBeGreaterThan(batchNotice.parent?.children.indexOf(setting("To mode").settingEl) ?? -1);
+        expect(batchNotice.parent?.children.indexOf(batchNotice)).toBeLessThan(batchNotice.parent?.children.indexOf(setting("Debug options").settingEl) ?? -1);
         expect(advanced.contains(setting("Rebuild command and view caches").settingEl)).toBe(false);
         advanced.open = true;
         advanced.dispatch("toggle");

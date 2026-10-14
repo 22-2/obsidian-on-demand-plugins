@@ -11,6 +11,7 @@ import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 const logger = log.getLogger("OnDemandPlugin/PluginPage");
 const COMPACT_LIST_STORAGE_KEY = "compact-plugin-list";
@@ -62,6 +63,9 @@ export class PluginPage extends SettingPage {
         void this.refreshCommunityPluginSnapshot();
         this.containerEl.empty();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
+        createSettingsNotice(this.containerEl, "lazy-plugin-changes-notice", (text) => {
+            text.setText("Changes apply only after you select save in the review dialog.");
+        });
         new Setting(this.containerEl).setName("Overview").setHeading();
         new Setting(this.containerEl)
             .setName(pluginStatisticsText(this.plugin))

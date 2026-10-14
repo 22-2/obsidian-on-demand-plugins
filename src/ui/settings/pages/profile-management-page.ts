@@ -6,6 +6,7 @@ import { showConfirmModal } from "src/core/confirm-modal";
 import type OnDemandPlugin from "src/main";
 import type { SettingsTab } from "src/ui/settings-tab";
 import { openBackupDirectory } from "src/ui/settings/helpers";
+import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 export class ProfileManagementPage extends SettingPage {
     private app: App;
@@ -23,16 +24,16 @@ export class ProfileManagementPage extends SettingPage {
     display() {
         this.containerEl.empty();
         this.containerEl.addClass("lazy-profile-page");
-        const syncNotice = this.containerEl.createDiv({ cls: "lazy-profile-sync-notice" });
-        const syncNoticeText = syncNotice.createEl("p");
-        // Profiles share data.json, so full-file saves can conflict across devices; this reminder asks users to coordinate edits without automatically applying synced profiles.
-        syncNoticeText.appendText("If you sync this plugin's settings across devices: ");
-        syncNoticeText.createEl("strong", { text: "Edit settings on one device only." });
-        syncNoticeText.appendText(" After changing these settings on another device: ");
-        syncNoticeText.createEl("strong", { text: "Wait for sync to finish, then reload this plugin on this device." });
-        syncNoticeText.appendText(" ");
-        syncNoticeText.createEl("strong", { text: "Concurrent edits or editing on another device while offline" });
-        syncNoticeText.appendText(" may cause conflicts or overwrite changes.");
+        const syncNotice = createSettingsNotice(this.containerEl, "lazy-profile-sync-notice", (text) => {
+            // Profiles share data.json, so full-file saves can conflict across devices; this reminder asks users to coordinate edits without automatically applying synced profiles.
+            text.appendText("If you sync this plugin's settings across devices: ");
+            text.createEl("strong", { text: "Edit settings on one device only." });
+            text.appendText(" After changing these settings on another device: ");
+            text.createEl("strong", { text: "Wait for sync to finish, then reload this plugin on this device." });
+            text.appendText(" ");
+            text.createEl("strong", { text: "Concurrent edits or editing on another device while offline" });
+            text.appendText(" may cause conflicts or overwrite changes.");
+        });
         this.containerEl.prepend(syncNotice);
         const service = this.plugin.core.settingsService;
         const profileIds = Object.keys(service.data.profiles);
