@@ -1,13 +1,6 @@
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 import type OnDemandPlugin from "src/main";
-import {
-    ensureBuilt,
-    pluginUnderTestId,
-    targetPluginId,
-    triggerActiveLeafChange,
-    useOnDemandPlugins,
-    waitForPluginEnabled
-} from "./test-utils";
+import { pluginUnderTestId, targetPluginId, triggerActiveLeafChange, useOnDemandPlugins, withReloadRecorded } from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -19,16 +12,11 @@ useOnDemandPlugins();
  * so their viewTypes were not populated during apply.
  */
 test("lazy mode with useView:true collects viewTypes during apply", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true; // prevent real reload
+    const result = await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
+            // prevent real reload
 
-        try {
             // Clear any pre-existing lazyOptions state
             if (plugin.settings.plugins[pluginId]) {
                 delete plugin.settings.plugins[pluginId].lazyOptions;
@@ -57,10 +45,8 @@ test("lazy mode with useView:true collects viewTypes during apply", async ({ obs
                 viewTypes: plugin.settings?.plugins?.[pluginId]?.lazyOptions?.viewTypes ?? null,
                 lazyOnViews: plugin.settings?.lazyOnViews?.[pluginId] ?? null,
             };
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, targetPluginId);
+        }, targetPluginId),
+    );
 
     expect(result.mode).toBe("lazy");
 
@@ -75,18 +61,11 @@ test("lazy mode with useView:true collects viewTypes during apply", async ({ obs
  * the ViewLazyLoader can actually trigger loading when that view becomes active.
  */
 test("lazy mode with useView:true loads plugin when matching view is activated", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
 
     // Configure: lazy mode + useView=true with explicit viewType "markdown"
-    const setupResult = await pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    const setupResult = await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
             if (plugin.settings.plugins[pluginId]) {
                 delete plugin.settings.plugins[pluginId].lazyOptions;
             }
@@ -104,24 +83,23 @@ test("lazy mode with useView:true loads plugin when matching view is activated",
                 fileCriteria: {},
             };
             await plugin.saveSettings();
-        } finally {
-            app.commands.executeCommandById = original;
-        }
 
-        return {
-            mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
-            viewTypes: plugin.settings?.plugins?.[pluginId]?.lazyOptions?.viewTypes ?? [],
-        };
-    }, targetPluginId);
+            return {
+                mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
+                viewTypes: plugin.settings?.plugins?.[pluginId]?.lazyOptions?.viewTypes ?? [],
+            };
+        }, targetPluginId),
+    );
 
     expect(setupResult.mode).toBe("lazy");
     expect(setupResult.viewTypes).toContain("markdown");
 
     // Simulate an active-leaf-change event on a markdown leaf to trigger the loader
+    expect(await obsidian.isPluginLoaded(targetPluginId)).toBe(false);
+    await obsidian.createNote("lazy-view-trigger.md", "");
+    await obsidian.open("lazy-view-trigger.md");
     await triggerActiveLeafChange(obsidian);
 
     // Wait up to 8 s for the plugin to be enabled
-    const enabled = await waitForPluginEnabled(obsidian, targetPluginId);
-
-    expect(enabled).toBe(true);
+    await obsidian.waitForPluginLoaded(targetPluginId);
 });

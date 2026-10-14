@@ -23,21 +23,24 @@ export class MaintenancePage extends SettingPage {
         this.tab.renderPendingControls(this.containerEl, () => this.display());
         const f = this.plugin.features.get(MaintenanceFeature);
         new Setting(this.containerEl).setName("Cache maintenance").setHeading();
-        new Setting(this.containerEl).setName("Force rebuild command cache").addButton((b) =>
-            b
-                .setButtonText("Rebuild cache")
-                .setWarning()
-                .onClick(async () => {
-                    if (!f) return;
-                    b.setDisabled(true);
-                    try {
-                        await f.rebuildAndApplyCommandCache({ force: true });
-                        new Notice("Command cache rebuilt successfully");
-                    } finally {
-                        b.setDisabled(false);
-                    }
-                }),
-        );
+        new Setting(this.containerEl)
+            .setName("Rebuild command and view caches")
+            .setDesc("Refresh commands and view types together for lazy plugins, then restart Obsidian.")
+            .addButton((b) =>
+                b
+                    .setButtonText("Rebuild caches")
+                    .setDestructive()
+                    .onClick(async () => {
+                        if (!f) return;
+                        b.setDisabled(true);
+                        try {
+                            await f.rebuildAndApplyCommandCache({ force: true });
+                            new Notice("Command and view caches rebuilt successfully");
+                        } finally {
+                            b.setDisabled(false);
+                        }
+                    }),
+            );
         new Setting(this.containerEl).setName("Sync settings").setHeading();
         new Setting(this.containerEl)
             .setName("Sync direction")
@@ -85,7 +88,7 @@ export class MaintenancePage extends SettingPage {
             .addButton((b) =>
                 b
                     .setButtonText("Replace all")
-                    .setWarning()
+                    .setDestructive()
                     .onClick(() => {
                         if (!f || this.from === this.to) return;
                         this.plugin.updateManifests();

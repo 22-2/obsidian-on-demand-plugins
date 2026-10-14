@@ -1,3 +1,4 @@
+import { Platform } from "obsidian";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE, SETTINGS_SCHEMA_VERSION } from "src/core/types";
 import { loadLocalStorage } from "src/core/storage";
 import type OnDemandPlugin from "src/main";
@@ -141,6 +142,147 @@ describe("SettingsService loading", () => {
     });
 });
 
+describe("SettingsService legacy profile migration", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+        Platform.isMobile = false;
+    });
+
+    it("migrates dual desktop and mobile settings and hydrates legacy local view rules", async () => {
+        vi.mocked(loadLocalStorage).mockReturnValue({ "local-plugin": ["local-view"] });
+        const { service, plugin } = createService({
+            showConsoleLog: false,
+            dualConfigs: true,
+            desktop: {
+                ...structuredClone(DEFAULT_DEVICE_SETTINGS),
+                defaultMode: PLUGIN_MODE.LAZY,
+                lazyOnViews: { "shared-plugin": ["desktop-view"] },
+            },
+            mobile: {
+                ...structuredClone(DEFAULT_DEVICE_SETTINGS),
+                defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
+                lazyOnViews: { "shared-plugin": ["mobile-view"] },
+            },
+        });
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default", "mobile"]);
+        expect(service.data.profiles.Default.name).toBe("Default (desktop)");
+        expect(service.data.profiles.mobile.name).toBe("Mobile");
+        expect(service.settings.defaultMode).toBe(PLUGIN_MODE.LAZY);
+        expect(service.settings.lazyOnViews).toEqual({ "shared-plugin": ["desktop-view"], "local-plugin": ["local-view"] });
+        expect(service.data).not.toHaveProperty("desktop");
+        expect(service.data).not.toHaveProperty("mobile");
+        expect(loadLocalStorage).toHaveBeenCalledWith(plugin.app, "lazyOnViews");
+    });
+
+    it("uses the mobile profile when the mobile platform is active", async () => {
+        Platform.isMobile = true;
+        try {
+            const { service } = createService({
+                showConsoleLog: false,
+                dualConfigs: true,
+                desktop: { ...structuredClone(DEFAULT_DEVICE_SETTINGS), defaultMode: PLUGIN_MODE.LAZY },
+                mobile: { ...structuredClone(DEFAULT_DEVICE_SETTINGS), defaultMode: PLUGIN_MODE.ALWAYS_DISABLED },
+            });
+
+            await service.load();
+
+            expect(service.currentProfileId).toBe("mobile");
+            expect(service.settings.defaultMode).toBe(PLUGIN_MODE.ALWAYS_DISABLED);
+        } finally {
+            Platform.isMobile = false;
+        }
+    });
+
+    it("migrates a single legacy config when dual configs are disabled", async () => {
+        const { service } = createService({
+            showConsoleLog: false,
+            dualConfigs: false,
+            desktop: { ...structuredClone(DEFAULT_DEVICE_SETTINGS), defaultMode: PLUGIN_MODE.LAZY },
+            mobile: { ...structuredClone(DEFAULT_DEVICE_SETTINGS), defaultMode: PLUGIN_MODE.ALWAYS_DISABLED },
+        });
+
+        await service.load();
+
+        expect(Object.keys(service.data.profiles)).toEqual(["Default"]);
+        expect(service.settings.defaultMode).toBe(PLUGIN_MODE.LAZY);
+        expect(service.data.mobileProfileId).toBe("Default");
+        expect(service.data).not.toHaveProperty("dualConfigs");
+    });
+});
+
+describe("SettingsService profile operations", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+        Platform.isMobile = false;
+    });
+
+    it("switches, renames, and deletes profiles while updating device defaults", async () => {
+        const profiles = {
+            Default: createProfile("Default"),
+            Work: createProfile("Work"),
+        };
+        const { service } = createService(migratedDataWith({ profiles }));
+        await service.load();
+
+        service.switchProfile("Work");
+        service.setDeviceDefault("Work", "mobile");
+        service.renameProfile("Work", "Writing");
+        service.deleteProfile("Default");
+
+        expect(service.currentProfileId).toBe("Work");
+        expect(service.data.desktopProfileId).toBe("Work");
+        expect(service.data.mobileProfileId).toBe("Work");
+        expect(service.data.profiles.Work.name).toBe("Writing");
+        expect(service.data.profiles).toEqual({ Work: profiles.Work });
+        expect(() => service.switchProfile("missing")).toThrow("Profile missing not found");
+        expect(() => service.deleteProfile("Work")).toThrow("Cannot delete the last profile");
+    });
+
+    it("rejects deleting the active profile and ignores unknown device defaults", async () => {
+        const { service } = createService(migratedDataWith({ profiles: { Default: createProfile("Default"), Work: createProfile("Work") } }));
+        await service.load();
+
+        expect(() => service.deleteProfile("Default")).toThrow("Cannot delete the active profile");
+        service.setDeviceDefault("missing", "desktop");
+        expect(service.data.desktopProfileId).toBe("Default");
+    });
+
+    it("creates a deep copy of the requested source profile", async () => {
+        const source = createProfile("Default");
+        source.settings.lazyOnFiles = { "sample-plugin": { suffixes: [".md"] } };
+        const { service } = createService(migratedDataWith({ profiles: { Default: source } }));
+        await service.load();
+        vi.stubGlobal("activeWindow", { crypto: { randomUUID: () => "created-profile" } });
+        try {
+            const createdId = service.createProfile("Copy", "Default");
+            service.data.profiles[createdId].settings.lazyOnFiles["sample-plugin"].suffixes?.push(".txt");
+
+            expect(createdId).toBe("created-profile");
+            expect(service.data.profiles[createdId].name).toBe("Copy");
+            expect(source.settings.lazyOnFiles["sample-plugin"]).toEqual({ suffixes: [".md"] });
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("creates a profile with defaults when the requested source does not exist", async () => {
+        const { service } = createService(migratedDataWith());
+        await service.load();
+        vi.stubGlobal("activeWindow", { crypto: { randomUUID: () => "default-profile" } });
+        try {
+            const createdId = service.createProfile("Fresh", "missing");
+
+            expect(service.data.profiles[createdId].settings).toEqual(DEFAULT_DEVICE_SETTINGS);
+            expect(service.data.profiles[createdId].settings).not.toBe(DEFAULT_DEVICE_SETTINGS);
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+});
+
 describe("SettingsService inline persistence", () => {
     beforeEach(() => vi.resetAllMocks());
 
@@ -259,5 +401,39 @@ describe("SettingsService inline persistence", () => {
         expect(saveData.mock.calls[0]?.[0]).toHaveProperty("profiles.Secondary");
         expect(saveData.mock.calls[0]?.[0]).not.toHaveProperty("profileStorageVersion");
         expect(trigger).toHaveBeenCalledTimes(2);
+    });
+
+    it("refuses to save before settings have loaded", async () => {
+        const { service, plugin } = createService(undefined);
+
+        await expect(service.save()).rejects.toThrow("Settings cannot be saved until a valid settings file is loaded.");
+        expect(plugin.saveData).not.toHaveBeenCalled();
+    });
+
+    it("blocks saving when the persisted data becomes unreadable", async () => {
+        const adapter = createAdapter();
+        adapter.exists.mockResolvedValue(true);
+        adapter.read.mockResolvedValueOnce(JSON.stringify(migratedDataWith())).mockRejectedValueOnce(new Error("read failed"));
+        const saveData = vi.fn().mockResolvedValue(undefined);
+        const plugin = {
+            app: { vault: { adapter }, workspace: { trigger: vi.fn() } },
+            manifest: { dir: "mock/plugin/dir" },
+            loadData: vi.fn(),
+            saveData,
+        } as unknown as OnDemandPlugin;
+        const service = new SettingsService(plugin);
+        await service.load();
+
+        await expect(service.save()).rejects.toThrow("changed into an unreadable state");
+        expect(saveData).not.toHaveBeenCalled();
+    });
+
+    it("blocks saving when the in-memory profile map becomes invalid", async () => {
+        const { service, plugin } = createService(migratedDataWith());
+        await service.load();
+        service.data.profiles = {};
+
+        await expect(service.save()).rejects.toThrow("in-memory profiles are incomplete");
+        expect(plugin.saveData).not.toHaveBeenCalled();
     });
 });

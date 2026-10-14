@@ -22,6 +22,22 @@ export const DropdownComponent = class {};
 export const ButtonComponent = class {};
 export const setIcon = () => {};
 
+export class FileSystemAdapter {
+    getBasePath() {
+        return "vault";
+    }
+}
+
+export class TFile {
+    basename = "";
+    name = "";
+    path = "";
+}
+
+export function debounce<T extends (...args: never[]) => unknown>(fn: T, _timeout?: number, _leading?: boolean): T {
+    return fn;
+}
+
 export function normalizePath(path: string): string {
     return path;
 }
@@ -29,6 +45,7 @@ export function normalizePath(path: string): string {
 export const Platform = {
     isDesktop: true,
     isMobile: false,
+    isDesktopApp: false,
 };
 
 export const MarkdownView = class {

@@ -57,7 +57,7 @@ export class EventBus {
  * Define common event names as constants to avoid typos.
  */
 export const FeatureEvents = {
-    /** Request to rebuild the command cache and apply policies. Payload: { force?: boolean } */
+    /** Request to rebuild command/view caches and apply policies. Payload: { force?: boolean } */
     REBUILD_CACHE_REQUESTED: "lazy-engine:rebuild-cache-requested",
     /** Request to apply startup policies and restart. Payload: { pluginIds?: string[] } */
     APPLY_POLICIES_REQUESTED: "lazy-engine:apply-policies-requested",

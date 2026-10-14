@@ -1,8 +1,8 @@
 import type { LogLevelDesc } from "loglevel";
-import fs from "node:fs";
 import path from "node:path";
-import { test, type ObsidianAPI } from "obsidian-e2e-toolkit";
+import type { ObsidianAPI } from "obsidian-e2e-toolkit";
 import { fileURLToPath } from "url";
+import { test } from "./fixtures";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,7 +11,6 @@ const repoRoot = path.resolve(__dirname, "..");
 const pluginUnderTestId = "on-demand-plugins";
 const targetPluginId = "obsidian42-brat";
 const excalidrawPluginId = "obsidian-excalidraw-plugin";
-const defaultWaitTimeoutMs = 8_000;
 
 type TestVaultOptions = {
     enableBrowserConsoleLogging?: boolean;
@@ -35,10 +34,7 @@ export function useVaultPlugins(pluginPaths: readonly string[], options: TestVau
     });
 }
 
-export function useOnDemandPluginsWithTargets(
-    targetPluginIds: string | readonly string[],
-    options: TestVaultOptions = {},
-) {
+export function useOnDemandPluginsWithTargets(targetPluginIds: string | readonly string[], options: TestVaultOptions = {}) {
     const pluginIds = Array.isArray(targetPluginIds) ? [...targetPluginIds] : [targetPluginIds];
 
     // Mental model: most E2E suites only vary by which bundled plugin is mounted next to
@@ -62,47 +58,18 @@ export function useOnDemandPluginsWithExcalidraw() {
     useOnDemandPluginsWithTargets(excalidrawPluginId);
 }
 
-export function ensureBuilt() {
-    const mainJsPath = path.resolve(repoRoot, "main.js");
-    if (!fs.existsSync(mainJsPath)) {
-        test.skip(true, "main.js not found; run build before tests");
-        return false;
-    }
-    return true;
-}
-
-// Reason: the toolkit waiters throw on timeout, but specs branch on a boolean outcome.
-async function settles(wait: Promise<void>): Promise<boolean> {
+/**
+ * Runs an action that may request app:reload, such as applying a startup policy. The reload request is
+ * recorded instead of performed, so the test keeps running on the same page. The interception is removed
+ * when the action settles.
+ */
+export async function withReloadRecorded<T>(obsidian: ObsidianAPI, action: () => Promise<T>): Promise<T> {
+    const reload = await obsidian.interceptReload();
     try {
-        await wait;
-        return true;
-    } catch {
-        return false;
+        return await action();
+    } finally {
+        await reload.restore();
     }
-}
-
-export function waitForPluginEnabled(
-    obsidian: ObsidianAPI,
-    pluginId: string,
-    timeoutMs = defaultWaitTimeoutMs,
-): Promise<boolean> {
-    return settles(obsidian.waitForPluginEnabled(pluginId, timeoutMs));
-}
-
-export function waitForPluginDisabled(
-    obsidian: ObsidianAPI,
-    pluginId: string,
-    timeoutMs = defaultWaitTimeoutMs,
-): Promise<boolean> {
-    return settles(obsidian.waitForPluginDisabled(pluginId, timeoutMs));
-}
-
-export function waitForViewType(
-    obsidian: ObsidianAPI,
-    viewType: string,
-    timeoutMs = defaultWaitTimeoutMs,
-): Promise<boolean> {
-    return settles(obsidian.waitForViewType(viewType, timeoutMs));
 }
 
 export async function triggerActiveLeafChange(obsidian: ObsidianAPI): Promise<void> {
@@ -117,36 +84,7 @@ export async function triggerActiveLeafChange(obsidian: ObsidianAPI): Promise<vo
     });
 }
 
-export async function findCommandByPrefix(
-    obsidian: ObsidianAPI,
-    commandPrefix: string,
-): Promise<string | null> {
-    return obsidian.page.evaluate(
-        (prefix) => Object.keys(app.commands.commands).find((commandId) => commandId.startsWith(prefix)) ?? null,
-        commandPrefix,
-    );
-}
-
-export async function findCommandByExactId(
-    obsidian: ObsidianAPI,
-    commandId: string,
-): Promise<string | null> {
-    return obsidian.page.evaluate(
-        (targetCommandId) =>
-            Object.keys(app.commands.commands).find((registeredCommandId) => registeredCommandId === targetCommandId) ?? null,
-        commandId,
-    );
-}
-
-export async function readCommunityPlugins(obsidian: ObsidianAPI): Promise<string[]> {
-    const configDir = await obsidian.evaluateApp(() => app.vault.configDir);
-    return JSON.parse(await obsidian.read(`${configDir}/community-plugins.json`)) as string[];
-}
-
-async function readOnDemandStorageRecord(
-    obsidian: ObsidianAPI,
-    prefix: string,
-): Promise<Record<string, unknown> | null> {
+async function readOnDemandStorageRecord(obsidian: ObsidianAPI, prefix: string): Promise<Record<string, unknown> | null> {
     return obsidian.page.evaluate((storagePrefix) => {
         const appWithId = app as unknown as {
             app?: {
@@ -167,11 +105,7 @@ async function readOnDemandStorageRecord(
     }, prefix);
 }
 
-export async function readOnDemandStorageValue(
-    obsidian: ObsidianAPI,
-    prefix: string,
-    key: string,
-): Promise<unknown> {
+export async function readOnDemandStorageValue(obsidian: ObsidianAPI, prefix: string, key: string): Promise<unknown> {
     const record = await readOnDemandStorageRecord(obsidian, prefix);
     return record?.[key] ?? null;
 }

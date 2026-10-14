@@ -24,7 +24,7 @@ describe("patchPluginLoad", () => {
             return instance;
         });
         const plugins = { loadPlugin } as unknown as Plugins;
-        uninstall = patchPluginLoad(plugins);
+        uninstall = patchPluginLoad(plugins, vi.fn());
 
         const cliLoad = plugins.loadPlugin("graph-analysis-ex");
         const lazyLoad = plugins.loadPlugin("graph-analysis-ex");
@@ -45,7 +45,7 @@ describe("patchPluginLoad", () => {
     it("allows retries after failure and preserves the receiver and arguments", async () => {
         const loadPlugin = vi.fn().mockRejectedValueOnce(new Error("read failed")).mockResolvedValue({});
         const plugins = { loadPlugin } as unknown as Plugins;
-        uninstall = patchPluginLoad(plugins);
+        uninstall = patchPluginLoad(plugins, vi.fn());
 
         await expect(plugins.loadPlugin("graph-analysis-ex", true)).rejects.toThrow("read failed");
         await plugins.loadPlugin("graph-analysis-ex", true);
@@ -65,7 +65,7 @@ describe("patchPluginLoad", () => {
             return id;
         });
         const plugins = { loadPlugin } as unknown as Plugins;
-        uninstall = patchPluginLoad(plugins);
+        uninstall = patchPluginLoad(plugins, vi.fn());
 
         const loadingFirst = plugins.loadPlugin("first");
         expect(await plugins.loadPlugin("second")).toBe("second");
@@ -73,5 +73,21 @@ describe("patchPluginLoad", () => {
         await loadingFirst;
         uninstall();
         expect(Object.getOwnPropertyDescriptor(plugins, "loadPlugin")?.value).toBe(loadPlugin);
+    });
+
+    it("reports settled loads and unloads, including failed loads", async () => {
+        const loadPlugin = vi.fn().mockRejectedValueOnce(new Error("read failed")).mockResolvedValue({});
+        const unloadPlugin = vi.fn().mockResolvedValue(undefined);
+        const plugins = { loadPlugin, unloadPlugin } as unknown as Plugins;
+        const onLoadStateChange = vi.fn();
+        uninstall = patchPluginLoad(plugins, onLoadStateChange);
+
+        await expect(plugins.loadPlugin("first")).rejects.toThrow("read failed");
+        expect(onLoadStateChange).toHaveBeenLastCalledWith("first");
+        await plugins.loadPlugin("second");
+        expect(onLoadStateChange).toHaveBeenLastCalledWith("second");
+        await plugins.unloadPlugin("second");
+        expect(unloadPlugin).toHaveBeenCalledWith("second");
+        expect(onLoadStateChange).toHaveBeenCalledTimes(3);
     });
 });

@@ -1,4 +1,3 @@
-import { MarkdownView } from "obsidian";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { CommandExecutor } from "src/features/lazy-engine/lazy-runner/command-executor";
@@ -6,9 +5,12 @@ import { beforeEach, describe, expect, it, vi, type Mocked } from "vitest";
 
 describe("CommandExecutor", () => {
     let executor: CommandExecutor;
+    let commands: Record<string, unknown>;
     let mockCtx: {
-        app: { workspace: { activeEditor: unknown } };
-        obsidianCommands: { commands: Record<string, unknown> };
+        obsidianCommands: {
+            findCommand: ReturnType<typeof vi.fn>;
+            executeCommandById: ReturnType<typeof vi.fn>;
+        };
         getData: ReturnType<typeof vi.fn>;
     };
     let mockRegistry: Mocked<CommandRegistry>;
@@ -16,25 +18,11 @@ describe("CommandExecutor", () => {
     beforeEach(() => {
         vi.resetAllMocks();
 
-        window.document = {
-            activeElement: {
-                closest: vi.fn().mockReturnValue(null),
-                contains: vi.fn().mockReturnValue(false),
-            },
-        } as unknown as Document;
-
-        // The executor reads `activeDocument` (Obsidian's global for the active window)
-        // rather than `document`, so the mock must be exposed under that name too.
-        (window as unknown as { activeDocument: Document }).activeDocument = window.document;
-
+        commands = {};
         mockCtx = {
-            app: {
-                workspace: {
-                    activeEditor: null,
-                },
-            },
             obsidianCommands: {
-                commands: {},
+                findCommand: vi.fn((id: string) => commands[id]),
+                executeCommandById: vi.fn().mockReturnValue(true),
             },
             getData: vi.fn().mockReturnValue({ showConsoleLog: false }),
         };
@@ -49,18 +37,19 @@ describe("CommandExecutor", () => {
     });
 
     describe("isCommandExecutable", () => {
-        it("should return true if any callback exists", () => {
-            mockCtx.obsidianCommands.commands["cmd1"] = { callback: () => {} };
+        it("should return true for a callback command", () => {
+            commands["cmd1"] = { callback: () => {} };
             expect(executor.isCommandExecutable("cmd1")).toBe(true);
         });
 
-        it("should return true if editorCallback exists", () => {
-            mockCtx.obsidianCommands.commands["cmd1"] = { editorCallback: () => {} };
+        it("should return true for a checkCallback command", () => {
+            // Obsidian stores editor commands with a generated checkCallback.
+            commands["cmd1"] = { checkCallback: () => true };
             expect(executor.isCommandExecutable("cmd1")).toBe(true);
         });
 
         it("should return false if it is a wrapper command", () => {
-            mockCtx.obsidianCommands.commands["cmd1"] = { callback: () => {} };
+            commands["cmd1"] = { callback: () => {} };
             mockRegistry.isWrapperCommand.mockReturnValue(true);
             expect(executor.isCommandExecutable("cmd1")).toBe(false);
         });
@@ -70,101 +59,41 @@ describe("CommandExecutor", () => {
         });
     });
 
-    describe("executeCommandDirect", () => {
-        it("should prefer editorCheckCallback when editor is active", () => {
-            const spy = vi.fn();
-            const cmd = {
-                editorCheckCallback: vi.fn((checking: boolean) => {
-                    if (!checking) spy();
-                    return true;
-                }),
-            };
-            mockCtx.obsidianCommands.commands["cmd1"] = cmd;
-            mockCtx.app.workspace.activeEditor = { editor: {} };
+    describe("executeCommand", () => {
+        it("should run a callback command through Obsidian with the trigger event", () => {
+            commands["cmd1"] = { callback: vi.fn() };
+            const event = { type: "keydown" } as KeyboardEvent;
 
-            const result = executor.executeCommandDirect("cmd1");
-            expect(result).toBe(true);
-            expect(cmd.editorCheckCallback).toHaveBeenCalledWith(true, expect.anything(), expect.anything());
-            expect(cmd.editorCheckCallback).toHaveBeenCalledWith(false, expect.anything(), expect.anything());
-            expect(spy).toHaveBeenCalled();
+            expect(executor.executeCommand("cmd1", event)).toBe(true);
+            expect(mockCtx.obsidianCommands.executeCommandById).toHaveBeenCalledWith("cmd1", event);
         });
 
-        it("should fallback to editorCallback", () => {
-            const cmd = {
-                editorCallback: vi.fn(),
-            };
-            mockCtx.obsidianCommands.commands["cmd1"] = cmd;
-            mockCtx.app.workspace.activeEditor = { editor: {} };
+        it("should pass no event when none was recorded", () => {
+            commands["cmd1"] = { callback: vi.fn() };
 
-            const result = executor.executeCommandDirect("cmd1");
-            expect(result).toBe(true);
-            expect(cmd.editorCallback).toHaveBeenCalled();
+            executor.executeCommand("cmd1", null);
+            expect(mockCtx.obsidianCommands.executeCommandById).toHaveBeenCalledWith("cmd1", undefined);
         });
 
-        it("should use checkCallback when no editor or editor callbacks", () => {
-            const spy = vi.fn();
-            const cmd = {
-                checkCallback: vi.fn((checking: boolean) => {
-                    if (!checking) spy();
-                    return true;
-                }),
-            };
-            mockCtx.obsidianCommands.commands["cmd1"] = cmd;
+        it("should check checkCallback before running the command", () => {
+            const checkCallback = vi.fn().mockReturnValue(true);
+            commands["cmd1"] = { checkCallback };
 
-            const result = executor.executeCommandDirect("cmd1");
-            expect(result).toBe(true);
-            expect(cmd.checkCallback).toHaveBeenCalledWith(true);
-            expect(cmd.checkCallback).toHaveBeenCalledWith(false);
-            expect(spy).toHaveBeenCalled();
+            expect(executor.executeCommand("cmd1", null)).toBe(true);
+            expect(checkCallback).toHaveBeenCalledWith(true);
+            expect(mockCtx.obsidianCommands.executeCommandById).toHaveBeenCalledWith("cmd1", undefined);
         });
 
-        it("should fallback to simple callback", () => {
-            const cmd = {
-                callback: vi.fn(),
-            };
-            mockCtx.obsidianCommands.commands["cmd1"] = cmd;
+        it("should not run the command when checkCallback rejects the current context", () => {
+            commands["cmd1"] = { checkCallback: vi.fn().mockReturnValue(false) };
 
-            const result = executor.executeCommandDirect("cmd1");
-            expect(result).toBe(true);
-            expect(cmd.callback).toHaveBeenCalled();
+            expect(executor.executeCommand("cmd1", null)).toBe(false);
+            expect(mockCtx.obsidianCommands.executeCommandById).not.toHaveBeenCalled();
         });
 
-        it("should return false if editorCheckCallback returns false", () => {
-            const cmd = {
-                editorCheckCallback: vi.fn(() => false),
-            };
-            mockCtx.obsidianCommands.commands["cmd1"] = cmd;
-            mockCtx.app.workspace.activeEditor = { editor: {} };
-
-            expect(executor.executeCommandDirect("cmd1")).toBe(false);
-        });
-
-        it("should return false if active element is title element", () => {
-            // @ts-expect-error - Create minimal MarkdownView instance for title-focus branch coverage
-            const view = new MarkdownView();
-            (view as unknown as { inlineTitleEl: unknown }).inlineTitleEl = { contains: vi.fn().mockReturnValue(true) };
-            mockCtx.app.workspace.activeEditor = view;
-            (view as unknown as { editor: unknown }).editor = {};
-
-            const cmd = { callback: vi.fn() };
-            mockCtx.obsidianCommands.commands["cmd1"] = cmd;
-
-            expect(executor.executeCommandDirect("cmd1")).toBe(false);
-            expect(cmd.callback).not.toHaveBeenCalled();
-        });
-
-        it("should return false if in metadata-container and allowProperties is false", () => {
-            mockCtx.app.workspace.activeEditor = { editor: {} };
-            (document.activeElement?.closest as ReturnType<typeof vi.fn>).mockReturnValue({}); // in a container
-
-            const cmd = {
-                callback: vi.fn(),
-                allowProperties: false,
-            };
-            mockCtx.obsidianCommands.commands["cmd1"] = cmd;
-
-            expect(executor.executeCommandDirect("cmd1")).toBe(false);
-            expect(cmd.callback).not.toHaveBeenCalled();
+        it("should return false if command does not exist", () => {
+            expect(executor.executeCommand("non-existent", null)).toBe(false);
+            expect(mockCtx.obsidianCommands.executeCommandById).not.toHaveBeenCalled();
         });
     });
 });

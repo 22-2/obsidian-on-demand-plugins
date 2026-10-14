@@ -92,12 +92,12 @@ export class ToolsModal extends Modal {
     private buildRebuildCacheSection(container: HTMLElement) {
         new Setting(container).setName("Cache maintenance").setHeading();
         new Setting(container)
-            .setName("Force rebuild command cache")
-            .setDesc("Force a rebuild of the cached commands for lazy plugins.")
+            .setName("Rebuild command and view caches")
+            .setDesc("Refresh commands and view types together for lazy plugins, then restart Obsidian.")
             .addButton((btn) =>
                 btn
-                    .setButtonText("Rebuild cache")
-                    .setWarning()
+                    .setButtonText("Rebuild caches")
+                    .setDestructive()
                     .onClick(() => {
                         void (async () => {
                             btn.setDisabled(true);
@@ -106,9 +106,9 @@ export class ToolsModal extends Modal {
                                 await (feature as MaintenanceFeature).rebuildAndApplyCommandCache({
                                     force: true,
                                 });
-                                new Notice("Command cache rebuilt successfully");
+                                new Notice("Command and view caches rebuilt successfully");
                             } catch {
-                                new Notice("Failed to rebuild command cache");
+                                new Notice("Failed to rebuild command and view caches");
                             } finally {
                                 btn.setDisabled(false);
                             }
@@ -220,12 +220,12 @@ export class ToolsModal extends Modal {
                     }
 
                     if (btn.buttonEl.innerText === "Replace all") {
-                        btn.setButtonText("Click to confirm").setWarning();
+                        btn.setButtonText("Click to confirm").setDestructive();
                         // Use window timers so confirm flow remains consistent in popout windows.
                         if (this.confirmTimeout) window.clearTimeout(this.confirmTimeout);
                         this.confirmTimeout = window.setTimeout(() => {
                             btn.setButtonText("Replace all");
-                            btn.buttonEl.removeClass("mod-warning");
+                            btn.removeDestructive();
                         }, 3000);
                         return;
                     }
@@ -245,7 +245,7 @@ export class ToolsModal extends Modal {
                     }
 
                     btn.setButtonText("Replace all");
-                    btn.buttonEl.removeClass("mod-warning");
+                    btn.removeDestructive();
                 }),
         );
     }

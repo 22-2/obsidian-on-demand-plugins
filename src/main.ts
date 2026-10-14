@@ -4,7 +4,6 @@ import { Plugin } from "obsidian";
 import { EventBus, FeatureEvents } from "src/core/event-bus";
 import { FeatureManager } from "src/core/feature-manager";
 import { createPluginContext } from "src/core/plugin-context";
-import { ProgressDialog } from "src/core/progress";
 import type { DeviceSettings, LazySettings } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 import { toggleLoggerBy } from "src/core/utils";
@@ -75,35 +74,8 @@ export default class OnDemandPlugin extends Plugin {
 
     private registerEventHandlers() {
         this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean }) => {
-            const force = options?.force ?? false;
-            const manifests = this.manifests;
-            const lazyCount = manifests.filter((p) => this.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_ENABLED && this.getPluginMode(p.id) !== PLUGIN_MODE.ALWAYS_DISABLED).length;
-
-            const progress = new ProgressDialog(this.app, {
-                title: "Rebuilding command cache",
-                total: Math.max(1, lazyCount) + 2,
-                cancellable: true,
-                cancelText: "Cancel",
-                onCancel: () => {},
-            });
-            progress.open();
-
-            const lazyEngine = this.features.get(LazyEngineFeature);
-            if (lazyEngine) {
-                await lazyEngine.commandCache.refreshCommandCache(undefined, force, (current, total, plugin) => {
-                    progress.setStatus(`Rebuilding ${plugin.name}`);
-                    progress.setProgress(current, total);
-                });
-            }
-
             const policyFeature = this.features.get(StartupPolicyFeature);
-            if (policyFeature) {
-                await policyFeature.applyWithProgress(progress);
-            }
-
-            if (lazyEngine) {
-                lazyEngine.commandCache.registerCachedCommands();
-            }
+            await policyFeature?.rebuildWithProgress(null, options?.force ?? false);
         });
 
         this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[] }) => {

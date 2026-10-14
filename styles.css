@@ -7,6 +7,7 @@
     display: flex;
     align-items: center;
     justify-content: flex-end;
+    gap: var(--size-4-3);
     min-height: var(--size-4-8);
     margin: 0;
     padding: 0 var(--size-4-2);
@@ -28,7 +29,126 @@
     position: sticky;
     top: 0;
     z-index: 2;
-    background: var(--background-primary);
+    /* Use the card colour: on phones the page background is black, which made the pinned bar look like a hole. */
+    background: var(--background-secondary);
+    /* The summary fits on one line, so trim the row to keep the pinned bar from covering the list. */
+    padding-block: var(--size-4-2);
+    /* Keep the summary clear of the card edge and centre it on the buttons. */
+    padding-inline: var(--size-4-4);
+    align-items: center;
+}
+
+.lazy-plugin-save-controls.has-pending-changes .setting-item-info {
+    min-width: 0;
+    overflow: visible;
+}
+
+.lazy-plugin-save-controls.has-pending-changes .setting-item-control {
+    align-self: center;
+    margin: 0;
+}
+
+.lazy-plugin-save-summary {
+    color: var(--text-muted);
+    font-weight: var(--font-normal);
+}
+
+.lazy-review-changes-modal .setting-item-heading {
+    /* Align the group heading with the item names below it. */
+    padding-inline: 0;
+}
+
+.lazy-review-changes-item {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding-block: var(--size-4-2);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.lazy-review-changes-info {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.lazy-review-changes-name {
+    font-weight: var(--font-medium);
+    overflow-wrap: anywhere;
+}
+
+.lazy-review-changes-desc {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    overflow-wrap: anywhere;
+}
+
+.lazy-review-changes-from {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+/* Discard: the draft value is lost, so it is struck through in the error colour and labelled as restored below. */
+.lazy-review-changes-lost {
+    color: var(--text-error);
+    text-decoration: line-through;
+}
+
+.lazy-review-changes-restore-label {
+    color: var(--text-muted);
+}
+
+.lazy-review-changes-arrow {
+    /* Full text colour so the arrow reads clearly between the two muted labels. */
+    color: var(--text-normal);
+    display: inline-flex;
+    vertical-align: middle;
+    margin-inline: 2px;
+}
+
+.lazy-review-changes-arrow svg {
+    width: 1em;
+    height: 1em;
+}
+
+.lazy-review-changes-to {
+    color: var(--text-normal);
+}
+
+.lazy-review-changes-note {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+/* Bound the dialog so the footer stays on screen; only the body scrolls. */
+.lazy-review-changes-modal {
+    display: flex;
+    flex-direction: column;
+    max-height: 85vh;
+}
+
+.lazy-review-changes-modal > .modal-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.lazy-review-changes-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.lazy-review-changes-group {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    font-weight: var(--font-medium);
+    margin-bottom: var(--size-4-2);
+}
+
+.lazy-review-changes-footer {
+    flex: 0 0 auto;
 }
 
 .lazy-plugin-filter-row .dropdown {
@@ -55,6 +175,8 @@
 .lazy-plugin-list-body > .lazy-plugin-mode-row {
     align-items: flex-start;
     flex-direction: row;
+    /* On narrow panes the control moves below the text instead of squeezing the description to nothing. */
+    flex-wrap: wrap;
     gap: var(--size-4-3);
     margin: 0;
     padding: var(--size-4-4);
@@ -66,6 +188,155 @@
 
 .lazy-plugin-list-body > .lazy-plugin-mode-row + .lazy-plugin-mode-row {
     border-top: 1px solid var(--background-modifier-border);
+}
+
+/* Compact list: the name, mode and load state share one line; the description and author line are hidden. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row {
+    /* Tighter rows: the default card padding is too loose for a one-line list. */
+    padding: var(--size-4-2) var(--size-4-3);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-name {
+    font-size: var(--font-ui-small);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row > .setting-item-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: var(--size-4-2);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge,
+.lazy-plugin-list-body.is-compact .lazy-plugin-enabled-badge {
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge,
+.lazy-plugin-list-body.is-compact .lazy-plugin-enabled-badge {
+    /* The icon or dot alone reads better without the outline box that the full label needs. */
+    padding: 0 6px;
+    border: 0;
+}
+
+/* Compact list: keep only the mode icon and the load dot; the words stay in each badge's tooltip. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-badge-text {
+    display: none;
+}
+
+/* Push the badges to the right edge, next to the actions button. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-badges {
+    margin-left: auto;
+}
+
+.lazy-plugin-list-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--size-4-2);
+    min-height: var(--size-4-8);
+    padding: 0 var(--size-4-2);
+}
+
+.lazy-plugin-compact-control {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.lazy-plugin-compact-control .checkbox-container {
+    /* A compact switch fits the one-line toolbar better than the default size. */
+    zoom: 0.7;
+}
+
+/* On phones the compact row keeps one line too: the ⋮ button sits at the right edge instead of a full-width footer. */
+.is-mobile .lazy-plugin-list-body.is-compact > .setting-item.lazy-plugin-mode-row {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact > .setting-item.lazy-plugin-mode-row > .setting-item-info {
+    width: auto;
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact > .setting-item.lazy-plugin-mode-row > .setting-item-control {
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-mobile {
+    /* Matches the mobile button's own selector, which otherwise keeps it visible. */
+    display: none;
+}
+
+.is-mobile .lazy-plugin-list-body.is-compact .lazy-plugin-row-actions-desktop {
+    display: flex;
+}
+
+/* The 44px touch target already sets the row height, so the padding around it can be smaller. */
+.is-mobile .lazy-plugin-list-body.is-compact .lazy-plugin-mode-row {
+    padding-block: var(--size-4-1);
+}
+
+/* Compact rows: centre the ⋮ button, the name and the badges on one shared line. */
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-control,
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row > .setting-item-info {
+    align-self: center;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-name {
+    margin: 0;
+}
+
+/* Touch target: the ⋮ button gets a 44px hit area on phones, the usual minimum for a finger. */
+.is-mobile .lazy-plugin-list-body.is-compact .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-desktop {
+    /* Same shape as the phone row button: a little wider than square, outlined. */
+    width: 48px;
+    min-width: 48px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    background: var(--interactive-normal);
+}
+
+/* The switch keeps its normal size on phones so it is easy to hit. */
+.is-mobile .lazy-plugin-compact-control .checkbox-container {
+    zoom: 1;
+}
+
+/* The info column must not take the desktop basis as a height: on phones the rows stack vertically. */
+.is-mobile .lazy-plugin-list-body > .setting-item.lazy-plugin-mode-row > .setting-item-info {
+    flex: 0 0 auto;
+}
+
+/* The pinned bar uses the card colour, so give its buttons an edge that stays visible in every theme. */
+.lazy-plugin-save-controls.has-pending-changes .setting-item-control button:not(.mod-cta) {
+    box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-description {
+    /* Lets the badges become flex items of the info row instead of a separate block below the name. */
+    display: contents;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-description,
+.lazy-plugin-list-body.is-compact .lazy-plugin-meta-badge {
+    display: none;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-4-2);
+    margin-top: 0;
 }
 
 .lazy-plugin-mode-row .setting-item-name {
@@ -84,10 +355,10 @@
 }
 
 .lazy-plugin-badges {
-    /* Reserve the same mode column in every row so runtime indicators do
-       not shift with label length. Long author names live outside this grid. */
+    /* Each badge takes its own width so the load badge sits right beside the mode badge.
+       Long author names live outside this grid. */
     display: grid;
-    grid-template-columns: minmax(0, 28ch) max-content;
+    grid-template-columns: max-content max-content;
     align-items: center;
     gap: var(--size-4-1) var(--size-4-2);
     margin-top: var(--size-4-2);
@@ -105,9 +376,14 @@
 }
 
 .lazy-plugin-enabled-badge {
+    /* Same outlined shape as the mode badge; the dot inside carries the load state. */
     display: inline-flex;
     align-items: center;
     gap: 5px;
+    justify-self: start;
+    padding: 2px 7px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
     color: var(--text-muted);
     white-space: nowrap;
 }
@@ -131,9 +407,53 @@
     line-height: 1.4;
 }
 
+/* Desktop: the version and author sit on the badge line, right-aligned. Phones keep them on their own line. */
+body:not(.is-mobile) .lazy-plugin-mode-row .setting-item-description {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--size-4-2);
+}
+
+body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-description {
+    grid-column: 1 / -1;
+}
+
+body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-badges {
+    grid-column: 1;
+    margin-top: var(--size-4-2);
+}
+
+body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-meta-badge {
+    grid-column: 2;
+    justify-self: end;
+    margin-top: var(--size-4-2);
+    white-space: nowrap;
+}
+
 .lazy-plugin-mode-row .setting-item-info {
     min-width: 0;
-    flex: 1 1 auto;
+    /* Wrap the control once the text would get narrower than this basis. */
+    flex: 1 1 14rem;
+    /* The name and its version share a line; the description takes the full line below. */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    column-gap: var(--size-4-2);
+}
+
+.lazy-plugin-mode-row .setting-item-info > .setting-item-description {
+    flex: 1 1 100%;
+}
+
+.lazy-plugin-mode-row .lazy-plugin-version {
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+}
+
+.lazy-plugin-list-body.is-compact .lazy-plugin-version {
+    display: none;
 }
 
 .lazy-plugin-mode-row .setting-item-name,
@@ -177,8 +497,14 @@
     justify-content: flex-end;
 }
 
+/* Refresh control: phones show it on the Plugins heading, desktop beside the filters. */
+.is-mobile .lazy-plugin-refresh-desktop,
+body:not(.is-mobile) .lazy-plugin-refresh-mobile {
+    display: none;
+}
+
 .is-mobile .lazy-plugin-list-body .setting-item.lazy-plugin-mode-row .setting-item-control .lazy-plugin-row-actions-mobile {
-    /* A wide button aligned to the right is easier to reach and hit with a thumb. */
+    /* A labelled button aligned to the right is easier to reach and hit with a thumb. */
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -190,7 +516,8 @@
     margin: 0;
     border: 1px solid var(--background-modifier-border);
     border-radius: var(--radius-m);
-    background: var(--background-primary);
+    /* A regular button colour; the primary background turned black in the phone dark theme. */
+    background: var(--interactive-normal);
 }
 
 .is-mobile .lazy-plugin-badges {
@@ -204,12 +531,35 @@
     white-space: normal;
 }
 
-.is-mobile .lazy-plugin-filter-row .setting-item-control {
-    /* Equal flexible columns prevent the fixed desktop dropdown width from squeezing the search field. */
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: var(--size-4-2);
+.lazy-plugin-filter-row .setting-item-info {
+    display: none;
+}
+
+.lazy-plugin-filter-row .setting-item-control {
+    /* The search field takes the free width and the mode dropdown keeps its fixed width beside it. */
+    flex: 1 1 auto;
     width: 100%;
+    align-items: center;
+    gap: var(--size-4-2);
+}
+
+.lazy-plugin-filter-row input {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.is-mobile .lazy-plugin-filter-row .setting-item-control {
+    /* The search field gets its own line; the mode dropdown and refresh button share the next one. */
+    flex-wrap: wrap;
+    gap: var(--size-4-2);
+}
+
+.is-mobile .lazy-plugin-filter-row input {
+    flex-basis: 100%;
+}
+
+.is-mobile .lazy-plugin-filter-row .dropdown {
+    flex: 1 1 0;
 }
 
 .is-mobile .lazy-plugin-filter-row input,

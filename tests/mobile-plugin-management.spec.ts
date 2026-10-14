@@ -1,44 +1,26 @@
 import type { Page } from "@playwright/test";
+import type { ObsidianAPI } from "obsidian-e2e-toolkit";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { expect, test } from "obsidian-e2e-toolkit";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import { expect, test } from "./fixtures";
+import { pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
 
 useOnDemandPlugins();
 
-async function waitForMobileAnimations(page: Page): Promise<void> {
-    // Bottom-sheet and page transitions temporarily move the background list;
-    // measure settled coordinates so animation frames do not look like scroll jumps.
-    await page.waitForFunction(() => document.getAnimations().every((animation) =>
-        animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity,
-    ));
-}
-
-async function openMobilePluginManagement(page: Page): Promise<Page> {
+async function openMobilePluginManagement(obsidian: ObsidianAPI): Promise<Page> {
     // Desktop Obsidian opens a separate Settings window; apply mobile classes there
     // so screenshots exercise Obsidian's mobile Setting styles rather than just a narrow desktop.
-    const settingsPagePromise = page.context().waitForEvent("page");
-    await page.evaluate(() => {
-        app.setting.open();
-        app.setting.openTabById("on-demand-plugins");
-    });
-    const settingsPage = await settingsPagePromise;
-    await settingsPage.waitForLoadState("domcontentloaded");
-    await settingsPage.evaluate(() => {
-        document.body.classList.add("is-mobile", "is-phone", "is-android");
-    });
-    await settingsPage.getByText("Plugin management", { exact: true }).click();
+    const settingsPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Plugin management" });
+    await obsidian.emulateMobile("phone", settingsPage);
     return settingsPage;
 }
 
 test("mobile plugin management remains usable at phone and tablet widths", async ({ obsidian }, testInfo) => {
-    if (!ensureBuilt()) return;
-    await obsidian.waitReady();
     const plugin = await obsidian.plugin(pluginUnderTestId);
     // The longest mode label exposes wrapping and dropdown overflow at narrow widths.
     await plugin.evaluate((instance, id) => instance.updatePluginSettings(id, "lazyOnLayoutReady"), targetPluginId);
-    const page = await openMobilePluginManagement(obsidian.page);
-    const artifactDir = path.resolve(".ci-artifacts/mobile-ui");
+    const page = await openMobilePluginManagement(obsidian);
+    const artifactDir = path.resolve(".ci-artifacts/ui-screenshots/mobile/plugin-management");
     await mkdir(artifactDir, { recursive: true });
 
     for (const width of [390, 320, 768]) {
@@ -70,12 +52,15 @@ test("mobile plugin management remains usable at phone and tablet widths", async
             const r = el.getBoundingClientRect();
             const b = button.getBoundingClientRect();
             return {
-                width: b.width, height: b.height, rightGap: r.right - b.right,
+                width: b.width,
+                height: b.height,
+                rightGap: r.right - b.right,
                 belowDescription: b.top >= info.getBoundingClientRect().bottom,
                 fits: el.scrollWidth <= el.clientWidth && r.left >= 0 && r.right <= window.innerWidth,
             };
         });
-        expect(bounds.width).toBeGreaterThanOrEqual(112);
+        // Icon-only three-dot button: a touch target at least as wide as it is tall.
+        expect(bounds.width).toBeGreaterThanOrEqual(44);
         expect(bounds.height).toBeGreaterThanOrEqual(44);
         expect(bounds.rightGap).toBeLessThanOrEqual(17);
         expect(bounds.belowDescription).toBe(true);
@@ -88,20 +73,17 @@ test("mobile plugin management remains usable at phone and tablet widths", async
     await page.setViewportSize({ width: 390, height: 844 });
     const row = page.locator(".lazy-plugin-mode-row");
     await row.getByRole("button", { name: "Actions", exact: true }).click();
-    const menuPage = await Promise.any(page.context().pages().map(async (candidate) => {
-        await candidate.locator(".menu-item").filter({ hasText: "🤲 Lazy on demand" }).waitFor({ state: "visible" });
-        return candidate;
-    }));
+    const menuPage = await obsidian.findPage((candidate) => candidate.locator(".menu-item").filter({ hasText: "🤲 Lazy on demand" }), { timeout: 10_000 });
     await menuPage.locator(".menu-item").filter({ hasText: "🤲 Lazy on demand" }).click();
     await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
-    await expect(page.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeEnabled();
+    await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
+    await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeEnabled();
 });
 
 for (const width of [320, 390]) {
     test(`mobile ${width}px Actions menu and pinned save controls in a long plugin list`, async ({ obsidian }, testInfo) => {
-        if (!ensureBuilt()) return;
         test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
-        await obsidian.waitReady();
+
         // Install small inert plugins in the isolated vault so the real registry,
         // list pagination and scroll container are exercised without large downloads.
         await obsidian.page.evaluate(async () => {
@@ -110,16 +92,23 @@ for (const width of [320, 390]) {
                 const id = `mobile-ui-fixture-${number}`;
                 const dir = `${app.vault.configDir}/plugins/${id}`;
                 await app.vault.adapter.mkdir(dir);
-                await app.vault.adapter.write(`${dir}/manifest.json`, JSON.stringify({
-                    id, name: `Mobile fixture ${number}`, version: "1.0.0", minAppVersion: "1.0.0",
-                    description: "A plugin with a longer description to check mobile wrapping, scrolling and access to its loading mode.",
-                    author: "Mobile UI test", isDesktopOnly: false,
-                }));
+                await app.vault.adapter.write(
+                    `${dir}/manifest.json`,
+                    JSON.stringify({
+                        id,
+                        name: `Mobile fixture ${number}`,
+                        version: "1.0.0",
+                        minAppVersion: "1.0.0",
+                        description: "A plugin with a longer description to check mobile wrapping, scrolling and access to its loading mode.",
+                        author: "Mobile UI test",
+                        isDesktopOnly: false,
+                    }),
+                );
                 await app.vault.adapter.write(`${dir}/main.js`, 'module.exports = class extends require("obsidian").Plugin {};');
             }
             await (app.plugins as unknown as { loadManifests: () => Promise<void> }).loadManifests();
         });
-        const page = await openMobilePluginManagement(obsidian.page);
+        const page = await openMobilePluginManagement(obsidian);
         await page.setViewportSize({ width, height: 844 });
         await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(width);
         await expect(page.locator(".lazy-plugin-results-count")).toHaveText("37 plugins");
@@ -129,49 +118,60 @@ for (const width of [320, 390]) {
         await row.getByRole("button", { name: "Actions", exact: true }).click();
         const menu = page.locator(".menu").filter({ has: page.getByText("🤲 Lazy on demand", { exact: true }) });
         await expect(menu).toBeVisible();
-        await waitForMobileAnimations(page);
-        expect(await menu.evaluate((el) => {
-            const bounds = el.getBoundingClientRect();
-            return bounds.left >= 0 && bounds.right <= window.innerWidth && bounds.top >= 0 && bounds.bottom <= window.innerHeight;
-        })).toBe(true);
+        await obsidian.waitForAnimations(page);
+        expect(
+            await menu.evaluate((el) => {
+                const bounds = el.getBoundingClientRect();
+                return bounds.left >= 0 && bounds.right <= window.innerWidth && bounds.top >= 0 && bounds.bottom <= window.innerHeight;
+            }),
+        ).toBe(true);
 
-        const artifactDir = path.resolve(".ci-artifacts/mobile-ui");
+        const artifactDir = path.resolve(".ci-artifacts/ui-screenshots/mobile/plugin-management");
         await mkdir(artifactDir, { recursive: true });
-        const capture = async (state: string) => {
+        const capture = async (state: string, target: Page = page) => {
             const screenshotPath = path.join(artifactDir, `mobile-${width}-${state}.png`);
-            await page.screenshot({ path: screenshotPath, animations: "disabled" });
+            await target.screenshot({ path: screenshotPath, animations: "disabled" });
             await testInfo.attach(`mobile-${width}-${state}`, { path: screenshotPath, contentType: "image/png" });
         };
         await capture("actions-menu");
         // Opening the menu can scroll the button into view; compare against the row's settled position.
-        const beforeTop = (await row.boundingBox())!.y;
-        await menu.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" }).click();
-        await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🚀 Lazy on layout ready");
-        await expect(page.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeEnabled();
+        const beforeBounds = (await row.boundingBox())!;
+        // At 320px, "Lazy on layout ready" wraps the status badge onto another line.
+        // If the row's top is clipped, scroll anchoring preserves its bottom and moves
+        // the top by that extra line's height. Use a same-height mode here to isolate
+        // save-bar insertion; the phone/tablet test above covers the longest label.
+        await menu.locator(".menu-item").filter({ hasText: "🤲 Lazy on demand" }).click();
+        await expect(row.locator(".lazy-plugin-mode-badge")).toHaveText("🤲 Lazy on demand");
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
+        await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeEnabled();
         // Prepending the pending bar must preserve the row being edited instead of jumping to the top.
-        await waitForMobileAnimations(page);
-        await expect.poll(async () => Math.abs((await row.boundingBox())!.y - beforeTop)).toBeLessThanOrEqual(2);
+        await obsidian.waitForAnimations(page);
+        await expect.poll(async () => Math.abs((await row.boundingBox())!.height - beforeBounds.height)).toBeLessThanOrEqual(1);
+        await expect.poll(async () => Math.abs((await row.boundingBox())!.y - beforeBounds.y)).toBeLessThanOrEqual(2);
 
         const sticky = page.locator(".lazy-plugin-save-controls");
-        const pinnedBounds = () => sticky.evaluate((bar) => {
-            let scroller = bar.parentElement!;
-            while (scroller.parentElement && !(scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) {
-                scroller = scroller.parentElement;
-            }
-            return {
-                position: getComputedStyle(bar).position,
-                scrollTop: scroller.scrollTop,
-                // Mobile Settings reserves padding for the header inside the scrollport.
-                expectedGap: parseFloat(getComputedStyle(scroller).paddingTop) + parseFloat(getComputedStyle(bar).top),
-                topGap: bar.getBoundingClientRect().top - scroller.getBoundingClientRect().top - scroller.clientTop,
-            };
-        });
+        const pinnedBounds = () =>
+            sticky.evaluate((bar) => {
+                let scroller = bar.parentElement!;
+                while (scroller.parentElement && !(scroller.scrollHeight > scroller.clientHeight && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) {
+                    scroller = scroller.parentElement;
+                }
+                return {
+                    position: getComputedStyle(bar).position,
+                    scrollTop: scroller.scrollTop,
+                    // Mobile Settings reserves padding for the header inside the scrollport.
+                    expectedGap: parseFloat(getComputedStyle(scroller).paddingTop) + parseFloat(getComputedStyle(bar).top),
+                    topGap: bar.getBoundingClientRect().top - scroller.getBoundingClientRect().top - scroller.clientTop,
+                };
+            });
         await expect.poll(async () => (await pinnedBounds()).position).toBe("sticky");
         expect((await pinnedBounds()).scrollTop).toBeGreaterThan(500);
-        await expect.poll(async () => {
-            const bounds = await pinnedBounds();
-            return Math.abs(bounds.topGap - bounds.expectedGap);
-        }).toBeLessThanOrEqual(1);
+        await expect
+            .poll(async () => {
+                const bounds = await pinnedBounds();
+                return Math.abs(bounds.topGap - bounds.expectedGap);
+            })
+            .toBeLessThanOrEqual(1);
         await capture("changed-pinned");
 
         // Move farther down after editing, exercising infinite scrolling with the save bar still pinned.
@@ -180,25 +180,39 @@ for (const width of [320, 390]) {
         await page.mouse.wheel(0, 1800);
         await expect.poll(async () => (await pinnedBounds()).scrollTop - previousScrollTop).toBeGreaterThan(500);
         await expect.poll(() => page.locator(".lazy-plugin-mode-row").count()).toBeGreaterThan(24);
-        await expect.poll(async () => {
-            const bounds = await pinnedBounds();
-            return Math.abs(bounds.topGap - bounds.expectedGap);
-        }).toBeLessThanOrEqual(1);
-        await expect(page.getByRole("button", { name: "Save & apply (1)", exact: true })).toBeInViewport();
+        await expect
+            .poll(async () => {
+                const bounds = await pinnedBounds();
+                return Math.abs(bounds.topGap - bounds.expectedGap);
+            })
+            .toBeLessThanOrEqual(1);
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("1 plugin");
+        await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeInViewport();
         await capture("scrolled-pinned");
 
         const nextRow = page.locator(".lazy-plugin-mode-row").filter({ has: page.getByText("Mobile fixture 30", { exact: true }) });
         await nextRow.scrollIntoViewIfNeeded();
         await nextRow.getByRole("button", { name: "Actions", exact: true }).click();
         await expect(menu).toBeVisible();
-        await waitForMobileAnimations(page);
+        await obsidian.waitForAnimations(page);
         await capture("scrolled-pinned-actions-menu");
         const nextTop = (await nextRow.boundingBox())!.y;
         await menu.locator(".menu-item").filter({ hasText: "✅ Always enabled" }).click();
-        await waitForMobileAnimations(page);
+        await obsidian.waitForAnimations(page);
         await expect(nextRow.locator(".lazy-plugin-mode-badge")).toHaveText("✅ Always enabled");
-        await expect(page.getByRole("button", { name: "Save & apply (2)", exact: true })).toBeInViewport();
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("2 plugins");
+        await expect(page.getByRole("button", { name: "Review & save…", exact: true })).toBeInViewport();
         await expect.poll(async () => Math.abs((await nextRow.boundingBox())!.y - nextTop)).toBeLessThanOrEqual(2);
         await capture("scrolled-pinned-second-change");
+
+        // The review modal opens in its own window, so find the page that shows it and match the phone layout there.
+        await page.getByRole("button", { name: "Review & save…", exact: true }).click();
+        const reviewPage = await obsidian.findPage((candidate) => candidate.locator(".lazy-review-changes-modal"), { timeout: 10_000 });
+        await reviewPage.setViewportSize({ width, height: 844 });
+        await obsidian.emulateMobile("phone", reviewPage);
+        await expect(reviewPage.locator(".lazy-review-changes-modal")).toContainText("Plugins (2)");
+        await obsidian.waitForAnimations(reviewPage);
+        await capture("review-modal", reviewPage);
+        await reviewPage.locator(".lazy-review-changes-modal .modal-button-container").getByRole("button", { name: "Cancel", exact: true }).click();
     });
 }

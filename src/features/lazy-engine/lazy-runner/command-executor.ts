@@ -1,6 +1,5 @@
 import log from "loglevel";
-import type { MarkdownFileInfo } from "obsidian";
-import { MarkdownView } from "obsidian";
+import type { UserEvent } from "obsidian";
 import type { CommandRegistry } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 
@@ -16,85 +15,31 @@ export class CommandExecutor {
     }
 
     /**
-     * Execute a command by invoking its registered callback function.
-     * Attempts to call the most appropriate callback (editorCheckCallback, editorCallback, checkCallback, or callback) based on available context.
-     * @param commandId - The command ID to execute
-     * @returns True if the command was executed successfully, false otherwise
+     * Execute a command through Obsidian's own command runner.
+     *
+     * Obsidian folds `editorCallback` / `editorCheckCallback`, including its editor-state
+     * guards (title focus, properties, preview mode), into `checkCallback` when a command
+     * is added, so the real command already carries every condition Obsidian applies.
+     * @param event - The user event that triggered the lazy wrapper, so commands can read modifier keys from `app.lastEvent`.
+     * @returns True if the command was executed, false if it is missing or not available in the current context
      */
-    executeCommandDirect(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId];
-
+    executeCommand(commandId: string, event: UserEvent | null): boolean {
+        const commands = this.ctx.obsidianCommands;
+        const command = commands.findCommand(commandId);
         if (!command) return false;
 
-        const activeEditor: MarkdownFileInfo | null = this.ctx.app.workspace.activeEditor;
+        // The palette lists a command only when checkCallback(true) passes. The cached wrapper
+        // is a plain callback that skipped that check, so apply it before running the real command.
+        if (command.checkCallback && !command.checkCallback(true)) return false;
 
-        if (activeEditor && activeEditor.editor) {
-            const editor = activeEditor.editor;
-            // Use activeDocument so commands also behave correctly in popout windows.
-            const activeElement = activeDocument.activeElement;
-
-            // Follow conditions from obsidian's source
-            if (activeEditor instanceof MarkdownView) {
-                const view = activeEditor;
-                if (view.inlineTitleEl?.contains(activeElement) || view.titleEl?.contains(activeElement)) {
-                    return false;
-                }
-            }
-
-            if (!command.allowProperties && activeElement?.closest(".metadata-container")) {
-                return false;
-            }
-
-            if (!command.allowPreview && (activeEditor as MarkdownView).getMode?.() === "preview") {
-                return false;
-            }
-
-            if (typeof command.editorCheckCallback === "function") {
-                const editorCheckCallback = command.editorCheckCallback as unknown as (checking: boolean, editor: unknown, info: MarkdownFileInfo) => boolean;
-                if (editorCheckCallback(true, editor, activeEditor)) {
-                    if (this.ctx.getData().showConsoleLog) {
-                        logger.debug(`Executing editorCheckCallback for: ${commandId}`);
-                    }
-                    editorCheckCallback(false, editor, activeEditor);
-                    return true;
-                }
-                return false;
-            }
-
-            if (typeof command.editorCallback === "function") {
-                const editorCallback = command.editorCallback as unknown as (editor: unknown, info: MarkdownFileInfo) => void;
-                if (this.ctx.getData().showConsoleLog) {
-                    logger.debug(`Executing editorCallback for: ${commandId}`);
-                }
-                editorCallback(editor, activeEditor);
-                return true;
-            }
+        if (this.ctx.getData().showConsoleLog) {
+            logger.debug(`Executing command: ${commandId}`);
         }
-
-        if (typeof command.checkCallback === "function") {
-            if (command.checkCallback(true)) {
-                if (this.ctx.getData().showConsoleLog) {
-                    logger.debug(`Executing checkCallback for: ${commandId}`);
-                }
-                command.checkCallback(false);
-                return true;
-            }
-            return false;
-        }
-
-        if (typeof command.callback === "function") {
-            if (this.ctx.getData().showConsoleLog) {
-                logger.debug(`Executing callback for: ${commandId}`);
-            }
-            command.callback();
-            return true;
-        }
-
-        return false;
+        return commands.executeCommandById(commandId, event ?? undefined);
     }
 
     isCommandExecutable(commandId: string): boolean {
-        const command = this.ctx.obsidianCommands.commands[commandId];
+        const command = this.ctx.obsidianCommands.findCommand(commandId);
 
         if (!command) return false;
 
@@ -104,6 +49,6 @@ export class CommandExecutor {
             return false;
         }
 
-        return typeof command.callback === "function" || typeof command.checkCallback === "function" || typeof command.editorCallback === "function" || typeof command.editorCheckCallback === "function";
+        return typeof command.callback === "function" || typeof command.checkCallback === "function";
     }
 }

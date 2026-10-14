@@ -1,52 +1,26 @@
-import { expect, test } from "obsidian-e2e-toolkit";
-import {
-    ensureBuilt,
-    findCommandByExactId,
-    pluginUnderTestId,
-    readOnDemandStorageValue,
-    useOnDemandPluginsWithTargets,
-    waitForPluginDisabled,
-} from "./test-utils";
+import { expect, test } from "./fixtures";
+import type { ObsidianAPI } from "obsidian-e2e-toolkit";
+import { pluginUnderTestId, readOnDemandStorageValue, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
 
 const myCommandsPluginId = "my-commands-plugin";
 const duplicateCurrentTabCommandId = `${myCommandsPluginId}:duplicate-current-tab`;
 
 useOnDemandPluginsWithTargets(myCommandsPluginId);
 
-type OnDemandPluginController = {
-    updatePluginSettings: (pluginId: string, mode: string) => Promise<void>;
-    rebuildAndApplyCommandCache: (options?: { force?: boolean }) => Promise<void>;
-};
-
-type ObsidianPluginAccessor = {
-    plugin: (pluginId: string) => Promise<{
-        evaluate: <TArg>(pageFunction: (plugin: OnDemandPluginController, arg: TArg) => Promise<void>, arg: TArg) => Promise<void>;
-    }>;
-};
-
-async function configureMyCommandsPluginAsLazy(obsidian: ObsidianPluginAccessor) {
+async function configureMyCommandsPluginAsLazy(obsidian: ObsidianAPI) {
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
             await plugin.rebuildAndApplyCommandCache({ force: true });
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, myCommandsPluginId);
+        }, myCommandsPluginId),
+    );
 }
 
 test("my-commands duplicate-current-tab is cached and restored as a lazy wrapper", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     await configureMyCommandsPluginAsLazy(obsidian);
 
-    expect(await waitForPluginDisabled(obsidian, myCommandsPluginId, 15_000)).toBe(true);
+    await obsidian.waitForPluginUnloaded(myCommandsPluginId, 15_000);
 
     const cachedCommands = await readOnDemandStorageValue(obsidian, "commandCache", myCommandsPluginId);
 
@@ -55,36 +29,39 @@ test("my-commands duplicate-current-tab is cached and restored as a lazy wrapper
     expect(Array.isArray(cachedCommands)).toBe(true);
     expect((cachedCommands as Array<{ id: string }>).some((command) => command.id === duplicateCurrentTabCommandId)).toBe(true);
 
-    const registeredCommandId = await findCommandByExactId(obsidian, duplicateCurrentTabCommandId);
+    const registeredCommandId = await obsidian.hasCommand(duplicateCurrentTabCommandId);
 
     // This distinguishes "cached but never re-registered" from "missing from cache".
-    expect(registeredCommandId).toBe(duplicateCurrentTabCommandId);
+    expect(registeredCommandId).toBe(true);
 
-    const executionState = await obsidian.page.evaluate(async ({ pluginId, commandId }) => {
-        const deadline = Date.now() + 45_000;
-        const before = app.commands.commands[commandId];
+    const executionState = await obsidian.page.evaluate(
+        async ({ pluginId, commandId }) => {
+            const deadline = Date.now() + 45_000;
+            const before = app.commands.commands[commandId];
 
-        await app.commands.executeCommandById(commandId);
+            await app.commands.executeCommandById(commandId);
 
-        let after = app.commands.commands[commandId];
-        let loaded = Boolean(app.plugins.plugins?.[pluginId]?._loaded);
+            let after = app.commands.commands[commandId];
+            let loaded = Boolean(app.plugins.plugins?.[pluginId]?._loaded);
 
-        while (Date.now() < deadline) {
-            after = app.commands.commands[commandId];
-            loaded = Boolean(app.plugins.plugins?.[pluginId]?._loaded);
+            while (Date.now() < deadline) {
+                after = app.commands.commands[commandId];
+                loaded = Boolean(app.plugins.plugins?.[pluginId]?._loaded);
 
-            if (loaded && before !== after) {
-                break;
+                if (loaded && before !== after) {
+                    break;
+                }
+
+                await new Promise((resolve) => setTimeout(resolve, 200));
             }
 
-            await new Promise((resolve) => setTimeout(resolve, 200));
-        }
-
-        return {
-            loaded,
-            commandReplaced: before !== after,
-        };
-    }, { pluginId: myCommandsPluginId, commandId: duplicateCurrentTabCommandId });
+            return {
+                loaded,
+                commandReplaced: before !== after,
+            };
+        },
+        { pluginId: myCommandsPluginId, commandId: duplicateCurrentTabCommandId },
+    );
 
     // The wrapper should at least load the plugin instance; if the command object stays the
     // same, the target plugin never re-registered its real command after lazy enable.
@@ -93,27 +70,26 @@ test("my-commands duplicate-current-tab is cached and restored as a lazy wrapper
 });
 
 test("my-commands plugin can be manually re-enabled after lazy rebuild", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     await configureMyCommandsPluginAsLazy(obsidian);
 
-    expect(await waitForPluginDisabled(obsidian, myCommandsPluginId, 15_000)).toBe(true);
+    await obsidian.waitForPluginUnloaded(myCommandsPluginId, 15_000);
 
     // This isolates plugin re-enable behavior from wrapper execution so failures here point
     // at the plugin lifecycle itself rather than command replacement.
-    const enableState = await obsidian.page.evaluate(async ({ pluginId, commandId }) => {
-        const beforeCommand = app.commands.commands?.[commandId] ?? null;
+    const enableState = await obsidian.page.evaluate(
+        async ({ pluginId, commandId }) => {
+            const beforeCommand = app.commands.commands?.[commandId] ?? null;
 
-        await app.plugins.enablePlugin(pluginId);
+            await app.plugins.enablePlugin(pluginId);
 
-        const afterCommand = app.commands.commands?.[commandId] ?? null;
-        return {
-            loaded: Boolean(app.plugins.plugins?.[pluginId]?._loaded),
-            commandReplaced: beforeCommand !== afterCommand,
-        };
-    }, { pluginId: myCommandsPluginId, commandId: duplicateCurrentTabCommandId });
+            const afterCommand = app.commands.commands?.[commandId] ?? null;
+            return {
+                loaded: Boolean(app.plugins.plugins?.[pluginId]?._loaded),
+                commandReplaced: beforeCommand !== afterCommand,
+            };
+        },
+        { pluginId: myCommandsPluginId, commandId: duplicateCurrentTabCommandId },
+    );
 
     expect(enableState.loaded).toBe(true);
     expect(enableState.commandReplaced).toBe(true);

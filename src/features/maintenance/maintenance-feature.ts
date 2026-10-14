@@ -34,6 +34,7 @@ export class MaintenanceFeature implements AppFeature {
 
     onunload() {}
 
+    /** Rebuild commands and views together; retain the method name for existing callers. */
     async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
         await this.events.emit(FeatureEvents.REBUILD_CACHE_REQUESTED, options);
     }

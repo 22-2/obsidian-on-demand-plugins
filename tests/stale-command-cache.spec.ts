@@ -1,14 +1,5 @@
-import { expect, test } from "obsidian-e2e-toolkit";
-import {
-    ensureBuilt,
-    findCommandByExactId,
-    findCommandByPrefix,
-    pluginUnderTestId,
-    readOnDemandStorageValue,
-    targetPluginId,
-    useOnDemandPlugins,
-    waitForPluginDisabled,
-} from "./test-utils";
+import { expect, test } from "./fixtures";
+import { pluginUnderTestId, readOnDemandStorageValue, targetPluginId, useOnDemandPlugins, withReloadRecorded } from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -17,10 +8,6 @@ useOnDemandPlugins();
 // invocation fail silently. Startup must skip stale caches and rebuild them in the
 // background after layout ready.
 test("stale command cache is skipped at startup and rebuilt after layout ready", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const fakeCommandId = `${targetPluginId}:fake-removed-command`;
 
     // 0. Pre-load the target plugin to verify it can load in this environment.
@@ -31,16 +18,11 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
 
     // 1. Configure the target plugin as lazy so wrappers are managed for it.
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, targetPluginId);
+        }, targetPluginId),
+    );
 
     // 2. Seed a stale cache: a version that no manifest reports anymore, plus a
     //    command ID the current plugin version does not register.
@@ -89,37 +71,24 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
     console.log("[stale-cache-debug] after reload:", JSON.stringify(await captureDebugState()));
 
     // 4. The stale wrapper must not be registered at startup.
-    expect(await findCommandByExactId(obsidian, fakeCommandId)).toBeNull();
+    expect(await obsidian.hasCommand(fakeCommandId)).toBe(false);
 
     // 5. The background refresh (layout is already ready, so it runs immediately)
     //    rebuilds the cache against the currently installed version.
     const manifestVersion = await obsidian.page.evaluate((id) => app.plugins.manifests?.[id]?.version ?? null, targetPluginId);
     expect(manifestVersion).toBeTruthy();
 
-    // Manual poll instead of expect.poll so the debug state can be dumped on timeout.
-    const deadline = Date.now() + 15_000;
-    let cachedVersion: unknown = null;
-    while (Date.now() < deadline) {
-        cachedVersion = await readOnDemandStorageValue(obsidian, "commandCacheVersions", targetPluginId);
-        if (cachedVersion === manifestVersion) break;
-        await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+        await expect.poll(() => readOnDemandStorageValue(obsidian, "commandCacheVersions", targetPluginId), { timeout: 15_000 }).toBe(manifestVersion);
+    } finally {
+        console.log("[stale-cache-debug] after refresh:", JSON.stringify(await captureDebugState()));
     }
-    console.log("[stale-cache-debug] after wait:", JSON.stringify(await captureDebugState()), "cachedVersion:", JSON.stringify(cachedVersion));
 
     // 6. The fake ID stays gone, fresh wrappers exist for the real commands, and the
     //    plugin is back to disabled so lazy loading is preserved.
-    expect(await findCommandByExactId(obsidian, fakeCommandId)).toBeNull();
+    expect(await obsidian.hasCommand(fakeCommandId)).toBe(false);
 
-    // The remaining assertions require the target plugin to have loaded during the
-    // background refresh. When it could not load (e.g. flaky CI environment), the
-    // version is intentionally NOT bumped so future startups retry the refresh (issue #6).
-    const debugAfterWait = await captureDebugState();
-    if (debugAfterWait.targetLoaded) {
-        expect(cachedVersion).toBe(manifestVersion);
-        expect(await findCommandByPrefix(obsidian, `${targetPluginId}:`)).not.toBeNull();
-        expect(await waitForPluginDisabled(obsidian, targetPluginId)).toBe(true);
-    } else {
-        // Plugin did not load; version must NOT be bumped to allow retry on next startup.
-        expect(cachedVersion).toBe("0.0.0-stale");
-    }
+    expect(await obsidian.findCommands(`${targetPluginId}:`)).not.toHaveLength(0);
+    // The plugin stays enabled on disk, so verify the runtime load flag.
+    await obsidian.waitForPluginUnloaded(targetPluginId);
 });

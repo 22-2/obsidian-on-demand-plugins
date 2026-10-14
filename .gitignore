@@ -1,5 +1,6 @@
 # vscode
-.vscode
+.vscode/*
+!.vscode/tasks.json
 
 # Intellij
 *.iml
@@ -11,6 +12,7 @@ node_modules
 # Don't include the compiled main.js file in the repo.
 # They should be uploaded to GitHub releases instead.
 main.js
+!tests/fixtures/**/main.js
 
 # Exclude sourcemaps
 *.map
@@ -29,5 +31,6 @@ repomix-output.md
 .obsidian-e2e-toolkit/
 playwright-report/
 test-results/
+coverage/
 .env
 .ci-artifacts/

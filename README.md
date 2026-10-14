@@ -10,6 +10,8 @@ Obsidian plugin that delays plugin activation and only loads plugins when needed
 2. Choose a loading mode for each plugin.
 3. Click **Apply changes** (Obsidian will restart automatically).
 
+To refresh cached commands and view types together, open **Maintenance → Rebuild command and view caches** and click **Rebuild caches**. View types are refreshed for lazy plugins with **lazy on view** enabled. Each plugin is loaded once, with up to three plugins initializing concurrently; plugins loaded only for rebuilding are unloaded afterwards. Obsidian restarts when the rebuild completes.
+
 ---
 
 ## Loading modes
@@ -41,6 +43,26 @@ Instead of loading the plugin code at startup, this project registers "dummy com
 ---
 
 This project is based on the work by Alan Grainger: https://github.com/alangrainger/obsidian-lazy-plugins
+
+## Test coverage
+
+```bash
+pnpm run test:coverage
+pnpm run test:e2e:coverage
+pnpm run test:coverage:all
+```
+
+Unit tests use `@vitest/coverage-v8`. E2E tests use the toolkit's `coverageOptions` fixture and coverage report API to collect V8 coverage from the Obsidian renderer before plugins are enabled. E2E coverage requires Windows or macOS and uses the same parallel/serial split as `test:e2e`.
+
+Open `coverage/unit/index.html` or `coverage/e2e/index.html` for the separate HTML reports. `test:coverage:all` runs both suites and merges their results into `coverage/combined/index.html`. Each report also includes `lcov.info` and `coverage-final.json`. Reports exclude tests, mocks, declarations, and dependencies. E2E reports cover source files included in the plugin bundle and map them back to TypeScript through inline source maps. The coverage command restores the normal production bundle afterwards.
+
+To merge existing results from the same source revision without rerunning tests, use `pnpm run test:coverage:merge`.
+
+To measure a specific E2E suite:
+
+```bash
+pnpm run test:e2e:coverage tests/on-demand.spec.ts
+```
 
 ## Screenshots
 

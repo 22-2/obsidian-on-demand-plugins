@@ -1,16 +1,19 @@
 import type { WorkspaceLeaf } from "obsidian";
 import PQueue from "p-queue";
+import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";
 import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
+import { isPluginLoaded } from "src/core/utils";
 import { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
 import { FileLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/file-lazy-loader";
 import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
 import { patchPluginLoad } from "src/patches/plugin-load";
+import { patchPluginInitialization } from "src/patches/plugin-initialization";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchPluginRegisterView } from "src/patches/view-registry";
 import { patchSetViewState } from "src/patches/view-state";
@@ -44,7 +47,8 @@ export class LazyEngineFeature implements AppFeature {
         this.fileLoader = new FileLazyLoader(ctx, this.lazyRunner, { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") });
 
         // 3. Patches and Subscriptions
-        ctx.register(patchPluginLoad(ctx.obsidianPlugins));
+        ctx.register(patchPluginLoad(ctx.obsidianPlugins, (pluginId) => ctx.app.workspace.trigger(PLUGIN_LOAD_STATE_CHANGED_EVENT, pluginId)));
+        ctx.register(patchPluginInitialization());
         patchSetViewState({
             register: (unload) => this.ctx.register(unload),
             onViewType: (viewType: string) => this.viewLoader.checkViewTypeForLazyLoading(viewType),
@@ -114,7 +118,7 @@ export class LazyEngineFeature implements AppFeature {
     async applyPluginState(pluginId: string) {
         const mode = this.ctx.getPluginMode(pluginId);
         if (mode === PLUGIN_MODE.ALWAYS_ENABLED) {
-            if (!this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
+            if (!isPluginLoaded(this.ctx.app, pluginId)) {
                 await this.ctx.obsidianPlugins.enablePlugin(pluginId);
                 await this.lazyRunner.waitForPluginLoaded(pluginId);
             }
@@ -123,11 +127,17 @@ export class LazyEngineFeature implements AppFeature {
         }
 
         if (mode === PLUGIN_MODE.LAZY) {
-            await this.commandCache.ensureCommandsCached(pluginId);
-            if (this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
-                await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+            try {
+                await this.commandCache.ensureCommandsCached(pluginId);
+            } finally {
+                // Caching commands may have just loaded the plugin, even if its initialization failed.
+                // enablePlugin does not add it to enabledPlugins, so check the loaded state or it
+                // would keep running this session.
+                if (isPluginLoaded(this.ctx.app, pluginId)) {
+                    await this.ctx.obsidianPlugins.disablePlugin(pluginId);
+                }
+                this.commandCache.registerCachedCommandsForPlugin(pluginId);
             }
-            this.commandCache.registerCachedCommandsForPlugin(pluginId);
             return;
         }
 
@@ -140,7 +150,7 @@ export class LazyEngineFeature implements AppFeature {
             return;
         }
 
-        if (this.ctx.obsidianPlugins.enabledPlugins.has(pluginId)) {
+        if (isPluginLoaded(this.ctx.app, pluginId)) {
             await this.ctx.obsidianPlugins.disablePlugin(pluginId);
         }
         this.commandCache.removeCachedCommandsForPlugin(pluginId);

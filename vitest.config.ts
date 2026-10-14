@@ -8,6 +8,13 @@ export default defineConfig({
         environment: "node",
         include: ["src/**/*.test.ts"],
         exclude: ["node_modules", "dist", ".obsidian", "tests"],
+        coverage: {
+            provider: "v8",
+            include: ["src/**/*.ts"],
+            exclude: ["src/**/*.test.ts", "src/**/__mocks__/**", "src/**/*.d.ts"],
+            reportsDirectory: "coverage/unit",
+            reporter: ["text", "html", "lcov", "json"],
+        },
     },
     resolve: {
         alias: {

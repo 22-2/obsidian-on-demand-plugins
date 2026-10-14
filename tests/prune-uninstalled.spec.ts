@@ -1,6 +1,6 @@
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 import type OnDemandPlugin from "src/main";
-import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
+import { pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
 
 useOnDemandPlugins();
 
@@ -8,10 +8,6 @@ useOnDemandPlugins();
 const GHOST_ID = "__ghost_uninstalled_plugin__";
 
 test("prune removes uninstalled-plugin entries but keeps installed ones", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
     const result = await pluginHandle.evaluate(
         async (plugin: OnDemandPlugin, args) => {
@@ -53,33 +49,22 @@ test("prune removes uninstalled-plugin entries but keeps installed ones", async 
 });
 
 test("prune is skipped while the toggle is off", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(
-        async (plugin: OnDemandPlugin, ghostId) => {
-            plugin.settings.plugins[ghostId] = { mode: "lazy", userConfigured: true };
-            plugin.settings.pruneUninstalledEntries = false;
+    const result = await pluginHandle.evaluate(async (plugin: OnDemandPlugin, ghostId) => {
+        plugin.settings.plugins[ghostId] = { mode: "lazy", userConfigured: true };
+        plugin.settings.pruneUninstalledEntries = false;
 
-            // setupDefaultPluginConfigurations() runs the cleanup, but only when the
-            // toggle is enabled, so the stale entry must remain.
-            await plugin.setupDefaultPluginConfigurations();
+        // setupDefaultPluginConfigurations() runs the cleanup, but only when the
+        // toggle is enabled, so the stale entry must remain.
+        await plugin.setupDefaultPluginConfigurations();
 
-            return { ghostStillThere: ghostId in plugin.settings.plugins };
-        },
-        GHOST_ID,
-    );
+        return { ghostStillThere: ghostId in plugin.settings.plugins };
+    }, GHOST_ID);
 
     expect(result.ghostStillThere).toBe(true);
 });
 
 test("legacy command-cache fields are stripped from data.json on load", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
     const result = await pluginHandle.evaluate(async (plugin: OnDemandPlugin) => {
         // Simulate an old install whose data.json still carries the now-unused cache

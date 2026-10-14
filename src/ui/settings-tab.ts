@@ -1,13 +1,14 @@
 import type { App, SettingDefinitionItem } from "obsidian";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
-import { showConfirmModal } from "src/core/confirm-modal";
 import { FeatureEvents } from "src/core/event-bus";
-import { PluginModes } from "src/core/types";
+import { PLUGIN_MODE, PluginModes } from "src/core/types";
 import type OnDemandPlugin from "src/main";
+import { showReviewChangesModal } from "src/ui/modals/review-changes-modal";
 import { pluginManagementSummary } from "src/ui/settings/helpers";
 import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { PluginPage } from "src/ui/settings/pages/plugin-page";
 import { ProfileManagementPage } from "src/ui/settings/pages/profile-management-page";
+import type { PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 import { PendingChanges } from "src/ui/settings/pending-changes";
 
 export class SettingsTab extends PluginSettingTab {
@@ -91,32 +92,59 @@ export class SettingsTab extends PluginSettingTab {
     markDirty() {
         this.pending.markDirty();
     }
+    describeChanges(): PendingChange[] {
+        return this.pending.describeChanges({
+            pluginName: (pluginId) => this.plugin.manifests.find((manifest) => manifest.id === pluginId)?.name ?? pluginId,
+            fallbackMode: (pluginId, settings) => (this.plugin.isPluginEnabledOnDisk(pluginId) ? PLUGIN_MODE.ALWAYS_ENABLED : settings.defaultMode),
+        });
+    }
+    private saveButtonText() {
+        const count = this.getChangedPluginIds().length;
+        return count > 0 ? `Save & apply (${count})` : "Save changes";
+    }
+    private discardButtonText() {
+        return `Discard all (${this.describeChanges().length})`;
+    }
     configurePendingControls(setting: Setting, onRefresh?: () => void) {
         setting.setClass("lazy-plugin-save-controls");
         // Sticky positioning applies only with pending changes so the bar does not cling to the top when there is nothing to save.
         setting.settingEl.toggleClass("has-pending-changes", this.hasPendingChanges);
-        const changedPluginIds = this.getChangedPluginIds();
+        const changes = this.describeChanges();
+        // A single summary line keeps the pinned bar short; the details live in the review modal.
+        if (changes.length > 0) setting.setName(pendingSummary(changes)).setDesc("");
+        else setting.setName("Changes").setDesc("Settings changes are staged until you save them.");
         setting
-            .setName("Changes")
-            .setDesc("Settings changes are staged until you save them. Plugin mode changes are applied when saved.")
             .addButton((button) =>
                 button
-                    .setButtonText(changedPluginIds.length > 0 ? `Save & apply (${changedPluginIds.length})` : "Save changes")
+                    // The ellipsis and "Review" signal that a confirmation follows, so the bar never reads as an immediate save.
+                    .setButtonText("Review & save…")
                     .setCta()
                     .setDisabled(!this.hasPendingChanges)
-                    .onClick(async () => {
-                        await this.saveChanges();
-                        onRefresh?.();
-                    }),
+                    .onClick(() => void this.reviewAndSave(onRefresh)),
             )
             .addButton((button) =>
                 button
-                    .setButtonText("Discard")
+                    .setButtonText("Discard…")
                     .setDisabled(!this.hasPendingChanges)
-                    .onClick(async () => {
-                        if (await this.discardChanges()) onRefresh?.();
-                    }),
+                    .onClick(() => void this.discardFromBar(onRefresh)),
             );
+    }
+    // Obsidian shows a loading spinner on a button while its click handler is pending, so the
+    // handlers stay synchronous and the awaiting happens here. Otherwise the spinner would stay on for the whole review.
+    private async reviewAndSave(onRefresh?: () => void) {
+        const confirmed = await showReviewChangesModal(this.app, {
+            mode: "save",
+            getChanges: () => this.describeChanges(),
+            getConfirmLabel: () => this.saveButtonText(),
+        });
+        // Reverts in the modal edit the draft even when the save is cancelled.
+        this.plugin.configureLogger();
+        if (confirmed) await this.saveChanges();
+        else this.update();
+        onRefresh?.();
+    }
+    private async discardFromBar(onRefresh?: () => void) {
+        if (await this.discardChanges()) onRefresh?.();
     }
     renderPendingControls(container: HTMLElement, onRefresh?: () => void) {
         container.querySelector(".lazy-plugin-save-controls")?.remove();
@@ -149,9 +177,35 @@ export class SettingsTab extends PluginSettingTab {
         if (refresh) this.update();
     }
     async discardChanges(): Promise<boolean> {
-        if (!(await showConfirmModal(this.app, { message: "Discard all unsaved changes?" }))) return false;
+        const confirmed = await showReviewChangesModal(this.app, {
+            mode: "discard",
+            getChanges: () => this.describeChanges(),
+            getConfirmLabel: () => this.discardButtonText(),
+        });
+        if (!confirmed) return false;
         await this.discardPendingChanges();
         new Notice("Changes discarded");
         return true;
     }
+}
+
+const GROUP_NOUNS: Record<PendingChangeGroup, [string, string]> = {
+    plugins: ["plugin", "plugins"],
+    settings: ["setting", "settings"],
+    profiles: ["profile change", "profile changes"],
+};
+
+function pendingSummary(changes: PendingChange[]): DocumentFragment {
+    const breakdown = (Object.keys(GROUP_NOUNS) as PendingChangeGroup[])
+        .map((group) => {
+            const count = changes.filter((change) => change.group === group).length;
+            const [singular, plural] = GROUP_NOUNS[group];
+            return count > 0 ? `${count} ${count === 1 ? singular : plural}` : "";
+        })
+        .filter(Boolean)
+        .join(", ");
+    return createFragment((fragment) => {
+        fragment.createSpan({ text: `${changes.length} unsaved ${changes.length === 1 ? "change" : "changes"}` });
+        fragment.createSpan({ cls: "lazy-plugin-save-summary", text: ` · ${breakdown}` });
+    });
 }

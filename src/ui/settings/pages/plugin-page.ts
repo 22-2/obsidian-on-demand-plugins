@@ -1,6 +1,8 @@
 import log from "loglevel";
-import type { App, PluginManifest } from "obsidian";
-import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage } from "obsidian";
+import type { App, EventRef, PluginManifest } from "obsidian";
+import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage, ToggleComponent, setTooltip } from "obsidian";
+import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
+import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
@@ -11,11 +13,30 @@ import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
 
 const logger = log.getLogger("OnDemandPlugin/PluginPage");
+const COMPACT_LIST_STORAGE_KEY = "compact-plugin-list";
+
+// Badge words sit in their own span so the compact list can hide them and keep only the icon or dot.
+// The full text stays in the tooltip for the hidden words.
+function setModeBadgeText(badge: HTMLElement, label: string) {
+    const [icon, ...words] = label.split(" ");
+    badge.empty();
+    badge.createSpan({ cls: "lazy-plugin-badge-icon", text: icon });
+    badge.createSpan({ cls: "lazy-plugin-badge-text", text: ` ${words.join(" ")}` });
+    setTooltip(badge, label);
+}
+
+function setStatusBadgeText(badge: HTMLElement, text: string) {
+    badge.empty();
+    badge.createSpan({ cls: "lazy-plugin-badge-text", text });
+    setTooltip(badge, text);
+}
 
 export class PluginPage extends SettingPage {
     private static readonly PAGE_SIZE = 24;
     private filter = "";
     private mode?: PLUGIN_MODE;
+    // Kept in vault-scoped local storage, not in the staged settings draft, so it saves at once.
+    private compact = false;
     private app: App;
     private plugin: OnDemandPlugin;
     private tab: SettingsTab;
@@ -23,14 +44,17 @@ export class PluginPage extends SettingPage {
     private loadedCount = 0;
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
+    private loadStateRef?: EventRef;
     constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.app = app;
         this.plugin = plugin;
         this.tab = tab;
+        this.compact = loadLocalStorage<boolean>(app, COMPACT_LIST_STORAGE_KEY) === true;
     }
     display() {
         this.disconnectInfiniteScroll();
+        this.watchPluginLoadState();
         // Plugin installations can happen while the settings modal is open.
         // Refresh the registry whenever this page is entered so the count and
         // list reflect the current Obsidian plugin manifests.
@@ -38,29 +62,24 @@ export class PluginPage extends SettingPage {
         void this.refreshCommunityPluginSnapshot();
         this.containerEl.empty();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
-        new Setting(this.containerEl).setName("Statistics").setHeading();
+        new Setting(this.containerEl).setName("Overview").setHeading();
         new Setting(this.containerEl)
             .setName(pluginStatisticsText(this.plugin))
             .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
             .setClass("lazy-plugin-statistics");
+        // Phones show the refresh control on the heading's right; desktop shows it beside the filters (see CSS).
         new Setting(this.containerEl)
             .setName("Plugins")
             .setHeading()
-            .addExtraButton((button) =>
+            .addExtraButton((button) => {
+                button.extraSettingsEl.addClass("lazy-plugin-refresh-mobile");
                 button
                     .setIcon("refresh-cw")
                     .setTooltip("Refresh plugin list")
-                    .onClick(() => {
-                        this.plugin.updateManifests();
-                        void this.refreshCommunityPluginSnapshot();
-                        // Re-render the list directly: tab.update() does not
-                        // guarantee the open page is re-displayed, so relying
-                        // on it leaves live badges (e.g. Enabled after an
-                        // on-demand load) stale.
-                        this.renderInfiniteList();
-                    }),
-            );
-        const filterSetting = new Setting(this.containerEl).setName("Filter");
+                    .onClick(() => this.refreshList());
+            });
+        // No row name: the placeholder already says what the field is, and a name column only leaves a gap.
+        const filterSetting = new Setting(this.containerEl);
         filterSetting.setClass("lazy-plugin-filter-row");
         filterSetting
             .addText((t) =>
@@ -79,12 +98,30 @@ export class PluginPage extends SettingPage {
                     this.mode = v ? (v as PLUGIN_MODE) : undefined;
                     this.renderInfiniteList();
                 });
+            })
+            // Beside the filters, so the refresh control lines up with the mode dropdown instead of the heading.
+            .addExtraButton((button) => {
+                button.extraSettingsEl.addClass("lazy-plugin-refresh-desktop");
+                button
+                    .setIcon("refresh-cw")
+                    .setTooltip("Refresh plugin list")
+                    .onClick(() => this.refreshList());
             });
         this.containerEl.createDiv({ cls: "lazy-plugin-infinite-host" });
         this.renderInfiniteList();
     }
+    private refreshList() {
+        this.plugin.updateManifests();
+        void this.refreshCommunityPluginSnapshot();
+        // Re-render the list directly: tab.update() does not
+        // guarantee the open page is re-displayed, so relying
+        // on it leaves live badges (e.g. Enabled after an
+        // on-demand load) stale.
+        this.renderInfiniteList();
+    }
     hide() {
         this.disconnectInfiniteScroll();
+        this.unwatchPluginLoadState();
         this.communityPluginReadId++;
         super.hide();
     }
@@ -97,8 +134,22 @@ export class PluginPage extends SettingPage {
         // only the query so typing and internal spaces in plugin names stay intact.
         const query = this.filter.trim().toLowerCase();
         const plugins = this.plugin.manifests.filter((manifest) => (!query || manifest.name.toLowerCase().includes(query)) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
-        host.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
+        // The compact toggle sits at the right edge of the count line. It has no visible label,
+        // so its tooltip supplies the accessible name.
+        const toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
+        const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
+        compactControl.createSpan({ text: "Compact list" });
+        new ToggleComponent(compactControl)
+            .setValue(this.compact)
+            .setTooltip("Compact list")
+            .onChange((value) => {
+                this.compact = value;
+                saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
+                this.renderInfiniteList();
+            });
+        toolbar.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
         const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
+        listEl.toggleClass("is-compact", this.compact);
         this.loadedCount = Math.min(PluginPage.PAGE_SIZE, plugins.length);
         this.appendPluginRows(listEl, plugins, 0, this.loadedCount);
         if (this.loadedCount >= plugins.length) return;
@@ -132,31 +183,40 @@ export class PluginPage extends SettingPage {
             // an editable control; edits go through the 3-dot menu instead.
             const badges = setting.descEl.createDiv({ cls: "lazy-plugin-badges" });
             const mode = this.plugin.getPluginMode(manifest.id);
-            const modeBadge = badges.createSpan({
-                cls: "lazy-plugin-mode-badge",
-                text: pluginModeLabel(mode),
-            });
+            const modeBadge = badges.createSpan({ cls: "lazy-plugin-mode-badge" });
+            setModeBadgeText(modeBadge, pluginModeLabel(mode));
             // Show the live runtime state; the staged mode alone cannot tell
             // whether a lazy plugin is actually loaded right now.
-            const enabledBadge = badges.createSpan({
-                cls: "lazy-plugin-enabled-badge",
-                text: enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds),
-            });
+            const enabledBadge = badges.createSpan({ cls: "lazy-plugin-enabled-badge" });
+            setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
             enabledBadge.setAttr("data-plugin-id", manifest.id);
             enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
-            // Author names vary widely in length; keep them on a separate
-            // line and omit the attribution prefix when no author is given.
+            // The version sits beside the plugin name, as a sibling so the name text stays exact.
+            setting.nameEl.after(createSpan({ cls: "lazy-plugin-version", text: `v${manifest.version}` }));
+            // Author names vary widely in length, so they keep their own line on the badge row.
             const author = manifest.author?.trim();
-            setting.descEl.createDiv({
-                cls: "lazy-plugin-meta-badge",
-                text: `v${manifest.version}${author ? ` · by ${author}` : ""}`,
-            });
+            if (author) {
+                setting.descEl.createDiv({ cls: "lazy-plugin-meta-badge", text: `by ${author}` });
+            }
             const actionsButton = new ExtraButtonComponent(setting.controlEl).setIcon("ellipsis-vertical").setTooltip("Plugin actions");
             actionsButton.extraSettingsEl.addClass("lazy-plugin-row-actions-desktop");
             // Both controls open the same menu; anchor it to the visible control
             // because ExtraButtonComponent callbacks do not provide a MouseEvent.
+            // A second press on the control closes its open menu instead of opening another.
+            let openMenu: Menu | undefined;
+            // Obsidian hides a menu on an outside mousedown, so the following click
+            // would reopen it; keep that mousedown here and let the click close it.
+            const keepMenuForClick = (evt: MouseEvent) => {
+                if (openMenu) evt.stopPropagation();
+            };
             const openActions = (anchor: HTMLElement) => {
+                if (openMenu) {
+                    openMenu.hide();
+                    return;
+                }
                 const menu = new Menu();
+                menu.onHide(() => (openMenu = undefined));
+                openMenu = menu;
                 addPluginRowMenuItems(menu, {
                     getMode: () => this.plugin.getPluginMode(manifest.id),
                     isEnabled: () => isPluginLoaded(this.app, manifest.id),
@@ -176,10 +236,12 @@ export class PluginPage extends SettingPage {
                 // menu and anchor coordinates refer to the same visible surface.
                 menu.showAtPosition({ x: rect.left, y: rect.bottom }, anchor.ownerDocument);
             };
+            actionsButton.extraSettingsEl.addEventListener("mousedown", keepMenuForClick);
             actionsButton.onClick(() => openActions(actionsButton.extraSettingsEl));
             // A labeled native button makes the mobile action easier to discover
             // and press while sharing the desktop menu's behavior.
             setting.addButton((button) => {
+                button.buttonEl.addEventListener("mousedown", keepMenuForClick);
                 button.setIcon("ellipsis-vertical").onClick(() => openActions(button.buttonEl));
                 // setIcon replaces button contents, so append the label afterward.
                 button.buttonEl.createSpan({ text: "Actions" });
@@ -202,7 +264,7 @@ export class PluginPage extends SettingPage {
             logger.error(`Failed to ${enabled ? "enable" : "disable"} plugin ${manifest.id}`, error);
             new Notice(`Failed to ${enabled ? "enable" : "disable"} ${manifest.name}`);
         }
-        enabledBadge.setText(enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
+        setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
         enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
     }
 
@@ -223,8 +285,8 @@ export class PluginPage extends SettingPage {
         // Update only the badges in place so the row stays where it is even
         // when it no longer matches the active filter; re-filtering waits
         // until the user changes the filter conditions.
-        modeBadge.setText(pluginModeLabel(mode));
-        enabledBadge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
+        setModeBadgeText(modeBadge, pluginModeLabel(mode));
+        setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
         enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, pluginId));
         this.refreshStats();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
@@ -248,12 +310,27 @@ export class PluginPage extends SettingPage {
         }
         this.updateVisibleEnabledBadges();
     }
+    /**
+     * Lazy loads (commands, views, files) and toggles from elsewhere happen
+     * outside this page, so follow them while the page is shown to keep the
+     * Enabled badges in sync without re-rendering the list.
+     */
+    private watchPluginLoadState() {
+        this.unwatchPluginLoadState();
+        // @ts-expect-error - Custom workspace event
+        this.loadStateRef = this.app.workspace.on(PLUGIN_LOAD_STATE_CHANGED_EVENT, () => this.updateVisibleEnabledBadges());
+    }
+    private unwatchPluginLoadState() {
+        if (!this.loadStateRef) return;
+        this.app.workspace.offref(this.loadStateRef);
+        this.loadStateRef = undefined;
+    }
     private updateVisibleEnabledBadges() {
         this.containerEl.querySelectorAll<HTMLElement>(".lazy-plugin-enabled-badge").forEach((badge) => {
             const pluginId = badge.dataset.pluginId;
             if (!pluginId) return;
             const loaded = isPluginLoaded(this.app, pluginId);
-            badge.setText(enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
+            setStatusBadgeText(badge, enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
             badge.toggleClass("is-loaded", loaded);
         });
     }

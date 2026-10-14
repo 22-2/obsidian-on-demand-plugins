@@ -1,6 +1,5 @@
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 
 test("smoke: vault ready", async ({ obsidian }) => {
-    await obsidian.waitReady();
     expect(await obsidian.vaultName()).toBeTruthy();
 });
