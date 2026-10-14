@@ -22,6 +22,16 @@ export const DropdownComponent = class {};
 export const ButtonComponent = class {};
 export const setIcon = () => {};
 
+export class TFile {
+    basename = "";
+    name = "";
+    path = "";
+}
+
+export function debounce<T extends (...args: never[]) => unknown>(fn: T, _timeout?: number, _leading?: boolean): T {
+    return fn;
+}
+
 export function normalizePath(path: string): string {
     return path;
 }
