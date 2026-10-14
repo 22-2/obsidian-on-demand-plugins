@@ -1,11 +1,16 @@
+import log from "loglevel";
+import type { ButtonComponent } from "obsidian";
 import { Notice, Setting, SettingPage } from "obsidian";
 import { PLUGIN_MODE } from "src/core/types";
+import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 import type OnDemandPlugin from "src/main";
 import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions } from "src/ui/settings/helpers";
 import { createSettingsNotice } from "src/ui/settings/settings-notice";
+
+const logger = log.getLogger("OnDemandPlugin/MaintenancePage");
 
 export class MaintenancePage extends SettingPage {
     private plugin: OnDemandPlugin;
@@ -14,10 +19,38 @@ export class MaintenancePage extends SettingPage {
     private to: PLUGIN_MODE = PLUGIN_MODE.LAZY;
     private syncDirection: SyncDirection = "lazyToCore";
     private advancedOpen = false;
+    /** The last rebuild started from this page, for callers that need to wait for it. */
+    rebuilding: Promise<void> = Promise.resolve();
     constructor(plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.plugin = plugin;
         this.tab = tab;
+    }
+    /** Resolves once the rebuild finished, failed or was declined; failures are reported, not thrown. */
+    rebuildCaches(button: ButtonComponent, feature: MaintenanceFeature): Promise<void> {
+        this.rebuilding = this.runRebuild(button, feature).catch((error: unknown) => {
+            logger.error("Failed to rebuild command and view caches", error);
+            new Notice("Failed to rebuild command and view caches. See the console for details.");
+        });
+        return this.rebuilding;
+    }
+    private async runRebuild(button: ButtonComponent, feature: MaintenanceFeature) {
+        await this.tab.waitForImmediateSaves();
+        // Rebuilding also persists settings and applies startup policies.
+        if (this.tab.hasPendingChanges) {
+            new Notice("Review & save or discard pending plugin changes before rebuilding caches.");
+            return;
+        }
+        // Ask here rather than inside the rebuild so declining is not reported as a success.
+        const drift = this.plugin.features.get(CommunityPluginsDriftFeature);
+        if (drift && !(await drift.confirmOverwrite())) return;
+        button.setDisabled(true);
+        try {
+            await feature.rebuildAndApplyCommandCache({ force: true, externalChangesConfirmed: true });
+            new Notice("Command and view caches rebuilt successfully");
+        } finally {
+            button.setDisabled(false);
+        }
     }
     display() {
         this.containerEl.empty();
@@ -32,21 +65,9 @@ export class MaintenancePage extends SettingPage {
                 b
                     .setButtonText("Rebuild caches")
                     .setDestructive()
-                    .onClick(async () => {
-                        if (!f) return;
-                        await this.tab.waitForImmediateSaves();
-                        // Rebuilding also persists settings and applies startup policies.
-                        if (this.tab.hasPendingChanges) {
-                            new Notice("Review & save or discard pending plugin changes before rebuilding caches.");
-                            return;
-                        }
-                        b.setDisabled(true);
-                        try {
-                            await f.rebuildAndApplyCommandCache({ force: true });
-                            new Notice("Command and view caches rebuilt successfully");
-                        } finally {
-                            b.setDisabled(false);
-                        }
+                    // Synchronous so Obsidian's button spinner does not run while the confirmation modal waits.
+                    .onClick(() => {
+                        if (f) void this.rebuildCaches(b, f);
                     }),
             );
         const advanced = this.containerEl.createEl("details", { cls: "lazy-maintenance-advanced" });

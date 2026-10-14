@@ -63,8 +63,8 @@ export class StartupPolicyFeature implements AppFeature {
         await this.mutex.runExclusive(() => this.executeStartupPolicy({ pluginIds, externalProgress: progress, externalChangesConfirmed: options?.externalChangesConfirmed }));
     }
 
-    public async rebuildWithProgress(progress: ProgressDialog | null, force = false) {
-        await this.mutex.runExclusive(() => this.executeStartupPolicy({ externalProgress: progress, force, rebuilding: true }));
+    public async rebuildWithProgress(progress: ProgressDialog | null, force = false, options?: { externalChangesConfirmed?: boolean }) {
+        await this.mutex.runExclusive(() => this.executeStartupPolicy({ externalProgress: progress, force, rebuilding: true, externalChangesConfirmed: options?.externalChangesConfirmed }));
     }
 
     // -------------------------------------------------------------------------

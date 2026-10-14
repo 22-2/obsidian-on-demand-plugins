@@ -148,3 +148,27 @@ test("applying after the user agrees writes the On-Demand settings back", async 
     expect(await onDiskSorted(obsidian)).toEqual([pluginUnderTestId, ...initiallyEnabled].sort());
     expect(await detectDrift(obsidian)).toBeNull();
 });
+
+test("the rebuild button does not spin while the overwrite confirmation is open", async ({ obsidian }) => {
+    await startFrom(obsidian);
+    await obsidian.page.evaluate((ids) => app.vault.writeConfigJson("community-plugins", ids), [pluginUnderTestId, ...dummyIds]);
+    // Settings open in their own window, so the confirmation appears there too.
+    const settingsPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Maintenance & batch" });
+    const button = settingsPage.getByRole("button", { name: "Rebuild caches" });
+    const overwriteText = "Continuing overwrites these changes";
+
+    await withReloadRecorded(obsidian, async () => {
+        await button.click();
+        const confirmPage = await obsidian.findPage((candidate) => candidate.locator(".modal").filter({ hasText: overwriteText }));
+        const modal = confirmPage.locator(".modal").filter({ hasText: overwriteText });
+        await expect(modal).toBeVisible();
+        // Obsidian shows its spinner (mod-loading) while a click handler's promise is pending.
+        await expect(button).not.toHaveClass(/mod-loading/);
+        await modal.getByRole("button", { name: "Cancel" }).click();
+        await expect(modal).toHaveCount(0);
+    });
+
+    await expect(settingsPage.locator(".notice").filter({ hasText: "rebuilt successfully" })).toHaveCount(0);
+    await expect(obsidian.page.locator(".notice").filter({ hasText: "rebuilt successfully" })).toHaveCount(0);
+    expect(await onDiskSorted(obsidian)).toEqual([pluginUnderTestId, ...dummyIds].sort());
+});

@@ -75,9 +75,9 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     private registerEventHandlers() {
-        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean }) => {
+        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean; externalChangesConfirmed?: boolean }) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
-            await policyFeature?.rebuildWithProgress(null, options?.force ?? false);
+            await policyFeature?.rebuildWithProgress(null, options?.force ?? false, { externalChangesConfirmed: options?.externalChangesConfirmed });
         });
 
         this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[]; externalChangesConfirmed?: boolean }) => {
@@ -216,7 +216,7 @@ export default class OnDemandPlugin extends Plugin {
         }
     }
 
-    async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
+    async rebuildAndApplyCommandCache(options?: { force?: boolean; externalChangesConfirmed?: boolean }) {
         const maintenance = this.features.get(MaintenanceFeature);
         if (maintenance) {
             await maintenance.rebuildAndApplyCommandCache(options);

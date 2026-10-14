@@ -14,6 +14,8 @@ vi.mock("obsidian", async () => ({
 function setup() {
     const feature = {
         rebuildAndApplyCommandCache: vi.fn().mockResolvedValue(undefined),
+        // The fixture returns this object for every feature, including the drift check.
+        confirmOverwrite: vi.fn().mockResolvedValue(true),
         executeSync: vi.fn().mockResolvedValue({ changed: 0, message: "Already in sync" }),
         applyBatchModeReplace: vi.fn().mockReturnValue(0),
     };
@@ -51,27 +53,46 @@ describe("MaintenancePage", () => {
     });
 
     it("waits for immediate saves and keeps the rebuild button disabled until rebuilding finishes", async () => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, page, setting, tabMock } = setup();
         const rebuilding = Promise.withResolvers<void>();
         feature.rebuildAndApplyCommandCache.mockReturnValue(rebuilding.promise);
         const button = setting("Rebuild command and view caches").buttons[0];
-        const clicked = button.click();
+        await button.click();
         await vi.waitFor(() => expect(button.disabled).toBe(true));
         expect(tabMock.waitForImmediateSaves.mock.invocationCallOrder[0]).toBeLessThan(feature.rebuildAndApplyCommandCache.mock.invocationCallOrder[0]);
-        expect(feature.rebuildAndApplyCommandCache).toHaveBeenCalledWith({ force: true });
+        expect(feature.confirmOverwrite.mock.invocationCallOrder[0]).toBeLessThan(feature.rebuildAndApplyCommandCache.mock.invocationCallOrder[0]);
+        expect(feature.rebuildAndApplyCommandCache).toHaveBeenCalledWith({ force: true, externalChangesConfirmed: true });
         rebuilding.resolve();
-        await clicked;
+        await page.rebuilding;
         expect(button.disabledHistory).toEqual([true, false]);
         expect(Notice.messages).toContain("Command and view caches rebuilt successfully");
     });
 
-    it("restores the rebuild button after a failure without announcing success", async () => {
-        const { feature, setting } = setup();
+    it("returns from the click handler at once so Obsidian shows no spinner while the confirmation is open", async () => {
+        const { feature, page, setting } = setup();
+        const answer = Promise.withResolvers<boolean>();
+        feature.confirmOverwrite.mockReturnValueOnce(answer.promise);
+        const button = setting("Rebuild command and view caches").buttons[0];
+
+        // The click settles while the confirmation is still unanswered.
+        await button.click();
+        await vi.waitFor(() => expect(feature.confirmOverwrite).toHaveBeenCalled());
+        expect(button.disabled).toBe(false);
+
+        answer.resolve(false);
+        await page.rebuilding;
+        expect(feature.rebuildAndApplyCommandCache).not.toHaveBeenCalled();
+        expect(Notice.messages).toEqual([]);
+    });
+
+    it("restores the rebuild button after a failure and reports it instead of a success", async () => {
+        const { feature, page, setting } = setup();
         feature.rebuildAndApplyCommandCache.mockRejectedValueOnce(new Error("cache failed"));
         const button = setting("Rebuild command and view caches").buttons[0];
-        await expect(button.click()).rejects.toThrow("cache failed");
+        await button.click();
+        await page.rebuilding;
         expect(button.disabled).toBe(false);
-        expect(Notice.messages).toEqual([]);
+        expect(Notice.messages).toEqual(["Failed to rebuild command and view caches. See the console for details."]);
     });
 
     it("blocks rebuilding and exporting while a plugin draft is pending", async () => {
