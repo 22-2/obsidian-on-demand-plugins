@@ -31,5 +31,6 @@ repomix-output.md
 .obsidian-e2e-toolkit/
 playwright-report/
 test-results/
+coverage/
 .env
 .ci-artifacts/

@@ -1,7 +1,7 @@
 import { access, copyFile, mkdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type OnDemandPlugin from "src/main";
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 import { ensureBuilt, pluginUnderTestId, useOnDemandPluginOnly } from "./test-utils";
 
 useOnDemandPluginOnly();

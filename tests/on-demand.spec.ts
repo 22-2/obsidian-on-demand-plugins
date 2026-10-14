@@ -1,4 +1,4 @@
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 import {
     ensureBuilt,
     findCommandByPrefix,

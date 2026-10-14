@@ -44,6 +44,23 @@ Instead of loading the plugin code at startup, this project registers "dummy com
 
 This project is based on the work by Alan Grainger: https://github.com/alangrainger/obsidian-lazy-plugins
 
+## Test coverage
+
+```bash
+pnpm run test:coverage
+pnpm run test:e2e:coverage
+```
+
+Unit tests use `@vitest/coverage-v8`. E2E tests collect V8 coverage from the Obsidian renderer using Playwright, starting before the toolkit enables the plugins. E2E coverage requires Windows or macOS and uses the same parallel/serial split as `test:e2e`.
+
+Open `coverage/unit/index.html` or `coverage/e2e/index.html` for the HTML reports. Both commands also generate `lcov.info` and `coverage-final.json`. Reports exclude tests, mocks, declarations, and dependencies. E2E reports cover the `src` files included in the plugin bundle and map them back to TypeScript through inline source maps. The coverage command restores the normal production bundle afterwards.
+
+To measure a specific E2E suite:
+
+```bash
+pnpm run test:e2e:coverage tests/on-demand.spec.ts
+```
+
 ## Screenshots
 
 <!-- Screenshot: On-Demand Plugins settings -->

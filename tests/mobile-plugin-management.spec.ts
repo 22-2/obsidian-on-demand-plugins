@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 import { ensureBuilt, pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
 
 useOnDemandPlugins();

@@ -1,4 +1,4 @@
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 import OnDemandPlugin from "src/main";
 import {
     ensureBuilt,

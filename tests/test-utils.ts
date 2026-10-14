@@ -1,7 +1,8 @@
 import type { LogLevelDesc } from "loglevel";
 import fs from "node:fs";
 import path from "node:path";
-import { test, type ObsidianAPI } from "obsidian-e2e-toolkit";
+import type { ObsidianAPI } from "obsidian-e2e-toolkit";
+import { test } from "./fixtures";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);

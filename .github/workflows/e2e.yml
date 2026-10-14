@@ -133,7 +133,14 @@ jobs:
             - name: Run E2E tests
               env:
                   CI: true
-              run: pnpm run test:e2e
+              run: pnpm run test:e2e:coverage
+
+            - name: Upload E2E coverage
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: coverage-e2e-${{ matrix.os }}
+                  path: coverage/e2e
 
             - name: Upload Playwright report
               if: always()

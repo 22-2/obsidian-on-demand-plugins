@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { expect, test } from "obsidian-e2e-toolkit";
+import { expect, test } from "./fixtures";
 import type OnDemandPlugin from "src/main";
 import { ensureBuilt, excalidrawPluginId, pluginUnderTestId, readOnDemandStorageValue, resolveMyfilesPluginPath, useVaultPlugins, waitForPluginLoaded, waitForViewType } from "./test-utils";
 

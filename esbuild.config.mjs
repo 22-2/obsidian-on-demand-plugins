@@ -17,6 +17,7 @@ if you want to view the source, please visit the github repository of this plugi
 `;
 
 const prod = (process.argv[2] === "production");
+const coverage = process.env.E2E_COVERAGE === "1";
 
 // Keep vault deployment separate from bundling so esbuild has no filesystem-copy plugin dependency.
 const context = await esbuild.context({
@@ -44,8 +45,8 @@ const context = await esbuild.context({
 	format: "cjs",
 	target: "esnext",
 	logLevel: "info",
-	minify: prod,
-	sourcemap: prod ? false : "inline",
+	minify: prod && !coverage,
+	sourcemap: coverage || !prod ? "inline" : false,
 	treeShaking: true,
 	outfile: "main.js",
 });
