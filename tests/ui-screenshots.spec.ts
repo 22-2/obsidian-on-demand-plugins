@@ -56,6 +56,9 @@ test(`captures plugin UI screenshots for ${SCREENSHOT_DEVICE}`, async ({ obsidia
     await testInfo.attach(`Compact plugin management ${primaryWidth}px`, { path: compactPath, contentType: "image/png" });
     await compactToggle.click();
 
+    // Obsidian renders Menu API popups as native menus on macOS, outside Playwright's DOM.
+    if (process.platform === "darwin") return;
+
     await pluginPage.locator(".lazy-plugin-filter-row input").fill("BRAT");
     const row = pluginPage.locator(".lazy-plugin-mode-row").filter({ hasText: "BRAT" });
     const actions = SCREENSHOT_DEVICE === "mobile" ? row.getByRole("button", { name: "Actions", exact: true }) : row.locator(".lazy-plugin-row-actions-desktop");
