@@ -12,6 +12,7 @@ export class MaintenancePage extends SettingPage {
     private from: PLUGIN_MODE = PLUGIN_MODE.ALWAYS_DISABLED;
     private to: PLUGIN_MODE = PLUGIN_MODE.LAZY;
     private syncDirection: SyncDirection = "lazyToCore";
+    private advancedOpen = false;
     constructor(plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.plugin = plugin;
@@ -32,6 +33,12 @@ export class MaintenancePage extends SettingPage {
                     .setDestructive()
                     .onClick(async () => {
                         if (!f) return;
+                        await this.tab.waitForImmediateSaves();
+                        // Rebuilding also persists settings and applies startup policies.
+                        if (this.tab.hasPendingChanges) {
+                            new Notice("Review & save or discard pending plugin changes before rebuilding caches.");
+                            return;
+                        }
                         b.setDisabled(true);
                         try {
                             await f.rebuildAndApplyCommandCache({ force: true });
@@ -41,8 +48,15 @@ export class MaintenancePage extends SettingPage {
                         }
                     }),
             );
-        new Setting(this.containerEl).setName("Sync settings").setHeading();
-        new Setting(this.containerEl)
+        const advanced = this.containerEl.createEl("details", { cls: "lazy-maintenance-advanced" });
+        advanced.open = this.advancedOpen;
+        advanced.createEl("summary", { text: "Advanced" });
+        advanced.addEventListener("toggle", () => {
+            this.advancedOpen = advanced.open;
+        });
+        const advancedContent = advanced.createDiv();
+        new Setting(advancedContent).setName("Sync settings").setHeading();
+        new Setting(advancedContent)
             .setName("Sync direction")
             .addDropdown((d) =>
                 d
@@ -57,6 +71,7 @@ export class MaintenancePage extends SettingPage {
                     .setCta()
                     .onClick(async () => {
                         if (!f) return;
+                        await this.tab.waitForImmediateSaves();
                         if (this.syncDirection === "lazyToCore" && this.tab.hasPendingChanges) {
                             // This direction writes Obsidian's config immediately, so
                             // do not let it persist a draft that Discard could undo only
@@ -77,13 +92,13 @@ export class MaintenancePage extends SettingPage {
                         }
                     }),
             );
-        new Setting(this.containerEl).setName("Batch operations").setHeading();
-        new Setting(this.containerEl).setName("From mode").addDropdown((d) =>
+        new Setting(advancedContent).setName("Batch operations").setHeading();
+        new Setting(advancedContent).setName("From mode").addDropdown((d) =>
             addModeOptions(d)
                 .setValue(this.from)
                 .onChange((v) => (this.from = v as PLUGIN_MODE)),
         );
-        new Setting(this.containerEl)
+        new Setting(advancedContent)
             .setName("To mode")
             .addButton((b) =>
                 b
@@ -107,12 +122,13 @@ export class MaintenancePage extends SettingPage {
                     .setValue(this.to)
                     .onChange((v) => (this.to = v as PLUGIN_MODE)),
             );
-        new Setting(this.containerEl).setName("Debug options").setHeading();
-        new Setting(this.containerEl).setName("Debug log output").addToggle((t) =>
+        new Setting(advancedContent).setName("Debug options").setHeading();
+        new Setting(advancedContent).setName("Debug log output").addToggle((t) =>
             t.setValue(this.plugin.data.showConsoleLog).onChange(async (v) => {
-                this.plugin.data.showConsoleLog = v;
+                await this.tab.saveImmediateChanges((data) => {
+                    data.showConsoleLog = v;
+                });
                 this.plugin.configureLogger();
-                this.tab.markDirty();
                 this.display();
             }),
         );

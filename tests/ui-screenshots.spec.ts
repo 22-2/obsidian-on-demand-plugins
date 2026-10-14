@@ -43,6 +43,15 @@ for (const theme of SCREENSHOT_THEMES) {
                 const screenshotPath = path.join(artifactDir, `${pageName.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-")}-${width}.png`);
                 await page.screenshot({ path: screenshotPath, animations: "disabled" });
                 await testInfo.attach(`${pageName} ${width}px`, { path: screenshotPath, contentType: "image/png" });
+                if (pageName === "Maintenance & batch") {
+                    const advanced = page.locator(".lazy-maintenance-advanced");
+                    await advanced.locator("summary").click();
+                    await expect(advanced.getByRole("button", { name: "Replace all", exact: true })).toBeVisible();
+                    const expandedPath = path.join(artifactDir, `maintenance-batch-advanced-${width}.png`);
+                    await page.screenshot({ path: expandedPath, animations: "disabled" });
+                    await testInfo.attach(`Advanced maintenance ${width}px`, { path: expandedPath, contentType: "image/png" });
+                    await advanced.locator("summary").click();
+                }
             }
         }
 

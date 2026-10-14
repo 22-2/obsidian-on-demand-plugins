@@ -607,6 +607,18 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     flex-wrap: wrap;
 }
 
+.lazy-maintenance-advanced {
+    margin-block: var(--size-4-4);
+    border-top: 1px solid var(--background-modifier-border);
+}
+
+.lazy-maintenance-advanced > summary {
+    padding-block: var(--size-4-3);
+    color: var(--text-normal);
+    font-weight: var(--font-medium);
+    cursor: pointer;
+}
+
 .lazy-plugin-gear-left {
     padding: 0;
     margin-right: 8px;

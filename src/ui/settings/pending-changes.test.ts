@@ -2,7 +2,7 @@ import { DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, PLUGIN_MODE, PluginModes } from "
 import type { LazySettings } from "src/core/types";
 import type { ChangeDescriber } from "src/ui/settings/pending-changes";
 import { PendingChanges } from "src/ui/settings/pending-changes";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const describer: ChangeDescriber = {
     pluginName: (pluginId) => `${pluginId[0].toUpperCase()}${pluginId.slice(1)} plugin`,
@@ -94,6 +94,124 @@ describe("PendingChanges", () => {
         expect(pending.hasChanges).toBe(false);
         pending.pluginIds.add("foo");
         expect(pending.hasChanges).toBe(true);
+        expect(pending.getChangedPluginIds()).toEqual(["foo"]);
+    });
+
+    it("saves ordinary settings without persisting or reverting staged modes and lazy rules", async () => {
+        const source = createSource();
+        const settings = source.data.profiles[DEFAULT_PROFILE_ID].settings;
+        settings.plugins.foo = { mode: PLUGIN_MODE.ALWAYS_DISABLED };
+        const pending = new PendingChanges(() => source);
+        settings.plugins.foo.mode = PLUGIN_MODE.LAZY;
+        settings.lazyOnViews.foo = ["foo-view"];
+        const save = vi.fn<(data: LazySettings) => Promise<void>>().mockResolvedValue(undefined);
+
+        await pending.saveImmediately((data, id) => {
+            data.profiles[id].settings.defaultMode = PLUGIN_MODE.LAZY_ON_LAYOUT_READY;
+        }, save);
+
+        const persisted = save.mock.calls[0][0].profiles[DEFAULT_PROFILE_ID].settings;
+        expect(persisted.plugins.foo.mode).toBe(PLUGIN_MODE.ALWAYS_DISABLED);
+        expect(persisted.lazyOnViews).toEqual({});
+        expect(persisted.defaultMode).toBe(PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
+        expect(source.data.profiles[DEFAULT_PROFILE_ID].settings).toBe(settings);
+        expect(settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
+        expect(settings.lazyOnViews.foo).toEqual(["foo-view"]);
+        expect(pending.getChangedPluginIds()).toEqual(["foo"]);
+        expect(pending.describeChanges(describer).map((change) => change.label)).toEqual(["Foo plugin", "View activation rules"]);
+    });
+
+    it("serializes rapid edits including a return to the original value", async () => {
+        const source = createSource();
+        const pending = new PendingChanges(() => source);
+        const persisted: LazySettings[] = [];
+        const save = async (data: LazySettings) => {
+            await Promise.resolve();
+            persisted.push(structuredClone(data));
+        };
+        await Promise.all([
+            pending.saveImmediately((data) => {
+                data.showConsoleLog = true;
+            }, save),
+            pending.saveImmediately((data) => {
+                data.profiles.Default.settings.defaultMode = PLUGIN_MODE.LAZY;
+            }, save),
+            pending.saveImmediately((data) => {
+                data.showConsoleLog = false;
+            }, save),
+        ]);
+
+        expect(persisted).toHaveLength(3);
+        expect(persisted[1].showConsoleLog).toBe(true);
+        expect(persisted[2].showConsoleLog).toBe(false);
+        expect(persisted[2].profiles.Default.settings.defaultMode).toBe(PLUGIN_MODE.LAZY);
+        expect(source.data).toEqual(persisted[2]);
+        expect(pending.hasChanges).toBe(false);
+    });
+
+    it("keeps the saved baseline and live settings on failure, then permits another save", async () => {
+        const source = createSource();
+        const pending = new PendingChanges(() => source);
+        source.data.profiles.Default.settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
+        const save = vi.fn<(data: LazySettings) => Promise<void>>().mockRejectedValueOnce(new Error("disk full")).mockResolvedValue(undefined);
+        const change = (data: LazySettings) => {
+            data.showConsoleLog = true;
+        };
+
+        await expect(pending.saveImmediately(change, save)).rejects.toThrow("disk full");
+        expect(source.data.showConsoleLog).toBe(false);
+        expect(pending.getChangedPluginIds()).toEqual(["foo"]);
+        await pending.saveImmediately(change, save);
+        expect(source.data.showConsoleLog).toBe(true);
+        expect(pending.getChangedPluginIds()).toEqual(["foo"]);
+    });
+
+    it("duplicates saved profile settings and commits metadata while retaining the active draft", async () => {
+        const source = createSource();
+        const settings = source.data.profiles.Default.settings;
+        settings.plugins.foo = { mode: PLUGIN_MODE.ALWAYS_DISABLED };
+        const pending = new PendingChanges(() => source);
+        settings.plugins.foo.mode = PLUGIN_MODE.LAZY;
+        const save = vi.fn<(data: LazySettings) => Promise<void>>().mockResolvedValue(undefined);
+
+        await pending.saveImmediately((data) => {
+            data.profiles.copy = { id: "copy", name: "Copy", settings: structuredClone(data.profiles.Default.settings) };
+            data.profiles.Default.name = "Renamed";
+            data.mobileProfileId = "copy";
+        }, save);
+
+        expect(source.data.profiles.copy.settings.plugins.foo.mode).toBe(PLUGIN_MODE.ALWAYS_DISABLED);
+        expect(source.data.profiles.Default.settings).toBe(settings);
+        expect(settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
+        expect(pending.describeChanges(describer).map((change) => change.group)).toEqual(["plugins"]);
+        await pending.saveImmediately((data) => {
+            data.mobileProfileId = "Default";
+            delete data.profiles.copy;
+        }, save);
+        expect(source.data.profiles.copy).toBeUndefined();
+        expect(pending.getChangedPluginIds()).toEqual(["foo"]);
+    });
+
+    it("commits cleanup deletions while preserving an installed plugin's staged mode", async () => {
+        const source = createSource();
+        const settings = source.data.profiles.Default.settings;
+        settings.plugins.foo = { mode: PLUGIN_MODE.ALWAYS_DISABLED };
+        settings.plugins.ghost = { mode: PLUGIN_MODE.LAZY };
+        settings.lazyOnFiles.ghost = { suffixes: [".ghost"] };
+        const pending = new PendingChanges(() => source);
+        settings.plugins.foo.mode = PLUGIN_MODE.LAZY;
+        await pending.saveImmediately(
+            (data, id) => {
+                const saved = data.profiles[id].settings;
+                saved.pruneUninstalledEntries = true;
+                delete saved.plugins.ghost;
+                delete saved.lazyOnFiles.ghost;
+            },
+            async () => undefined,
+        );
+        expect(settings.plugins.ghost).toBeUndefined();
+        expect(settings.lazyOnFiles.ghost).toBeUndefined();
+        expect(settings.pruneUninstalledEntries).toBe(true);
         expect(pending.getChangedPluginIds()).toEqual(["foo"]);
     });
 });

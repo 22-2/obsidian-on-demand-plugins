@@ -23,7 +23,6 @@ export class ProfileManagementPage extends SettingPage {
     display() {
         this.containerEl.empty();
         this.containerEl.addClass("lazy-profile-page");
-        this.tab.renderPendingControls(this.containerEl, () => this.display());
         const syncNotice = this.containerEl.createDiv({ cls: "lazy-profile-sync-notice" });
         const syncNoticeText = syncNotice.createEl("p");
         // Profiles share data.json, so full-file saves can conflict across devices; this reminder asks users to coordinate edits without automatically applying synced profiles.
@@ -126,8 +125,7 @@ export class ProfileManagementPage extends SettingPage {
                         .setTitle("Duplicate")
                         .setIcon("copy")
                         .onClick(async () => {
-                            service.createProfile(`${profile.name} (Copy)`, id);
-                            this.tab.markDirty();
+                            await this.tab.createProfile(`${profile.name} (Copy)`, id);
                             this.display();
                         }),
                 );
@@ -157,17 +155,17 @@ export class ProfileManagementPage extends SettingPage {
         new Setting(this.containerEl).setName(label).addDropdown((dropdown) => {
             Object.values(service.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
             dropdown.setValue(currentId).onChange(async (profileId) => {
-                // Selecting the already-active default changes nothing, so keep the draft clean.
-                const activeId = type === "desktop" ? service.data.desktopProfileId : service.data.mobileProfileId;
-                if (profileId === activeId) return;
-                service.setDeviceDefault(profileId, type);
-                this.tab.markDirty();
+                await this.tab.saveImmediateChanges((data) => {
+                    if (type === "desktop") data.desktopProfileId = profileId;
+                    else data.mobileProfileId = profileId;
+                });
                 this.display();
             });
         });
     }
 
     private async switchProfile(id: string) {
+        await this.tab.waitForImmediateSaves();
         if (this.tab.hasPendingChanges) {
             if (!(await showConfirmModal(this.app, { message: "You have unsaved changes. Switch profile anyway?" }))) return;
             // Reload first so switchProfile cannot persist the discarded draft while
@@ -197,8 +195,9 @@ export class ProfileManagementPage extends SettingPage {
                         modal.close();
                         return;
                     }
-                    service.renameProfile(id, nextName);
-                    this.tab.markDirty();
+                    await this.tab.saveImmediateChanges((data) => {
+                        data.profiles[id].name = nextName;
+                    });
                     modal.close();
                     this.display();
                 }),
@@ -209,8 +208,7 @@ export class ProfileManagementPage extends SettingPage {
     private async createProfile() {
         const name = this.createName.trim();
         if (!name) return;
-        this.plugin.core.settingsService.createProfile(name);
-        this.tab.markDirty();
+        await this.tab.createProfile(name);
         this.createName = "";
         this.display();
     }
@@ -225,8 +223,9 @@ export class ProfileManagementPage extends SettingPage {
         // destructive click does not silently remove the user's fallback copy.
         const message = id === "initial-backup" ? `WARNING: \"${name}\" is your failsafe initial backup. It is highly recommended to keep it. Are you absolutely sure you want to delete it?` : `Delete profile \"${name}\"?`;
         if (!(await showConfirmModal(this.app, { message }))) return;
-        service.deleteProfile(id);
-        this.tab.markDirty();
+        await this.tab.saveImmediateChanges((data) => {
+            delete data.profiles[id];
+        });
         this.display();
     }
 }

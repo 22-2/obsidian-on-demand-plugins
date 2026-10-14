@@ -105,7 +105,7 @@ export class MaintenanceFeature implements AppFeature {
         }
 
         if (changed > 0) {
-            return { changed, pluginIds, message: `Staged ${changed} plugin changes from Obsidian config. Click "Save" to apply.` };
+            return { changed, pluginIds, message: `Staged ${changed} plugin changes from Obsidian config. Click "Review & save…" to apply.` };
         }
         return { changed: 0, message: "On-Demand Plugins is already in sync with Obsidian config" };
     }

@@ -25,6 +25,8 @@ export type ChangeDescriber = {
     fallbackMode: (pluginId: string, settings: DeviceSettings) => PLUGIN_MODE;
 };
 
+export type ImmediateSettingsChange = (data: LazySettings, profileId: string) => void | Promise<void>;
+
 /** Top-level keys described explicitly; any other differing key is reported generically so nothing pending stays hidden. */
 const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog"]);
 const DESCRIBED_DEVICE_KEYS = new Set<string>(["plugins", "defaultMode", "pruneUninstalledEntries"]);
@@ -46,6 +48,7 @@ export class PendingChanges {
     private baselineData?: LazySettings;
     private baselineFingerprint?: string;
     private readonly getSource: () => DraftSource | undefined;
+    private immediateSaveQueue: Promise<void> = Promise.resolve();
 
     constructor(getSource: () => DraftSource | undefined) {
         this.getSource = getSource;
@@ -118,6 +121,30 @@ export class PendingChanges {
         this.ensureBaseline();
     }
 
+    saveImmediately(change: ImmediateSettingsChange, save: (data: LazySettings) => Promise<void>): Promise<void> {
+        const profileId = this.getSource()?.currentProfileId;
+        const pendingSave = this.immediateSaveQueue.then(async () => {
+            this.ensureBaseline();
+            const data = this.getSource()?.data;
+            const baseline = this.baselineData;
+            if (!data || !baseline || !profileId) throw new Error("Settings must be loaded before saving changes.");
+            // Build from saved data so an unrelated control never persists a staged mode or lazy rule.
+            const saved = structuredClone(baseline);
+            await change(saved, profileId);
+            if (!differs(baseline, saved)) return;
+            await save(saved);
+            applySavedChanges(data, baseline, saved);
+            this.baselineData = saved;
+            this.baselineFingerprint = stableStringify(saved);
+        });
+        this.immediateSaveQueue = pendingSave.catch(() => undefined);
+        return pendingSave;
+    }
+
+    async waitForImmediateSaves(): Promise<void> {
+        await this.immediateSaveQueue;
+    }
+
     reset() {
         this.pluginIds.clear();
         // Re-baseline to the current (saved or reloaded) state so earlier edits no longer count as pending.
@@ -134,6 +161,24 @@ export class PendingChanges {
         // Deep clone so later in-memory edits cannot mutate the comparison source.
         this.baselineData = structuredClone(data);
         this.baselineFingerprint = stableStringify(data);
+    }
+}
+
+function isSettingsRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Apply only the committed fields, retaining live drafts and the service's object references. */
+function applySavedChanges(current: object, before: object, after: object) {
+    const live = current as Record<string, unknown>;
+    const previous = before as Record<string, unknown>;
+    const saved = after as Record<string, unknown>;
+    for (const key of new Set([...Object.keys(previous), ...Object.keys(saved)])) {
+        if (!differs(previous[key], saved[key])) continue;
+        if (!Object.hasOwn(saved, key)) delete live[key];
+        else if (isSettingsRecord(live[key]) && isSettingsRecord(previous[key]) && isSettingsRecord(saved[key])) {
+            applySavedChanges(live[key], previous[key], saved[key]);
+        } else live[key] = structuredClone(saved[key]);
     }
 }
 

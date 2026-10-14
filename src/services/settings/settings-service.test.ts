@@ -1,5 +1,6 @@
 import { Platform } from "obsidian";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE, SETTINGS_SCHEMA_VERSION } from "src/core/types";
+import type { LazySettings } from "src/core/types";
 import { loadLocalStorage } from "src/core/storage";
 import type OnDemandPlugin from "src/main";
 import { SettingsService } from "src/services/settings/settings-service";
@@ -401,6 +402,34 @@ describe("SettingsService inline persistence", () => {
         expect(saveData.mock.calls[0]?.[0]).toHaveProperty("profiles.Secondary");
         expect(saveData.mock.calls[0]?.[0]).not.toHaveProperty("profileStorageVersion");
         expect(trigger).toHaveBeenCalledTimes(2);
+    });
+
+    it("persists an explicit snapshot without including or replacing the live plugin draft", async () => {
+        const adapter = createAdapter();
+        let diskData = JSON.stringify(migratedDataWith());
+        adapter.exists.mockResolvedValue(true);
+        adapter.read.mockImplementation(async () => diskData);
+        const saveData = vi.fn(async (value: unknown) => {
+            diskData = JSON.stringify(value);
+        });
+        const plugin = {
+            app: { vault: { adapter }, workspace: { trigger: vi.fn() } },
+            manifest: { dir: "mock/plugin/dir" },
+            saveData,
+        } as unknown as OnDemandPlugin;
+        const service = new SettingsService(plugin);
+        await service.load();
+        const saved = structuredClone(service.data);
+        saved.showConsoleLog = true;
+        service.settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
+
+        await service.save(saved);
+        const persisted = JSON.parse(diskData) as LazySettings;
+        expect(persisted.profiles.Default.settings.plugins.foo).toBeUndefined();
+        expect(persisted.showConsoleLog).toBe(true);
+        expect(service.settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
+        await service.save();
+        expect((JSON.parse(diskData) as LazySettings).profiles.Default.settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
     });
 
     it("refuses to save before settings have loaded", async () => {

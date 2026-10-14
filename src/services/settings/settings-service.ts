@@ -304,14 +304,15 @@ export class SettingsService {
         }
     }
 
-    async save() {
+    async save(snapshot?: LazySettings) {
         // Reason: serialize snapshots so concurrent setting changes cannot race the disk fingerprint and overwrite one another.
-        const pendingSave = this.saveQueue.then(() => this.saveNow());
+        const savedSnapshot = snapshot ? structuredClone(snapshot) : undefined;
+        const pendingSave = this.saveQueue.then(() => this.saveNow(savedSnapshot));
         this.saveQueue = pendingSave.catch(() => undefined);
         await pendingSave;
     }
 
-    private async saveNow() {
+    private async saveNow(snapshot?: LazySettings) {
         if (this.writesBlocked || !this.data || !this.settings || !this.currentProfileId) {
             throw new Error("Settings cannot be saved until a valid settings file is loaded.");
         }
@@ -332,11 +333,11 @@ export class SettingsService {
         if (this.data.profiles[this.currentProfileId]) {
             this.data.profiles[this.currentProfileId].settings = this.settings;
         }
-        if (!this.isValidProfileMap(this.data.profiles)) {
+        const persisted = structuredClone(snapshot ?? this.data);
+        if (!this.isValidProfileMap(persisted.profiles)) {
             this.blockSettings("The in-memory profiles are incomplete. Restore a valid backup before saving.");
         }
 
-        const persisted = structuredClone(this.data);
         delete persisted.profileStorageVersion;
         persisted.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
         // Keep every profile in Obsidian's plugin data.json so Sync transfers the

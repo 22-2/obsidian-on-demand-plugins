@@ -1,14 +1,15 @@
 import type { App, SettingDefinitionItem } from "obsidian";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import { FeatureEvents } from "src/core/event-bus";
-import { PLUGIN_MODE, PluginModes } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE, PluginModes } from "src/core/types";
+import { BackupFeature } from "src/features/backup/backup-feature";
 import type OnDemandPlugin from "src/main";
 import { showReviewChangesModal } from "src/ui/modals/review-changes-modal";
 import { pluginManagementSummary } from "src/ui/settings/helpers";
 import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { PluginPage } from "src/ui/settings/pages/plugin-page";
 import { ProfileManagementPage } from "src/ui/settings/pages/profile-management-page";
-import type { PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
+import type { ImmediateSettingsChange, PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 import { PendingChanges } from "src/ui/settings/pending-changes";
 
 export class SettingsTab extends PluginSettingTab {
@@ -31,14 +32,10 @@ export class SettingsTab extends PluginSettingTab {
     getControlValue(key: string) {
         return (this.plugin.settings as unknown as Record<string, unknown>)[key];
     }
-    setControlValue(key: string, value: unknown) {
-        const controls = this.plugin.settings as unknown as Record<string, unknown>;
-        // Assigning the same value changes nothing, so keep the draft clean.
-        if (Object.is(controls[key], value)) return;
-        controls[key] = value;
-        // Keep declarative controls on the same draft lifecycle as plugin modes;
-        // otherwise Save/Discard cannot provide an atomic, predictable result.
-        this.markDirty();
+    async setControlValue(key: string, value: unknown) {
+        await this.saveImmediateChanges((data, profileId) => {
+            (data.profiles[profileId].settings as unknown as Record<string, unknown>)[key] = value;
+        });
         this.update();
     }
     getSettingDefinitions(): SettingDefinitionItem[] {
@@ -59,11 +56,6 @@ export class SettingsTab extends PluginSettingTab {
                 name: "Behaviour",
                 desc: "Configure default loading behaviour.",
                 items: [
-                    {
-                        name: "Changes",
-                        desc: "Settings changes are staged until you save them.",
-                        render: (setting) => this.configurePendingControls(setting),
-                    },
                     { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
                     {
                         name: "Auto-remove uninstalled entries",
@@ -71,12 +63,19 @@ export class SettingsTab extends PluginSettingTab {
                         render: (setting) => {
                             setting.addToggle((toggle) =>
                                 toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange(async (value) => {
-                                    this.plugin.settings.pruneUninstalledEntries = value;
-                                    this.markDirty();
                                     try {
-                                        // Back up before pruning so enabling cleanup never loses
-                                        // the stale entries before the user can save the draft.
-                                        if (value) await this.plugin.backupAndPruneUninstalledEntries();
+                                        await this.saveImmediateChanges(async (data, profileId) => {
+                                            const settings = data.profiles[profileId].settings;
+                                            settings.pruneUninstalledEntries = value;
+                                            if (!value) return;
+                                            const installed = new Set(this.plugin.manifests.map((manifest) => manifest.id));
+                                            const maps = [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
+                                            if (!maps.some((map) => Object.keys(map).some((id) => !installed.has(id)))) return;
+                                            await this.plugin.features.get(BackupFeature)?.createBackup();
+                                            for (const map of maps) {
+                                                for (const id of Object.keys(map)) if (!installed.has(id)) delete map[id];
+                                            }
+                                        });
                                     } finally {
                                         this.update();
                                     }
@@ -91,6 +90,19 @@ export class SettingsTab extends PluginSettingTab {
     }
     markDirty() {
         this.pending.markDirty();
+    }
+    async saveImmediateChanges(change: ImmediateSettingsChange): Promise<void> {
+        await this.pending.saveImmediately(change, (data) => this.plugin.core.settingsService.save(data));
+    }
+    async waitForImmediateSaves(): Promise<void> {
+        await this.pending.waitForImmediateSaves();
+    }
+    async createProfile(name: string, sourceProfileId?: string): Promise<void> {
+        const id = this.containerEl.ownerDocument.defaultView!.crypto.randomUUID();
+        await this.saveImmediateChanges((data) => {
+            const settings = sourceProfileId ? data.profiles[sourceProfileId].settings : DEFAULT_DEVICE_SETTINGS;
+            data.profiles[id] = { id, name, settings: structuredClone(settings) };
+        });
     }
     describeChanges(): PendingChange[] {
         return this.pending.describeChanges({
@@ -158,6 +170,7 @@ export class SettingsTab extends PluginSettingTab {
         this.pending.reset();
     }
     async saveChanges() {
+        await this.waitForImmediateSaves();
         if (!this.hasPendingChanges) return;
         const pluginIds = this.getChangedPluginIds();
         await this.plugin.saveSettings();
@@ -169,6 +182,7 @@ export class SettingsTab extends PluginSettingTab {
         this.update();
     }
     async discardPendingChanges(refresh = true) {
+        await this.waitForImmediateSaves();
         await this.plugin.loadSettings();
         // Debug logging is applied at runtime, so restore it after reloading the
         // persisted draft when the user discards changes.
