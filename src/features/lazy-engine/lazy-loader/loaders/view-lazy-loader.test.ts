@@ -66,6 +66,15 @@ describe("ViewLazyLoader", () => {
         expect(harness.commandRegistry.syncCommandWrappersForPlugin).not.toHaveBeenCalled();
     });
 
+    it("ignores a missing leaf", async () => {
+        const harness = createHarness();
+
+        await harness.loader.initializeLazyViewForLeaf(null as unknown as WorkspaceLeaf);
+
+        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
+        expect(resolvePluginForViewType).not.toHaveBeenCalled();
+    });
+
     it("loads a matching plugin under the leaf lock and synchronizes its commands", async () => {
         const leaf = createLeaf("leaf-1", "canvas");
         const harness = createHarness();
@@ -115,10 +124,22 @@ describe("ViewLazyLoader", () => {
         expect(harness.pluginLoader.ensurePluginLoaded).toHaveBeenCalledWith("view-plugin");
     });
 
+    it("does not ensure a plugin when an explicit view type has no matching rule", async () => {
+        const harness = createHarness();
+        vi.mocked(resolvePluginForViewType).mockReturnValue(null);
+
+        await harness.loader.checkViewTypeForLazyLoading("canvas");
+
+        expect(resolvePluginForViewType).toHaveBeenCalledWith(harness.ctx, "canvas");
+        expect(harness.pluginLoader.ensurePluginLoaded).not.toHaveBeenCalled();
+    });
+
     it("registers active-leaf and initial-layout scans", async () => {
         const leaf = createLeaf("leaf-1", "canvas");
         const harness = createHarness(true, [leaf]);
         harness.loader.registerActiveLeafReload();
+        harness.eventHandlers.get("active-leaf-change")?.(null);
+        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
         harness.eventHandlers.get("active-leaf-change")?.(leaf);
         harness.layoutReadyCallbacks[0]?.();
 
