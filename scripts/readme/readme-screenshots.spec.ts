@@ -4,8 +4,9 @@ import path from "node:path";
 import { expect, test } from "obsidian-e2e-toolkit";
 import { pluginUnderTestId, useOnDemandPluginsWithTargets } from "../../tests/test-utils";
 
-// Captures the README screenshots of the settings window, its review and discard dialogs, and the phone layout.
-// Run with `pnpm readme:shots`. Set README_SHOT_DIR to choose the output folder (default: the OS temp directory).
+// Captures the settings window, lazy options, review and discard dialogs, and the phone layout.
+// Run with `pnpm readme:shots`. README_SHOT_DIR overrides the default .ci-artifacts/ui-screenshots/readme folder.
+// ss.png and ss-modal.png match the existing README asset names for drop-in replacement.
 const outDir = process.env.README_SHOT_DIR ?? path.resolve(".ci-artifacts/ui-screenshots/readme");
 
 useOnDemandPluginsWithTargets(["obsidian42-brat", "obsidian-excalidraw-plugin", "obsidian-linter", "notebook-navigator"]);
@@ -23,6 +24,12 @@ test("capture README screenshots", async ({ obsidian }) => {
     await plugin.evaluate(async (instance) => {
         await instance.updatePluginSettings("obsidian42-brat", "lazyOnLayoutReady");
         await instance.updatePluginSettings("obsidian-excalidraw-plugin", "lazy");
+        instance.settings.plugins["obsidian-excalidraw-plugin"].lazyOptions = {
+            useView: true,
+            viewTypes: ["excalidraw"],
+            useFile: true,
+            fileCriteria: { suffixes: [".excalidraw"], frontmatterKeys: ["excalidraw-plugin"] },
+        };
         await instance.updatePluginSettings("obsidian-linter", "alwaysDisabled");
         await instance.updatePluginSettings("notebook-navigator", "lazy");
     });
@@ -52,6 +59,7 @@ test("capture README screenshots", async ({ obsidian }) => {
     // The OS window is 916px wide; a wider layout is clipped at its right edge, so keep the page within it.
     await settingsPage.setViewportSize({ width: 900, height: 877 });
     await obsidian.waitForAnimations(settingsPage);
+    await captureWindow(settingsPage, "ss.png");
     await settingsPage.getByRole("button", { name: "Review & save…", exact: true }).click();
     const reviewPage = await obsidian.findPage((candidate) => candidate.locator(".lazy-review-changes-modal"), { timeout: 10_000 });
     await obsidian.waitForAnimations(settingsPage);
@@ -74,6 +82,20 @@ test("capture README screenshots", async ({ obsidian }) => {
     await obsidian.waitForAnimations(settingsPage);
     await captureWindow(settingsPage, "window-compact.png");
     await compactToggle.click();
+
+    // Match the existing README modal: Excalidraw with both activation rules and its file suffix visible.
+    await excalidrawRow.locator(".lazy-plugin-row-actions-desktop").click();
+    const optionsMenuPage = await obsidian.findPage((candidate) => candidate.getByText("Lazy settings", { exact: true }), { timeout: 10_000 });
+    await optionsMenuPage.getByText("Lazy settings", { exact: true }).click();
+    const optionsPage = await obsidian.findPage((candidate) => candidate.locator(".modal").filter({ hasText: "Lazy options for obsidian-excalidraw-plugin" }), { timeout: 10_000 });
+    await optionsPage.setViewportSize({ width: 900, height: 877 });
+    await obsidian.setTheme("dark", optionsPage);
+    const optionsModal = optionsPage.locator(".modal").filter({ hasText: "Lazy options for obsidian-excalidraw-plugin" });
+    await expect(optionsModal.locator(".setting-item").filter({ hasText: "File suffixes" }).locator("textarea")).toHaveValue(".excalidraw");
+    await obsidian.waitForAnimations(optionsPage);
+    await optionsPage.evaluate(() => document.fonts.ready);
+    await optionsModal.screenshot({ path: path.join(outDir, "ss-modal.png"), animations: "disabled" });
+    await optionsModal.getByRole("button", { name: "Cancel", exact: true }).click();
 
     // Phone layout: the same classes and 390px viewport as the mobile spec. The OS window cannot shrink
     // this far (it stops at about 616px), so the phone shots are page screenshots rather than window captures.
