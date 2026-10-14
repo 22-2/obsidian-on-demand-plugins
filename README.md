@@ -49,11 +49,14 @@ This project is based on the work by Alan Grainger: https://github.com/alangrain
 ```bash
 pnpm run test:coverage
 pnpm run test:e2e:coverage
+pnpm run test:coverage:all
 ```
 
-Unit tests use `@vitest/coverage-v8`. E2E tests collect V8 coverage from the Obsidian renderer using Playwright, starting before the toolkit enables the plugins. E2E coverage requires Windows or macOS and uses the same parallel/serial split as `test:e2e`.
+Unit tests use `@vitest/coverage-v8`. E2E tests use the toolkit's `coverageOptions` fixture and coverage report API to collect V8 coverage from the Obsidian renderer before plugins are enabled. E2E coverage requires Windows or macOS and uses the same parallel/serial split as `test:e2e`.
 
-Open `coverage/unit/index.html` or `coverage/e2e/index.html` for the HTML reports. Both commands also generate `lcov.info` and `coverage-final.json`. Reports exclude tests, mocks, declarations, and dependencies. E2E reports cover the `src` files included in the plugin bundle and map them back to TypeScript through inline source maps. The coverage command restores the normal production bundle afterwards.
+Open `coverage/unit/index.html` or `coverage/e2e/index.html` for the separate HTML reports. `test:coverage:all` runs both suites and merges their results into `coverage/combined/index.html`. Each report also includes `lcov.info` and `coverage-final.json`. Reports exclude tests, mocks, declarations, and dependencies. E2E reports cover source files included in the plugin bundle and map them back to TypeScript through inline source maps. The coverage command restores the normal production bundle afterwards.
+
+To merge existing results from the same source revision without rerunning tests, use `pnpm run test:coverage:merge`.
 
 To measure a specific E2E suite:
 

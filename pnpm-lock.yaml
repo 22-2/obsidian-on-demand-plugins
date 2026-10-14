@@ -57,9 +57,6 @@ importers:
       '@vitest/ui':
         specifier: ^5.0.3
         version: 5.0.3(vitest@5.0.3)
-      ast-v8-to-istanbul:
-        specifier: ^1.0.7
-        version: 1.0.7
       conventional-changelog-conventionalcommits:
         specifier: ^10.4.1
         version: 10.4.1
@@ -78,15 +75,6 @@ importers:
       globals:
         specifier: ^17.13.0
         version: 17.13.0
-      istanbul-lib-coverage:
-        specifier: ^3.2.2
-        version: 3.2.2
-      istanbul-lib-report:
-        specifier: ^3.0.1
-        version: 3.0.1
-      istanbul-reports:
-        specifier: ^3.2.0
-        version: 3.2.0
       jiti:
         specifier: ^2.7.0
         version: 2.7.0
@@ -100,8 +88,8 @@ importers:
         specifier: ^1.14.4
         version: 1.14.4(@codemirror/state@6.7.6)(@codemirror/view@6.43.13)
       obsidian-e2e-toolkit:
-        specifier: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.5/obsidian-e2e-toolkit-1.4.5.tgz
-        version: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.5/obsidian-e2e-toolkit-1.4.5.tgz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0)
+        specifier: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.6.0/obsidian-e2e-toolkit-1.6.0.tgz
+        version: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.6.0/obsidian-e2e-toolkit-1.6.0.tgz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0)
       playwright:
         specifier: ^1.64.0
         version: 1.64.0
@@ -2317,9 +2305,9 @@ packages:
     resolution: {integrity: sha512-gXah6aZrcUxjWg2zR2MwouP2eHlCBzdV4pygudehaKXSGW4v2AsRQUK+lwwXhii6KFZcunEnmSUoYp5CXibxtA==}
     engines: {node: '>= 0.4'}
 
-  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.5/obsidian-e2e-toolkit-1.4.5.tgz:
-    resolution: {integrity: sha512-hqwT3uVYGPyhKFq26dC1KU1HbqUUltevdlOU4w9tDCj8l5NdOrcyROfMjqebvl36nn2tj0M+OVCYDPD8Jn0PKA==, tarball: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.5/obsidian-e2e-toolkit-1.4.5.tgz}
-    version: 1.4.5
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.6.0/obsidian-e2e-toolkit-1.6.0.tgz:
+    resolution: {integrity: sha512-jShABMaZ0dyjVWa5Xpi5vY3QYFWGZXUreLBOTI4oRjldYBW5xSuhL/Rx4y3MtCBO5FpcGk9VlnQ5MMybSQ/kgg==, tarball: https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.6.0/obsidian-e2e-toolkit-1.6.0.tgz}
+    version: 1.6.0
     engines: {node: '>=23.0.0'}
     hasBin: true
     peerDependencies:
@@ -5451,15 +5439,20 @@ snapshots:
       define-properties: 1.2.1
       es-object-atoms: 1.1.2
 
-  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.4.5/obsidian-e2e-toolkit-1.4.5.tgz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0):
+  obsidian-e2e-toolkit@https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.6.0/obsidian-e2e-toolkit-1.6.0.tgz(@playwright/test@1.64.0)(electron@44.7.0(supports-color@7.2.0))(playwright@1.64.0)(supports-color@7.2.0):
     dependencies:
       '@electron/asar': 4.3.1
       '@playwright/test': 1.64.0
+      acorn: 8.19.0
+      ast-v8-to-istanbul: 1.0.7
       chalk: 6.0.1
       electron: 44.7.0(supports-color@7.2.0)
       es-toolkit: 1.52.0
       extract-zip: 2.0.1(supports-color@7.2.0)
       find-up: 8.0.0
+      istanbul-lib-coverage: 3.2.2
+      istanbul-lib-report: 3.0.1
+      istanbul-reports: 3.2.0
       loglevel: 1.9.2
       loglevel-plugin-prefix: 0.8.4
       playwright: 1.64.0

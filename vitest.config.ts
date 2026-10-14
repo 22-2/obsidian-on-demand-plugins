@@ -6,7 +6,7 @@ export default defineConfig({
         setupFiles: "vitest.setup.ts",
         globals: true,
         environment: "node",
-        include: ["src/**/*.test.ts", "scripts/*.test.js"],
+        include: ["src/**/*.test.ts"],
         exclude: ["node_modules", "dist", ".obsidian", "tests"],
         coverage: {
             provider: "v8",

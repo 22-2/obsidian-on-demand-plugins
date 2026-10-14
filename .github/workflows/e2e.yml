@@ -133,7 +133,14 @@ jobs:
             - name: Run E2E tests
               env:
                   CI: true
-              run: pnpm run test:e2e:coverage
+              run: pnpm run test:coverage:all
+
+            - name: Upload combined coverage
+              if: always()
+              uses: actions/upload-artifact@v7
+              with:
+                  name: coverage-combined-${{ matrix.os }}
+                  path: coverage/combined
 
             - name: Upload E2E coverage
               if: always()
