@@ -128,7 +128,7 @@ export class LazyCommandRunner implements PluginLoader {
             });
             return true;
         } catch (error) {
-            logger.warn(`Timeout waiting for command ${commandId} to become ready ${error instanceof Error ? error.message : String(error)}`);
+            logger.warn(`Could not wait for command ${commandId} to become ready: ${error instanceof Error ? error.message : String(error)}`);
             return false;
         }
     }
@@ -161,10 +161,12 @@ export class LazyCommandRunner implements PluginLoader {
             );
         }
 
-        // Resolve when any event satisfies the condition
-        if (promises.length > 0) {
-            await Promise.race(promises);
+        if (promises.length === 0) {
+            throw new Error("No readiness events are available");
         }
+
+        // Resolve when any event satisfies the condition
+        await Promise.race(promises);
     }
 
     async waitForPluginLoaded(pluginId: string, timeoutMs = 8000): Promise<boolean> {
