@@ -27,13 +27,15 @@ concurrency:
 jobs:
     e2e:
         runs-on: ${{ matrix.os }}
-        # A normal run takes about 5 minutes. Cap hung runs instead of waiting for the 6 hour default.
+        # Each shard takes roughly half of a normal run. Cap hung runs instead of waiting for the 6 hour default.
         timeout-minutes: 20
         strategy:
             # Let each OS finish so one platform's failure doesn't hide the other's result.
             fail-fast: false
             matrix:
                 os: [macos-latest, windows-latest]
+                # Split each OS's tests across parallel runners. Playwright assigns whole files to one shard.
+                shard: [1, 2]
 
         # Share authentication and asset paths so installation and test setup cannot omit them.
         env:
@@ -105,7 +107,7 @@ jobs:
             - name: Install dependencies
               run: |
                   git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
-                  pnpm install --no-frozen-lockfile
+                  pnpm install --frozen-lockfile
 
             - name: Verify Electron installation
               # The toolkit declares Electron as a peer dependency, so keep it
@@ -133,25 +135,74 @@ jobs:
             - name: Run E2E tests
               env:
                   CI: true
-              run: pnpm run test:coverage:all
-
-            - name: Upload combined coverage
-              if: always()
-              uses: actions/upload-artifact@v7
-              with:
-                  name: coverage-combined-${{ matrix.os }}
-                  path: coverage/combined
+              # Call the script directly: `pnpm run <script> -- <args>` forwards a literal "--" that makes
+              # Playwright treat --shard as a file filter, so every shard ran the whole suite.
+              run: node scripts/e2e-coverage.mjs --shard=${{ matrix.shard }}/2
 
             - name: Upload E2E coverage
               if: always()
               uses: actions/upload-artifact@v7
               with:
-                  name: coverage-e2e-${{ matrix.os }}
+                  name: coverage-e2e-${{ matrix.os }}-${{ matrix.shard }}
                   path: coverage/e2e
 
             - name: Upload Playwright report
               if: always()
               uses: actions/upload-artifact@v7
               with:
-                  name: playwright-report-${{ matrix.os }}
+                  name: playwright-report-${{ matrix.os }}-${{ matrix.shard }}
                   path: playwright-report
+
+    coverage:
+        # Merge every shard's E2E coverage with the unit coverage into one report.
+        # Runs even when a shard failed so the coverage from the passing shards is still published.
+        needs: e2e
+        if: always()
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v6
+
+            - name: Setup pnpm
+              uses: pnpm/action-setup@v5
+              with:
+                  version: "10"
+
+            - name: Setup Node
+              uses: actions/setup-node@v6
+              with:
+                  node-version: '24.15.0'
+                  cache: "pnpm"
+                  cache-dependency-path: pnpm-lock.yaml
+
+            - name: Install dependencies
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  git config --global url."https://${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+                  pnpm install --frozen-lockfile
+
+            - name: Download E2E coverage
+              uses: actions/download-artifact@v7
+              with:
+                  pattern: coverage-e2e-*
+                  path: coverage/e2e-shards
+
+            - name: Run unit tests with coverage
+              env:
+                  CI: true
+              run: pnpm run test:coverage
+
+            - name: Merge coverage
+              run: pnpm run test:coverage:merge
+
+            - name: Upload combined coverage
+              uses: actions/upload-artifact@v7
+              with:
+                  name: coverage-combined
+                  # HTML pages are named after source paths, which contain ":" from Windows shards and
+                  # cannot be stored in an artifact. The JSON and lcov reports are kept.
+                  path: |
+                      coverage/combined/**
+                      !coverage/combined/**/*.html
