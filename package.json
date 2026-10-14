@@ -21,7 +21,7 @@
         "lint": "pnpm exec eslint ./src",
         "format": "pnpm run lint --fix && pnpm exec prettier --editorconfig --write ./src && pnpx organize-imports-cli tsconfig.json",
         "release": "release-it",
-        "release:dry": "release-it --dry-run --ci",
+        "release:dry": "release-it --dry-run --ci --no-git.requireBranch --no-git.requireCleanWorkingDir",
         "release:with-versions": "release-it --config .release-it.with-versions.json",
         "verify-build": "node scripts/verify-release-assets.mjs"
     },
