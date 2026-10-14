@@ -1,26 +1,12 @@
 import { expect, test } from "./fixtures";
-import {
-    ensureBuilt,
-    pluginUnderTestId,
-    targetPluginId,
-    triggerActiveLeafChange,
-    useOnDemandPlugins,
-    waitForPluginLoaded
-} from "./test-utils";
+import { pluginUnderTestId, targetPluginId, triggerActiveLeafChange, useOnDemandPlugins, withReloadRecorded } from "./test-utils";
 
 useOnDemandPlugins();
 
 test("lazy mode with useView loads plugin on view activation", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    const result = await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
             plugin.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
@@ -31,14 +17,12 @@ test("lazy mode with useView loads plugin on view activation", async ({ obsidian
             plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
             plugin.settings.lazyOnViews[pluginId] = ["markdown"];
             await plugin.saveSettings();
-        } finally {
-            app.commands.executeCommandById = original;
-        }
 
-        return {
-            mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
-        };
-    }, targetPluginId);
+            return {
+                mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null,
+            };
+        }, targetPluginId),
+    );
 
     expect(result.mode).toBe("lazy");
 
@@ -47,7 +31,5 @@ test("lazy mode with useView loads plugin on view activation", async ({ obsidian
     await obsidian.open("lazy-view-trigger.md");
     await triggerActiveLeafChange(obsidian);
 
-    const enabled = await waitForPluginLoaded(obsidian, targetPluginId);
-
-    expect(enabled).toBe(true);
+    await obsidian.waitForPluginLoaded(targetPluginId);
 });

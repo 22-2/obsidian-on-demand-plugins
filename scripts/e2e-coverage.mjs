@@ -30,7 +30,8 @@ try {
     const args = process.argv.slice(2);
     const cli = path.join(root, "node_modules/@playwright/test/cli.js");
     exitCode = await run(cli, ["test", ...args, "--grep-invert", "@serial", "--pass-with-no-tests"]);
-    if (!exitCode) exitCode = await run(cli, ["test", ...args, "--grep", "@serial", "--workers=1", "--pass-with-no-tests"]);
+    const serialExit = await run(cli, ["test", ...args, "--grep", "@serial", "--workers=1", "--pass-with-no-tests"]);
+    exitCode ||= serialExit;
     // Keep both invocations' results and report failing tests too.
     await generateCoverageReport({ outputDir });
 } finally {

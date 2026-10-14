@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 import type OnDemandPlugin from "src/main";
-import { ensureBuilt, pluginUnderTestId, useOnDemandPluginsWithTargets, waitForPluginLoaded } from "./test-utils";
+import { pluginUnderTestId, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
 
 /**
  * Regression tests for plugins that register their views AFTER an await in
@@ -17,16 +17,11 @@ const graphAnalysisViewType = "graph-analysis-ex";
 useOnDemandPluginsWithTargets("graph-analysis");
 
 test("apply collects view types from a plugin that registers views after async onload", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true; // prevent real reload
+    const result = await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
+            // prevent real reload
 
-        try {
             await plugin.updatePluginSettings(pluginId, "lazy");
             plugin.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
@@ -48,10 +43,8 @@ test("apply collects view types from a plugin that registers views after async o
                 viewTypes: plugin.settings?.plugins?.[pluginId]?.lazyOptions?.viewTypes ?? null,
                 lazyOnViews: plugin.settings?.lazyOnViews?.[pluginId] ?? null,
             };
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, graphAnalysisId);
+        }, graphAnalysisId),
+    );
 
     expect(result.mode).toBe("lazy");
     expect(result.viewTypes).toContain(graphAnalysisViewType);
@@ -59,16 +52,9 @@ test("apply collects view types from a plugin that registers views after async o
 });
 
 test("apply collects view types even when the plugin is already enabled", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const result = await pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    const result = await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
             plugin.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
@@ -96,25 +82,16 @@ test("apply collects view types even when the plugin is already enabled", async 
             return {
                 viewTypes: plugin.settings?.plugins?.[pluginId]?.lazyOptions?.viewTypes ?? null,
             };
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, graphAnalysisId);
+        }, graphAnalysisId),
+    );
 
     expect(result.viewTypes).toContain(graphAnalysisViewType);
 });
 
 test("opening the graph-analysis view lazily loads the plugin", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
             // Simulate the post-capture state: view types already collected
             plugin.settings.plugins[pluginId].lazyOptions = {
@@ -130,10 +107,8 @@ test("opening the graph-analysis view lazily loads the plugin", async ({ obsidia
             if (app.plugins.enabledPlugins.has(pluginId)) {
                 await app.plugins.disablePlugin(pluginId);
             }
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, graphAnalysisId);
+        }, graphAnalysisId),
+    );
 
     // Open a leaf with the plugin's view type; the setViewState patch should
     // trigger lazy loading even though the view type is not registered yet.
@@ -142,6 +117,5 @@ test("opening the graph-analysis view lazily loads the plugin", async ({ obsidia
         await leaf.setViewState({ type: viewType, active: true });
     }, graphAnalysisViewType);
 
-    const enabled = await waitForPluginLoaded(obsidian, graphAnalysisId);
-    expect(enabled).toBe(true);
+    await obsidian.waitForPluginLoaded(graphAnalysisId);
 });

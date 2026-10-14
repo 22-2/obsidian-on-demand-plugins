@@ -1,35 +1,22 @@
 import { expect, test } from "./fixtures";
 import OnDemandPlugin from "src/main";
-import {
-    ensureBuilt,
-    pluginUnderTestId,
-    readCommunityPlugins,
-    targetPluginId,
-    useOnDemandPlugins
-} from "./test-utils";
+import { pluginUnderTestId, targetPluginId, useOnDemandPlugins, withReloadRecorded } from "./test-utils";
 
 useOnDemandPlugins();
 
 test("apply changes writes community-plugins.json", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true; // prevent real reload
+    await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
+            // prevent real reload
 
-        try {
             // Make plugin keepEnabled so it should be present in the file
             await plugin.updatePluginSettings(pluginId, "alwaysEnabled");
             await plugin.applyStartupPolicyAndRestart([pluginId]);
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, targetPluginId);
+        }, targetPluginId),
+    );
 
-    const parsed = await readCommunityPlugins(obsidian);
+    const parsed = await obsidian.enabledPluginsOnDisk();
 
     // Should include the on-demand plugin and the kept plugin
     expect(parsed).toContain(pluginUnderTestId);
@@ -37,16 +24,11 @@ test("apply changes writes community-plugins.json", async ({ obsidian }) => {
 });
 
 test("Apply changes records an empty view snapshot for a plugin without views", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const detected = await pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true; // prevent reload
+    const detected = await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
+            // prevent reload
 
-        try {
             // Ensure no pre-existing entry
             if (plugin.settings.lazyOnViews && plugin.settings.lazyOnViews[pluginId]) {
                 delete plugin.settings.lazyOnViews[pluginId];
@@ -63,10 +45,8 @@ test("Apply changes records an empty view snapshot for a plugin without views", 
             await plugin.applyStartupPolicyAndRestart([pluginId]);
 
             return plugin.settings.lazyOnViews?.[pluginId] ?? null;
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, targetPluginId);
+        }, targetPluginId),
+    );
 
     // BRAT has commands but no views. An empty snapshot must complete without a timeout.
     expect(detected).toEqual([]);

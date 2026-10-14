@@ -2,7 +2,7 @@ import { access, copyFile, mkdir, readFile, realpath, rm, writeFile } from "node
 import path from "node:path";
 import type OnDemandPlugin from "src/main";
 import { expect, test } from "./fixtures";
-import { ensureBuilt, pluginUnderTestId, useOnDemandPluginOnly } from "./test-utils";
+import { pluginUnderTestId, useOnDemandPluginOnly } from "./test-utils";
 
 useOnDemandPluginOnly();
 
@@ -40,15 +40,8 @@ async function pathExists(target: string): Promise<boolean> {
 }
 
 test("saved profiles survive a data.json-only replacement and reject stale writes", async ({ obsidian, tempDir }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const actualVaultPath = await obsidian.page.evaluate(() => {
-        const adapter = app.vault.adapter as unknown as { getBasePath: () => string };
-        return adapter.getBasePath();
-    });
+    const actualVaultPath = await obsidian.vaultPath();
     const expectedVaultPath = path.resolve(`${tempDir}-vault`);
     const vaultRoot = await realpath(actualVaultPath);
     expect(vaultRoot).toBe(await realpath(expectedVaultPath));

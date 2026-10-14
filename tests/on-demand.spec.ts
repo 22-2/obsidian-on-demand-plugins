@@ -1,20 +1,9 @@
 import { expect, test } from "./fixtures";
-import {
-    ensureBuilt,
-    findCommandByPrefix,
-    pluginUnderTestId,
-    targetPluginId,
-    useOnDemandPlugins,
-    waitForPluginLoaded
-} from "./test-utils";
+import { pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
 
 useOnDemandPlugins();
 
 test("on-demand: lazy command enables plugin", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
     await pluginHandle.evaluate(async (plugin, pluginId) => {
         await plugin.updatePluginSettings(pluginId, "lazy");
@@ -28,10 +17,10 @@ test("on-demand: lazy command enables plugin", async ({ obsidian }) => {
     // Attempt to disable for a stronger signal (may be overridden by Obsidian state)
     await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
 
-    const commandId = await findCommandByPrefix(obsidian, `${targetPluginId}:`);
+    const [commandId] = await obsidian.findCommands(`${targetPluginId}:`);
 
     expect(commandId).toBeTruthy();
-    await obsidian.command(commandId as string);
+    await obsidian.command(commandId);
 
-    expect(await waitForPluginLoaded(obsidian, targetPluginId)).toBe(true);
+    await obsidian.waitForPluginLoaded(targetPluginId);
 });

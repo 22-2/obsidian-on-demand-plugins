@@ -4,7 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "./fixtures";
 import type OnDemandPlugin from "src/main";
-import { ensureBuilt, excalidrawPluginId, pluginUnderTestId, readOnDemandStorageValue, resolveMyfilesPluginPath, useVaultPlugins, waitForPluginLoaded, waitForViewType } from "./test-utils";
+import { excalidrawPluginId, pluginUnderTestId, readOnDemandStorageValue, resolveMyfilesPluginPath, useVaultPlugins, withReloadRecorded } from "./test-utils";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
 const FILLER_PLUGIN_COUNT = 28;
@@ -43,36 +43,33 @@ useVaultPlugins([repoRoot, resolveMyfilesPluginPath(excalidrawPluginId), path.jo
 
 for (let attempt = 1; attempt <= 3; attempt++) {
     test(`bulk rebuild with 30 lazy plugins captures latest Excalidraw (run ${attempt})`, async ({ obsidian }) => {
-        if (!ensureBuilt()) return;
-        await obsidian.waitReady();
         const handle = await obsidian.plugin(pluginUnderTestId);
         const ids = [excalidrawPluginId, "cache-async", ...fillerIds];
-        const result = await handle.evaluate(async (plugin: OnDemandPlugin, pluginIds: string[]) => {
-            for (const id of pluginIds) {
-                plugin.settings.plugins[id] = {
-                    mode: "lazy",
-                    userConfigured: true,
-                    lazyOptions: { useView: true, viewTypes: [], useFile: false, fileCriteria: {} },
+        const result = await withReloadRecorded(obsidian, () =>
+            handle.evaluate(async (plugin: OnDemandPlugin, pluginIds: string[]) => {
+                for (const id of pluginIds) {
+                    plugin.settings.plugins[id] = {
+                        mode: "lazy",
+                        userConfigured: true,
+                        lazyOptions: { useView: true, viewTypes: [], useFile: false, fileCriteria: {} },
+                    };
+                    await app.plugins.disablePlugin(id);
+                }
+
+                let error: string | null = null;
+                try {
+                    await plugin.rebuildAndApplyCommandCache({ force: true });
+                } catch (e) {
+                    const errors = e instanceof AggregateError ? e.errors : [e];
+                    error = errors.map((x) => String((x as Error)?.stack ?? x)).join("\n");
+                }
+                return {
+                    error,
+                    excalidrawViews: plugin.settings.plugins["obsidian-excalidraw-plugin"].lazyOptions?.viewTypes ?? [],
+                    loaded: pluginIds.filter((id) => !!app.plugins.plugins[id]?._loaded),
                 };
-                await app.plugins.disablePlugin(id);
-            }
-            const originalReload = app.commands.executeCommandById;
-            app.commands.executeCommandById = () => true;
-            let error: string | null = null;
-            try {
-                await plugin.rebuildAndApplyCommandCache({ force: true });
-            } catch (e) {
-                const errors = e instanceof AggregateError ? e.errors : [e];
-                error = errors.map((x) => String((x as Error)?.stack ?? x)).join("\n");
-            } finally {
-                app.commands.executeCommandById = originalReload;
-            }
-            return {
-                error,
-                excalidrawViews: plugin.settings.plugins["obsidian-excalidraw-plugin"].lazyOptions?.viewTypes ?? [],
-                loaded: pluginIds.filter((id) => !!app.plugins.plugins[id]?._loaded),
-            };
-        }, ids);
+            }, ids),
+        );
 
         expect(result.error).toBeNull();
         expect(result.loaded).toEqual([]);
@@ -85,7 +82,7 @@ for (let attempt = 1; attempt <= 3; attempt++) {
             const file = await app.vault.create("bulk.excalidraw.md", '---\nexcalidraw-plugin: parsed\n---\n\n# Drawing\n```json\n{"type":"excalidraw","version":2,"elements":[],"appState":{},"files":{}}\n```\n');
             await app.workspace.getLeaf(false).openFile(file);
         });
-        expect(await waitForPluginLoaded(obsidian, excalidrawPluginId, 10_000)).toBe(true);
-        expect(await waitForViewType(obsidian, "excalidraw", 10_000)).toBe(true);
+        await obsidian.waitForPluginLoaded(excalidrawPluginId, 10_000);
+        await obsidian.waitForViewType("excalidraw", 10_000);
     });
 }

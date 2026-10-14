@@ -1,57 +1,33 @@
 import { expect, test } from "./fixtures";
-import {
-    ensureBuilt,
-    pluginUnderTestId,
-    readOnDemandStorageValue,
-    targetPluginId,
-    useOnDemandPlugins
-} from "./test-utils";
+import { pluginUnderTestId, readOnDemandStorageValue, targetPluginId, useOnDemandPlugins, withReloadRecorded } from "./test-utils";
 
 useOnDemandPlugins();
 
 test("force rebuild refreshes command cache", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
             await plugin.rebuildAndApplyCommandCache({ force: true });
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, targetPluginId);
+        }, targetPluginId),
+    );
 
     const cachedCommands = await readOnDemandStorageValue(obsidian, "commandCache", targetPluginId);
     const cacheCount = Array.isArray(cachedCommands) ? cachedCommands.length : 0;
 
-    expect(cacheCount).toBeGreaterThanOrEqual(0);
+    expect(cacheCount).toBeGreaterThan(0);
 });
 
 test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
-    const manifestVersion = await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    const manifestVersion = await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
             await plugin.rebuildAndApplyCommandCache({ force: true });
-        } finally {
-            app.commands.executeCommandById = original;
-        }
 
-        return app.plugins.manifests?.[pluginId]?.version ?? null;
-    }, targetPluginId);
+            return app.plugins.manifests?.[pluginId]?.version ?? null;
+        }, targetPluginId),
+    );
 
     expect(manifestVersion).toBeTruthy();
 
@@ -61,23 +37,14 @@ test("commandCacheVersions updates on force rebuild", async ({ obsidian }) => {
 });
 
 test("disabling keepEnabled plugin syncs settings to disabled", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-
-    await obsidian.waitReady();
-
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
 
     // 1. Set the target plugin to keepEnabled
-    await pluginHandle.evaluate(async (plugin, pluginId) => {
-        const original = app.commands.executeCommandById;
-        app.commands.executeCommandById = () => true;
-
-        try {
+    await withReloadRecorded(obsidian, () =>
+        pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "alwaysEnabled");
-        } finally {
-            app.commands.executeCommandById = original;
-        }
-    }, targetPluginId);
+        }, targetPluginId),
+    );
 
     // 2. Disable via Obsidian UI (triggers the patch)
     await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);

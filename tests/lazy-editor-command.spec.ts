@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { ensureBuilt, pluginUnderTestId, useOnDemandPluginOnly } from "./test-utils";
+import { pluginUnderTestId, useOnDemandPluginOnly } from "./test-utils";
 
 useOnDemandPluginOnly();
 
@@ -8,20 +8,27 @@ const commandId = `${fixtureId}:insert-marker`;
 const marker = "LAZY-EDITOR-OK";
 
 test("lazy wrapper runs an editorCallback command in the active editor", async ({ obsidian }) => {
-    if (!ensureBuilt()) return;
-    await obsidian.waitReady();
-
     // Obsidian turns editorCallback into a generated checkCallback when the command is added;
     // executing the real command must go through that path once the plugin loads lazily.
     await obsidian.page.evaluate(
         async ({ id, marker }) => {
             const dir = `${app.vault.configDir}/plugins/${id}`;
             await app.vault.adapter.mkdir(dir);
-            await app.vault.adapter.write(`${dir}/manifest.json`, JSON.stringify({
-                id, name: "Lazy editor fixture", version: "1.0.0", minAppVersion: "1.0.0",
-                description: "Registers an editor command for lazy execution tests.", author: "E2E", isDesktopOnly: false,
-            }));
-            await app.vault.adapter.write(`${dir}/main.js`, `
+            await app.vault.adapter.write(
+                `${dir}/manifest.json`,
+                JSON.stringify({
+                    id,
+                    name: "Lazy editor fixture",
+                    version: "1.0.0",
+                    minAppVersion: "1.0.0",
+                    description: "Registers an editor command for lazy execution tests.",
+                    author: "E2E",
+                    isDesktopOnly: false,
+                }),
+            );
+            await app.vault.adapter.write(
+                `${dir}/main.js`,
+                `
                 const { Plugin } = require("obsidian");
                 module.exports = class extends Plugin {
                     onload() {
@@ -32,7 +39,8 @@ test("lazy wrapper runs an editorCallback command in the active editor", async (
                         });
                     }
                 };
-            `);
+            `,
+            );
             await (app.plugins as unknown as { loadManifests: () => Promise<void> }).loadManifests();
         },
         { id: fixtureId, marker },
@@ -45,10 +53,17 @@ test("lazy wrapper runs an editorCallback command in the active editor", async (
     }, fixtureId);
     // Caching the commands loads the plugin without adding it to enabledPlugins. Applying lazy
     // mode must still unload it and leave the cached wrapper in place of the real command.
-    await expect.poll(() => obsidian.page.evaluate(({ id, commandId }) => ({
-        loaded: Boolean(app.plugins.plugins[id]?._loaded),
-        hasWrapper: commandId in app.commands.commands,
-    }), { id: fixtureId, commandId })).toEqual({ loaded: false, hasWrapper: true });
+    await expect
+        .poll(() =>
+            obsidian.page.evaluate(
+                ({ id, commandId }) => ({
+                    loaded: Boolean(app.plugins.plugins[id]?._loaded),
+                    hasWrapper: commandId in app.commands.commands,
+                }),
+                { id: fixtureId, commandId },
+            ),
+        )
+        .toEqual({ loaded: false, hasWrapper: true });
 
     await obsidian.page.evaluate(async () => {
         const file = await app.vault.create("lazy-editor-command.md", "");
