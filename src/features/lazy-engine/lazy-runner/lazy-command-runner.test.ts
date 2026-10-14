@@ -278,4 +278,16 @@ describe("LazyCommandRunner", () => {
             await expect(runner.waitForCommand("cmd1")).resolves.toBe(true);
         });
     });
+
+    describe("waitForPluginLoaded", () => {
+        it("should poll until the plugin is loaded", async () => {
+            vi.mocked(pWaitFor).mockImplementation(async (condition) => {
+                vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
+                expect(condition()).toBe(true);
+            });
+
+            await expect(runner.waitForPluginLoaded("test-plugin")).resolves.toBe(true);
+            expect(utilsMs.isPluginLoaded).toHaveBeenCalledWith(mockCtx.app, "test-plugin");
+        });
+    });
 });
