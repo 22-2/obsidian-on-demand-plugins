@@ -7,7 +7,8 @@
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "typecheck": "tsc6 -noEmit -skipLibCheck",
-        "test:e2e": "playwright test --grep-invert @serial && playwright test --grep @serial --workers=1",
+        "test:e2e": "node scripts/run-e2e.mjs",
+        "test:e2e:runner": "node --test scripts/run-e2e.test.mjs",
         "test:e2e:coverage": "node scripts/e2e-coverage.mjs",
         "readme:shots": "playwright test --config playwright.readme.config.ts --workers=1",
         "ui:shots:pc": "node scripts/ui-screenshots.mjs pc",

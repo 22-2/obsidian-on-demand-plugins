@@ -30,6 +30,7 @@ data copy.json
 repomix-output.md
 .obsidian-e2e-toolkit/
 playwright-report/
+blob-report/
 test-results/
 coverage/
 .env

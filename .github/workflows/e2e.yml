@@ -130,7 +130,10 @@ jobs:
               uses: actions/upload-artifact@v7
               with:
                   name: playwright-report-${{ matrix.os }}-${{ matrix.shard }}
-                  path: playwright-report
+                  path: |
+                      playwright-report
+                      blob-report
+                      test-results
 
     coverage:
         # Merge every shard's E2E coverage with the unit coverage into one report.

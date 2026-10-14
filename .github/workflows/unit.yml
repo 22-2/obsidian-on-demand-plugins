@@ -50,3 +50,6 @@ jobs:
         with:
           name: coverage-unit
           path: coverage/unit
+
+      - name: Verify E2E report preservation
+        run: pnpm run test:e2e:runner

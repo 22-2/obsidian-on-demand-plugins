@@ -56,6 +56,8 @@ Unit tests use `@vitest/coverage-v8`. E2E tests use the toolkit's `coverageOptio
 
 Open `coverage/unit/index.html` or `coverage/e2e/index.html` for the separate HTML reports. `test:coverage:all` runs both suites and merges their results into `coverage/combined/index.html`. Each report also includes `lcov.info` and `coverage-final.json`. Reports exclude tests, mocks, declarations, and dependencies. E2E reports cover source files included in the plugin bundle and map them back to TypeScript through inline source maps. The coverage command restores the normal production bundle afterwards.
 
+Both `test:e2e` and `test:e2e:coverage` preserve the parallel and serial phases separately under `test-results/` and `blob-report/`. The combined HTML report is `playwright-report/index.html`, with machine-readable results in `playwright-report/results.json`. A failure in either phase still fails the command, and CI uploads both phases' diagnostics.
+
 To merge existing results from the same source revision without rerunning tests, use `pnpm run test:coverage:merge`.
 
 To measure a specific E2E suite:
