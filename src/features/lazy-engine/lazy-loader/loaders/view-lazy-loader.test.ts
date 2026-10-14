@@ -147,4 +147,38 @@ describe("ViewLazyLoader", () => {
         expect(harness.workspace.on).toHaveBeenCalledWith("active-leaf-change", expect.any(Function));
         expect(harness.workspace.iterateAllLeaves).toHaveBeenCalledOnce();
     });
+
+    it("loads visible lazy leaves on a workspace resize, such as a sidebar expanding", async () => {
+        const leaf = createLeaf("leaf-1", "nav-view");
+        const harness = createHarness(true, [leaf]);
+        harness.loader.registerActiveLeafReload();
+
+        harness.eventHandlers.get("resize")?.(null);
+
+        await vi.waitFor(() => expect(harness.pluginLoader.ensurePluginLoaded).toHaveBeenCalledWith("view-plugin"));
+        expect(harness.lockStrategy.lock.mock.calls).toContainEqual([{ leaf, viewType: "nav-view" }]);
+    });
+
+    it("skips hidden, unmatched and already loaded leaves when scanning visible leaves", () => {
+        const hidden = createLeaf("hidden", "nav-view");
+        const unmatched = createLeaf("unmatched", "markdown");
+        const loaded = createLeaf("loaded", "loaded-view");
+        const harness = createHarness(true, [hidden, unmatched, loaded]);
+        vi.mocked(isLeafVisible).mockImplementation((leaf) => leaf !== hidden);
+        vi.mocked(resolvePluginForViewType).mockImplementation((_ctx, viewType) => (viewType === "markdown" ? null : "view-plugin"));
+        vi.mocked(isPluginLoaded).mockReturnValue(true);
+
+        harness.loader.initializeVisibleLazyLeaves();
+
+        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
+        expect(resolvePluginForViewType).not.toHaveBeenCalledWith(harness.ctx, "nav-view");
+    });
+
+    it("does not scan visible leaves before the layout is ready", () => {
+        const harness = createHarness(false, [createLeaf("leaf-1", "nav-view")]);
+
+        harness.loader.initializeVisibleLazyLeaves();
+
+        expect(harness.workspace.iterateAllLeaves).not.toHaveBeenCalled();
+    });
 });

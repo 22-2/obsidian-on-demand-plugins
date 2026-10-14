@@ -3,6 +3,10 @@
         "repo": "ycnmhd/obsidian-lineage",
         "tag": "0.8.5"
     },
+    "notebook-navigator": {
+        "repo": "johansan/notebook-navigator",
+        "tag": "3.4.3"
+    },
     "obsidian-another-quick-switcher": {
         "repo": "tadashi-aikawa/obsidian-another-quick-switcher",
         "tag": "14.6.0"

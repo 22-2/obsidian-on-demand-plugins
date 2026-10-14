@@ -3,7 +3,7 @@ import type { WorkspaceLeaf } from "obsidian";
 import { debounce } from "obsidian";
 import type { CommandRegistry, PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
-import { isLeafVisible } from "src/core/utils";
+import { isLeafVisible, isPluginLoaded } from "src/core/utils";
 import { BaseLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/base-lazy-loader";
 import { resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
 import type { LeafResource, LockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
@@ -26,6 +26,11 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
         true,
     );
 
+    // Expanding a collapsed sidebar makes its leaves visible without an active-leaf-change,
+    // and Obsidian only reports it as a workspace "resize". Dragging a divider fires many of
+    // those, so rescan once the burst settles.
+    private debouncedInitializeVisibleLazyLeaves = debounce(() => this.initializeVisibleLazyLeaves(), 100, true);
+
     private commandRegistry: CommandRegistry;
 
     constructor(
@@ -42,6 +47,7 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
 
     registerActiveLeafReload(): void {
         this.ctx.registerEvent(this.ctx.app.workspace.on("active-leaf-change", this.debouncedInitializeLazyViewForLeaf));
+        this.ctx.registerEvent(this.ctx.app.workspace.on("resize", this.debouncedInitializeVisibleLazyLeaves));
 
         // Initial load
         this.ctx.app.workspace.onLayoutReady(() =>
@@ -49,6 +55,23 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
                 void this.initializeLazyViewForLeaf(leaf);
             }),
         );
+    }
+
+    /**
+     * Load the plugins behind visible leaves whose view type belongs to a lazy plugin that is not loaded yet.
+     * A leaf restored while its sidebar was collapsed keeps the view type as a placeholder, and Obsidian
+     * swaps in the real view once the plugin registers it.
+     */
+    initializeVisibleLazyLeaves(): void {
+        if (!this.ctx.app.workspace.layoutReady) return;
+
+        this.ctx.app.workspace.iterateAllLeaves((leaf) => {
+            // Filter before initializeLazyViewForLeaf so a resize does not take a lock on every leaf.
+            if (!isLeafVisible(leaf)) return;
+            const pluginId = resolvePluginForViewType(this.ctx, leaf.view.getViewType());
+            if (!pluginId || isPluginLoaded(this.ctx.app, pluginId)) return;
+            void this.initializeLazyViewForLeaf(leaf);
+        });
     }
 
     async initializeLazyViewForLeaf(leaf: WorkspaceLeaf): Promise<void> {
