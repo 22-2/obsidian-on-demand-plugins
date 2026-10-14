@@ -9,6 +9,7 @@ import type { CommandRegistry, PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { isPluginLoaded } from "src/core/utils";
 import { CommandExecutor } from "src/features/lazy-engine/lazy-runner/command-executor";
+import { getPluginDisplayName, PluginLoadNotice } from "src/ui/load-feedback";
 
 const logger = log.getLogger("OnDemandPlugin/LazyCommandRunner");
 
@@ -57,8 +58,14 @@ export class LazyCommandRunner implements PluginLoader {
             return;
         }
 
+        // Loading a plugin can take seconds, and the command looks ignored until it runs.
+        const loadNotice = isPluginLoaded(this.ctx.app, cached.pluginId) ? null : new PluginLoadNotice(getPluginDisplayName(this.ctx, cached.pluginId));
         const success = await this.ensurePluginLoaded(cached.pluginId);
-        if (!success) return;
+        if (!success) {
+            loadNotice?.fail();
+            return;
+        }
+        loadNotice?.succeed();
 
         try {
             const ready = await this.waitForCommand(cached.id);

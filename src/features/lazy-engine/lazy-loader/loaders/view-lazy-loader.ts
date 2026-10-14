@@ -7,6 +7,7 @@ import { isLeafVisible, isPluginLoaded } from "src/core/utils";
 import { BaseLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/base-lazy-loader";
 import { resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
 import type { LeafResource, LockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
+import { getPluginDisplayName, showLeafLoading } from "src/ui/load-feedback";
 
 const logger = log.getLogger("OnDemandPlugin/ViewLazyLoader");
 
@@ -89,22 +90,39 @@ export class ViewLazyLoader extends BaseLazyLoader<LeafResource> {
             return;
         }
 
-        await this.loadPluginWithLock({ leaf, viewType }, () => Promise.resolve(resolvePluginForViewType(this.ctx, viewType)), { leafId, description: `viewType: ${viewType}` });
+        const pluginId = resolvePluginForViewType(this.ctx, viewType);
+        const hideLoading = this.showLoadingWhilePending(leaf, pluginId);
+        try {
+            await this.loadPluginWithLock({ leaf, viewType }, () => Promise.resolve(pluginId), { leafId, description: `viewType: ${viewType}` });
+        } finally {
+            hideLoading();
+        }
 
         // Sync commands and update re-entry guard
-        const pluginId = resolvePluginForViewType(this.ctx, viewType);
         if (pluginId) {
             this.commandRegistry.syncCommandWrappersForPlugin(pluginId);
         }
     }
 
-    async checkViewTypeForLazyLoading(viewType: string): Promise<void> {
+    async checkViewTypeForLazyLoading(viewType: string, leaf?: WorkspaceLeaf): Promise<void> {
         if (!viewType) return;
         if (!this.ctx.app.workspace.layoutReady) return;
 
         const pluginId = resolvePluginForViewType(this.ctx, viewType);
-        if (pluginId) {
+        if (!pluginId) return;
+
+        // The leaf keeps the placeholder only while the requested type is still unregistered.
+        const hideLoading = leaf?.view?.getViewType() === viewType ? this.showLoadingWhilePending(leaf, pluginId) : () => {};
+        try {
             await this.pluginLoader.ensurePluginLoaded(pluginId);
+        } finally {
+            hideLoading();
         }
+    }
+
+    /** Show a spinner on the leaf until its plugin loads, so the empty placeholder does not look broken. */
+    private showLoadingWhilePending(leaf: WorkspaceLeaf, pluginId: string | null): () => void {
+        if (!pluginId || isPluginLoaded(this.ctx.app, pluginId)) return () => {};
+        return showLeafLoading(leaf, getPluginDisplayName(this.ctx, pluginId));
     }
 }
