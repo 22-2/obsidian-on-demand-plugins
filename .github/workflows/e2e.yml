@@ -135,7 +135,9 @@ jobs:
             - name: Run E2E tests
               env:
                   CI: true
-              run: pnpm run test:e2e:coverage -- --shard=${{ matrix.shard }}/2
+              # Call the script directly: `pnpm run <script> -- <args>` forwards a literal "--" that makes
+              # Playwright treat --shard as a file filter, so every shard ran the whole suite.
+              run: node scripts/e2e-coverage.mjs --shard=${{ matrix.shard }}/2
 
             - name: Upload E2E coverage
               if: always()
@@ -199,4 +201,8 @@ jobs:
               uses: actions/upload-artifact@v7
               with:
                   name: coverage-combined
-                  path: coverage/combined
+                  # HTML pages are named after source paths, which contain ":" from Windows shards and
+                  # cannot be stored in an artifact. The JSON and lcov reports are kept.
+                  path: |
+                      coverage/combined/**
+                      !coverage/combined/**/*.html
