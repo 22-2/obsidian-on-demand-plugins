@@ -1,7 +1,8 @@
 allowBuilds:
   electron: true
   esbuild: true
-  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/63df6164082f3329600916beb020b7d6308df410: true
+  obsidian-e2e-toolkit@https://codeload.github.com/22-2/obsidian-e2e-toolkit/tar.gz/ea1341de0f55393a64096af163016120131089ac: true
   obsidian-typings: true
 minimumReleaseAgeExclude:
   - prettier@3.9.5
+
