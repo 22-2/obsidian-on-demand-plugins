@@ -25,26 +25,31 @@ const MODE_TEXT = {
     restore: { title: "Restore unsaved changes", note: "These changes were not saved when settings closed. Restore them to keep editing, or discard them." },
 };
 
-export type RestoreChoice = "restore" | "discard" | "dismiss";
+export type RestoreChoice = { action: "restore" | "discard" | "dismiss"; dontAskAgain: boolean };
+type ModalChoice = { action: "confirm" | "cancel" | "dismiss"; dontAskAgain: boolean };
 
 /**
  * Lists the staged draft before saving or discarding it so neither action
  * touches changes the user has not seen. Resolves `true` when the user confirms.
  */
 export function showReviewChangesModal(app: App, options: ReviewChangesOptions): Promise<boolean> {
-    return new ReviewChangesModal(app, options).openAndWait().then((choice) => choice === "confirm");
+    return new ReviewChangesModal(app, options).openAndWait().then((choice) => choice.action === "confirm");
 }
 
-/** Offers an unsaved draft back. Closing without a choice resolves "dismiss", so the draft can be offered again. */
+/** Offers an unsaved draft back. Closing without a choice resolves with action "dismiss", so it can be offered again. */
 export async function showRestoreDraftModal(app: App, getChanges: () => PendingChange[]): Promise<RestoreChoice> {
     const choice = await new ReviewChangesModal(app, { mode: "restore", getChanges, getConfirmLabel: () => `Restore (${getChanges().length})` }).openAndWait();
-    return choice === "confirm" ? "restore" : choice === "cancel" ? "discard" : "dismiss";
+    return {
+        action: choice.action === "confirm" ? "restore" : choice.action === "cancel" ? "discard" : "dismiss",
+        dontAskAgain: choice.dontAskAgain,
+    };
 }
 
 class ReviewChangesModal extends Modal {
     private readonly options: ReviewChangesOptions;
-    private choice: "confirm" | "cancel" | "dismiss" = "dismiss";
-    private resolve!: (choice: "confirm" | "cancel" | "dismiss") => void;
+    private choice: ModalChoice = { action: "dismiss", dontAskAgain: false };
+    private dontAskAgain?: HTMLInputElement;
+    private resolve!: (choice: ModalChoice) => void;
 
     constructor(app: App, options: ReviewChangesOptions) {
         super(app);
@@ -62,8 +67,8 @@ class ReviewChangesModal extends Modal {
         this.resolve(this.choice);
     }
 
-    openAndWait(): Promise<"confirm" | "cancel" | "dismiss"> {
-        const result = new Promise<"confirm" | "cancel" | "dismiss">((resolve) => (this.resolve = resolve));
+    openAndWait(): Promise<ModalChoice> {
+        const result = new Promise<ModalChoice>((resolve) => (this.resolve = resolve));
         this.open();
         return result;
     }
@@ -89,16 +94,21 @@ class ReviewChangesModal extends Modal {
             items.forEach((change) => this.renderChange(list, change));
         }
         body.createEl("p", { cls: "lazy-review-changes-note", text: MODE_TEXT[this.options.mode].note });
+        if (this.options.mode === "restore") {
+            const rememberLabel = body.createEl("label", { cls: "lazy-restore-draft-remember" });
+            this.dontAskAgain = rememberLabel.createEl("input", { attr: { type: "checkbox" } });
+            rememberLabel.createSpan({ text: "Don't ask again" });
+        }
         const footer = contentEl.createDiv({ cls: "lazy-review-changes-footer" });
         const buttons = footer.createDiv({ cls: "modal-button-container" });
         const confirmClass = this.options.mode === "discard" ? "mod-warning" : "mod-cta";
         buttons.createEl("button", { text: this.options.getConfirmLabel(), cls: confirmClass }).onClickEvent(() => {
-            this.choice = "confirm";
+            this.choice = { action: "confirm", dontAskAgain: this.options.mode === "restore" && (this.dontAskAgain?.checked ?? false) };
             this.close();
         });
         // Restoring is a choice between two actions, so the second button names the other one.
         buttons.createEl("button", { text: this.options.mode === "restore" ? "Discard" : "Cancel" }).onClickEvent(() => {
-            this.choice = "cancel";
+            this.choice = { action: "cancel", dontAskAgain: this.options.mode === "restore" && (this.dontAskAgain?.checked ?? false) };
             this.close();
         });
     }

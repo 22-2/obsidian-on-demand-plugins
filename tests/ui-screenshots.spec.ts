@@ -56,7 +56,7 @@ for (const theme of SCREENSHOT_THEMES) {
         }
 
         // Capture the primary page, compact list, and conditional advanced form.
-        const pluginPage = await openSettingsPage(obsidian, "Plugin management", theme);
+        let pluginPage = await openSettingsPage(obsidian, "Plugin management", theme);
         const primaryWidth = SCREENSHOT_DEVICE === "mobile" ? 390 : 900;
         for (const width of SCREENSHOT_WIDTHS) {
             await pluginPage.setViewportSize({ width, height: SCREENSHOT_HEIGHT });
@@ -118,5 +118,20 @@ for (const theme of SCREENSHOT_THEMES) {
         const discardPath = path.join(artifactDir, `review-discard-${primaryWidth}.png`);
         await discardPage.screenshot({ path: discardPath, animations: "disabled" });
         await testInfo.attach(`Discard review ${primaryWidth}px`, { path: discardPath, contentType: "image/png" });
+        await discardPage.locator(".lazy-review-changes-modal .modal-button-container").getByRole("button", { name: "Cancel", exact: true }).click();
+
+        // Capture the unsaved-draft recovery offer, including its remember-choice checkbox.
+        await obsidian.page.evaluate(() => (app as unknown as { setting: { close: () => void } }).setting.close());
+        pluginPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Plugin management" });
+        await prepareScreenshotPage(obsidian, pluginPage, theme);
+        const restorePage = await obsidian.findPage((candidate) => candidate.locator(".lazy-review-changes-modal").filter({ hasText: "Restore unsaved changes" }), { timeout: 10_000 });
+        await restorePage.setViewportSize({ width: primaryWidth, height: SCREENSHOT_HEIGHT });
+        await prepareScreenshotPage(obsidian, restorePage, theme);
+        await expect(restorePage.getByLabel("Don't ask again")).toBeVisible();
+        await obsidian.waitForAnimations(restorePage);
+        const restorePath = path.join(artifactDir, `restore-draft-${primaryWidth}.png`);
+        await restorePage.screenshot({ path: restorePath, animations: "disabled" });
+        await testInfo.attach(`Restore draft ${primaryWidth}px`, { path: restorePath, contentType: "image/png" });
+        await restorePage.keyboard.press("Escape");
     });
 }

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 type MockElement = {
     className: string;
     text: string;
+    checked?: boolean;
     children: MockElement[];
     clickHandler?: () => void;
     addClass: (className: string) => void;
@@ -220,19 +221,29 @@ describe("showReviewChangesModal", () => {
             expect(mockState.extraButtonCalls).toEqual([]);
             button(modal, "Restore (1)")?.clickHandler?.();
 
-            await expect(result).resolves.toBe("restore");
+            await expect(result).resolves.toEqual({ action: "restore", dontAskAgain: false });
         });
 
         it("resolves discard from the Discard button", async () => {
             const result = showRestoreDraftModal({} as never, () => changes);
             button(mockState.modals[0], "Discard")?.clickHandler?.();
-            await expect(result).resolves.toBe("discard");
+            await expect(result).resolves.toEqual({ action: "discard", dontAskAgain: false });
+        });
+
+        it("returns the remember choice with the selected action", async () => {
+            const result = showRestoreDraftModal({} as never, () => changes);
+            const modal = mockState.modals[0];
+            const checkbox = findElements(modal.contentEl, "lazy-restore-draft-remember")[0]?.children[0];
+            expect(findElements(modal.contentEl, "lazy-restore-draft-remember")[0]?.children[1]?.text).toBe("Don't ask again");
+            if (checkbox) checkbox.checked = true;
+            button(modal, "Discard")?.clickHandler?.();
+            await expect(result).resolves.toEqual({ action: "discard", dontAskAgain: true });
         });
 
         it("resolves dismiss when closed without a choice, so the draft can be offered again", async () => {
             const result = showRestoreDraftModal({} as never, () => changes);
             mockState.modals[0].close();
-            await expect(result).resolves.toBe("dismiss");
+            await expect(result).resolves.toEqual({ action: "dismiss", dontAskAgain: false });
         });
     });
 });

@@ -27,6 +27,7 @@ function createSettings(overrides: Partial<DeviceSettings> = {}): DeviceSettings
         lazyOnViews: {},
         lazyOnFiles: {},
         ...overrides,
+        restoreDraftBehavior: overrides.restoreDraftBehavior ?? "ask",
     };
 }
 
@@ -43,6 +44,7 @@ describe("resolvePluginForViewType", () => {
     it("resolves plugin when both useView and useFile are enabled", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.LAZY,
+            restoreDraftBehavior: "ask",
             pruneUninstalledEntries: false,
             plugins: {
                 "plugin-a": {
@@ -69,6 +71,7 @@ describe("resolvePluginForViewType", () => {
     it("resolves legacy lazyOnViews entry even when lazyOnFiles also exists", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.LAZY,
+            restoreDraftBehavior: "ask",
             pruneUninstalledEntries: false,
             plugins: {},
             lazyOnViews: {
@@ -89,6 +92,7 @@ describe("resolvePluginForViewType", () => {
     it("returns null for non-lazy mode even if view rule matches", () => {
         const settings: DeviceSettings = {
             defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
+            restoreDraftBehavior: "ask",
             pruneUninstalledEntries: false,
             plugins: {
                 "plugin-c": {

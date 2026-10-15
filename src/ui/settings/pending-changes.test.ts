@@ -57,10 +57,12 @@ describe("PendingChanges", () => {
         const settings = source.data.profiles[DEFAULT_PROFILE_ID].settings;
         settings.plugins.foo = { mode: PLUGIN_MODE.LAZY, userConfigured: true };
         settings.defaultMode = PLUGIN_MODE.LAZY;
+        settings.restoreDraftBehavior = "restore";
         source.data.showConsoleLog = true;
         expect(pending.describeChanges(describer).map(({ group, label, from, to }) => ({ group, label, from, to }))).toEqual([
             { group: "plugins", label: "Foo plugin", from: PluginModes[PLUGIN_MODE.ALWAYS_DISABLED], to: PluginModes[PLUGIN_MODE.LAZY] },
             { group: "settings", label: "Default mode", from: PluginModes[PLUGIN_MODE.ALWAYS_DISABLED], to: PluginModes[PLUGIN_MODE.LAZY] },
+            { group: "settings", label: "Unsaved draft prompt", from: "Ask every time", to: "Always restore" },
             { group: "settings", label: "Debug log output", from: "Off", to: "On" },
         ]);
     });

@@ -18,6 +18,11 @@ export function isPluginMode(value: unknown): value is PLUGIN_MODE {
 
 /** Device class that owns a default profile. */
 export type DeviceType = "desktop" | "mobile";
+export type RestoreDraftBehavior = "ask" | "restore" | "discard";
+
+export function isRestoreDraftBehavior(value: unknown): value is RestoreDraftBehavior {
+    return value === "ask" || value === "restore" || value === "discard";
+}
 
 export const PluginModes: Record<PLUGIN_MODE, string> = {
     [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",
@@ -48,6 +53,8 @@ export interface FileActivationCriteria {
 // Settings per device (desktop/mobile)
 export interface DeviceSettings {
     defaultMode: PLUGIN_MODE;
+    /** How to handle an unsaved draft when its settings page is reopened. */
+    restoreDraftBehavior: RestoreDraftBehavior;
     // When true, settings/cache entries for plugin IDs no longer present in the
     // installed manifests are pruned during the manifest reconcile pass.
     pruneUninstalledEntries: boolean;
@@ -58,6 +65,7 @@ export interface DeviceSettings {
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
     defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
+    restoreDraftBehavior: "ask",
     pruneUninstalledEntries: false,
     plugins: {},
     lazyOnViews: {},

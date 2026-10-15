@@ -1,7 +1,7 @@
 import log from "loglevel";
 import type { AppFeature } from "src/core/feature";
 import type { PluginContext } from "src/core/plugin-context";
-import { SETTINGS_SCHEMA_VERSION, isPluginMode } from "src/core/types";
+import { SETTINGS_SCHEMA_VERSION, isPluginMode, isRestoreDraftBehavior } from "src/core/types";
 
 // Needed dynamic import from obsidian
 import { normalizePath } from "obsidian";
@@ -19,6 +19,7 @@ function hasValidInlineProfiles(value: unknown): value is { profiles: Record<str
         if (!isRecord(profile) || profile.id !== id || typeof profile.name !== "string" || !isRecord(profile.settings)) return false;
         const settings = profile.settings;
         if (settings.defaultMode !== undefined && !isPluginMode(settings.defaultMode)) return false;
+        if (settings.restoreDraftBehavior !== undefined && !isRestoreDraftBehavior(settings.restoreDraftBehavior)) return false;
         if (settings.pruneUninstalledEntries !== undefined && typeof settings.pruneUninstalledEntries !== "boolean") return false;
         return ["plugins", "lazyOnViews", "lazyOnFiles"].every((key) => settings[key] === undefined || isRecord(settings[key]));
     });
@@ -309,6 +310,7 @@ export class BackupFeature implements AppFeature {
             if (settings.defaultMode !== undefined && !isPluginMode(settings.defaultMode)) {
                 return { valid: false };
             }
+            if (settings.restoreDraftBehavior !== undefined && !isRestoreDraftBehavior(settings.restoreDraftBehavior)) return { valid: false };
             if (settings.pruneUninstalledEntries !== undefined && typeof settings.pruneUninstalledEntries !== "boolean") return { valid: false };
             if (["plugins", "lazyOnViews", "lazyOnFiles"].some((key) => settings[key] !== undefined && !isRecord(settings[key]))) {
                 return { valid: false };

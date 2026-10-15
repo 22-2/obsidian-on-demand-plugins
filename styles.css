@@ -131,6 +131,20 @@
     font-size: var(--font-ui-small);
 }
 
+.lazy-restore-draft-remember {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-3);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    cursor: pointer;
+}
+
+.lazy-restore-draft-remember input {
+    margin: 0;
+}
+
 /* Bound the dialog so the footer stays on screen; only the body scrolls. */
 .lazy-review-changes-modal {
     display: flex;

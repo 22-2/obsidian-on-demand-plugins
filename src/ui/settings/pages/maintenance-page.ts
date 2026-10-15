@@ -63,6 +63,10 @@ export class MaintenancePage extends SettingPage {
             });
         return this.syncing;
     }
+    hide() {
+        this.tab.stashDraftOnPageClose("maintenance");
+        super.hide();
+    }
     private async runSync(feature: MaintenanceFeature) {
         await this.tab.waitForImmediateSaves();
         if (this.syncDirection === "lazyToCore" && this.tab.hasPendingChanges) {
@@ -117,6 +121,7 @@ export class MaintenancePage extends SettingPage {
         }
     }
     display() {
+        this.tab.offerRestoreOnPageOpen("maintenance");
         this.containerEl.empty();
         this.containerEl.addClass("lazy-maintenance-page");
         this.tab.renderPendingControls(this.containerEl, () => this.display());

@@ -2,6 +2,7 @@ import type { App, SettingDefinitionItem } from "obsidian";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import { FeatureEvents } from "src/core/event-bus";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE, PluginModes } from "src/core/types";
+import type { RestoreDraftBehavior } from "src/core/types";
 import { BackupFeature } from "src/features/backup/backup-feature";
 import type { CommunityPluginsDrift } from "src/features/community-plugins-drift/community-plugins-drift";
 import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
@@ -55,6 +56,8 @@ export class SettingsTab extends PluginSettingTab {
      */
     private readonly renderObserver?: MutationObserver;
     private shown = false;
+    private readonly restoreOfferRequested = new Set<"plugin-management" | "maintenance">();
+    private restoreOfferInProgress = false;
     /** Set when a shown tab hides; a render before the current task ends is the same tab redrawn, not a reopen. */
     private redrawing = false;
     /** The last restore offer, for callers that need to wait for it. */
@@ -69,12 +72,7 @@ export class SettingsTab extends PluginSettingTab {
         // e.g. when settings open again, so only a hide while shown is the user leaving.
         const wasShown = this.shown;
         this.shown = false;
-        // Keep an older stash when there is nothing new, so a quick look does not lose it.
-        const stash = this.pending.stashDraft();
-        if (stash) {
-            this.stash = stash;
-            this.plugin.configureLogger();
-        }
+        this.stashPendingDraft();
         if (!wasShown || !this.stash) return;
         // Clicking the open tab again makes Obsidian hide and redraw it in one go.
         this.redrawing = true;
@@ -83,16 +81,32 @@ export class SettingsTab extends PluginSettingTab {
     private onRendered() {
         this.shown = true;
         if (!this.stash) return;
-        if (this.redrawing) this.restoreQuietly();
+        if (this.redrawing) {
+            this.restoreOfferRequested.clear();
+            this.restoreQuietly();
+        }
     }
-    /** Offer a stashed draft when the user enters Plugin management. */
-    offerRestoreOnPluginManagementOpen() {
-        if (this.stash && !this.redrawing) this.restoring = this.offerRestore();
+    /** Stash page edits and remember where the user can choose to restore them. */
+    stashDraftOnPageClose(page: "plugin-management" | "maintenance") {
+        if (this.stashPendingDraft()) this.restoreOfferRequested.add(page);
+    }
+    /** Offer a stashed draft only after its page was previously left. */
+    offerRestoreOnPageOpen(page: "plugin-management" | "maintenance") {
+        if (this.restoreOfferRequested.has(page) && this.stash && !this.redrawing && !this.restoreOfferInProgress) this.restoring = this.offerRestore();
+    }
+    private stashPendingDraft(): boolean {
+        // Keep an older stash when there is nothing new, so a quick look does not lose it.
+        const stash = this.pending.stashDraft();
+        if (!stash) return false;
+        this.stash = stash;
+        this.plugin.configureLogger();
+        return true;
     }
     /** Stops watching renders; the stash goes with the plugin, as it lives for this session only. */
     dispose() {
         this.renderObserver?.disconnect();
         this.stash = undefined;
+        this.restoreOfferRequested.clear();
     }
     private restoreQuietly() {
         const stash = this.stash;
@@ -103,21 +117,39 @@ export class SettingsTab extends PluginSettingTab {
         this.update();
     }
     private async offerRestore() {
-        const stash = this.stash;
-        if (!stash) return;
-        const changes = this.pending.describeStash(stash, this.describer());
-        if (changes.length === 0) {
+        if (this.restoreOfferInProgress) return;
+        this.restoreOfferInProgress = true;
+        try {
+            const stash = this.stash;
+            if (!stash) return;
+            const changes = this.pending.describeStash(stash, this.describer());
+            if (changes.length === 0) {
+                this.stash = undefined;
+                this.restoreOfferRequested.clear();
+                return;
+            }
+            const behavior = this.plugin.settings.restoreDraftBehavior ?? "ask";
+            const choice = behavior === "ask" ? await showRestoreDraftModal(this.app, () => changes) : { action: behavior, dontAskAgain: false };
+            if (choice.action === "dismiss" || this.stash !== stash) return;
+            if (choice.dontAskAgain) {
+                try {
+                    await this.saveImmediateChanges((data, profileId) => {
+                        data.profiles[profileId].settings.restoreDraftBehavior = choice.action as RestoreDraftBehavior;
+                    });
+                } catch {
+                    new Notice("Could not save the restore preference. This choice still applies to this draft.");
+                }
+            }
             this.stash = undefined;
-            return;
+            this.restoreOfferRequested.clear();
+            if (choice.action === "restore") {
+                this.pending.restoreDraft(stash);
+                this.plugin.configureLogger();
+            }
+            this.update();
+        } finally {
+            this.restoreOfferInProgress = false;
         }
-        const choice = await showRestoreDraftModal(this.app, () => changes);
-        if (choice === "dismiss" || this.stash !== stash) return;
-        this.stash = undefined;
-        if (choice === "restore") {
-            this.pending.restoreDraft(stash);
-            this.plugin.configureLogger();
-        }
-        this.update();
     }
     getSettingDefinitions(): SettingDefinitionItem[] {
         this.plugin.updateManifests();

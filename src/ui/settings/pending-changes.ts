@@ -1,4 +1,4 @@
-import type { DeviceSettings, LazySettings, PLUGIN_MODE, PluginSettings } from "src/core/types";
+import type { DeviceSettings, LazySettings, PLUGIN_MODE, PluginSettings, RestoreDraftBehavior } from "src/core/types";
 import { PluginModes } from "src/core/types";
 import { stableStringify } from "src/services/settings/settings-service";
 
@@ -39,10 +39,15 @@ export type DraftStash = {
 
 /** Top-level keys described explicitly; any other differing key is reported generically so nothing pending stays hidden. */
 const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog"]);
-const DESCRIBED_DEVICE_KEYS = new Set<string>(["plugins", "defaultMode", "pruneUninstalledEntries"]);
+const DESCRIBED_DEVICE_KEYS = new Set<string>(["plugins", "defaultMode", "pruneUninstalledEntries", "restoreDraftBehavior"]);
 const DEVICE_KEY_LABELS: Record<string, string> = {
     lazyOnViews: "View activation rules",
     lazyOnFiles: "File activation rules",
+};
+const RESTORE_DRAFT_BEHAVIOR_LABELS: Record<RestoreDraftBehavior, string> = {
+    ask: "Ask every time",
+    restore: "Always restore",
+    discard: "Always discard",
 };
 
 const onOff = (value: boolean) => (value ? "On" : "Off");
@@ -256,6 +261,15 @@ function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings):
             from: onOff(saved.pruneUninstalledEntries),
             to: onOff(current.pruneUninstalledEntries),
             revert: () => (current.pruneUninstalledEntries = saved.pruneUninstalledEntries),
+        });
+    }
+    if (current.restoreDraftBehavior !== saved.restoreDraftBehavior) {
+        changes.push({
+            group: "settings",
+            label: "Unsaved draft prompt",
+            from: RESTORE_DRAFT_BEHAVIOR_LABELS[saved.restoreDraftBehavior],
+            to: RESTORE_DRAFT_BEHAVIOR_LABELS[current.restoreDraftBehavior],
+            revert: () => (current.restoreDraftBehavior = saved.restoreDraftBehavior),
         });
     }
     const currentRecord = current as unknown as Record<string, unknown>;
