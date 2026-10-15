@@ -15,10 +15,7 @@ async function installSlowFixture(obsidian: ObsidianAPI) {
         async ({ id, name, viewType }) => {
             const dir = `${app.vault.configDir}/plugins/${id}`;
             await app.vault.adapter.mkdir(dir);
-            await app.vault.adapter.write(
-                `${dir}/manifest.json`,
-                JSON.stringify({ id, name, version: "1.0.0", minAppVersion: "1.0.0", description: "Loads slowly.", author: "E2E", isDesktopOnly: false }),
-            );
+            await app.vault.adapter.write(`${dir}/manifest.json`, JSON.stringify({ id, name, version: "1.0.0", minAppVersion: "1.0.0", description: "Loads slowly.", author: "E2E", isDesktopOnly: false }));
             await app.vault.adapter.write(
                 `${dir}/main.js`,
                 `
@@ -48,8 +45,8 @@ async function installSlowFixture(obsidian: ObsidianAPI) {
         async (instance, { id, viewType }) => {
             instance.updateManifests();
             await instance.updatePluginSettings(id, "lazy");
-            instance.settings.plugins[id].lazyOptions = { useView: true, viewTypes: [viewType], useFile: false, fileCriteria: {} };
-            instance.settings.lazyOnViews = { ...instance.settings.lazyOnViews, [id]: [viewType] };
+            instance.core.settingsService.activeProfile.settings.plugins[id].lazyOptions = { useView: true, viewTypes: [viewType], useFile: false, fileCriteria: {} };
+            instance.core.settingsService.activeProfile.settings.lazyOnViews = { ...instance.core.settingsService.activeProfile.settings.lazyOnViews, [id]: [viewType] };
             await instance.saveSettings();
         },
         { id: fixtureId, viewType },

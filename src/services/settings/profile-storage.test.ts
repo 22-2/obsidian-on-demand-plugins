@@ -1,4 +1,4 @@
-import { DEFAULT_DEVICE_SETTINGS } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, SETTINGS_SCHEMA_VERSION } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { ProfileStorage } from "src/services/settings/profile-storage";
 import { SettingsService } from "src/services/settings/settings-service";
@@ -88,7 +88,7 @@ describe("ProfileStorage migration reader", () => {
         const savedData = JSON.parse(dataFile) as Record<string, unknown>;
         expect(savedData.profiles).toEqual({ Default: profile });
         expect(savedData).not.toHaveProperty("profileStorageVersion");
-        expect(savedData.settingsSchemaVersion).toBe(1);
+        expect(savedData.settingsSchemaVersion).toBe(SETTINGS_SCHEMA_VERSION);
         expect(adapter.write).not.toHaveBeenCalled();
         expect(adapter.remove).not.toHaveBeenCalled();
     });

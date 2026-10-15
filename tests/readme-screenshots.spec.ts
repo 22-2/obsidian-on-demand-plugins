@@ -21,7 +21,7 @@ test.describe("README: well-known plugins", () => {
         await plugin.evaluate(async (instance) => {
             await instance.updatePluginSettings("obsidian42-brat", "lazyOnLayoutReady");
             await instance.updatePluginSettings("obsidian-excalidraw-plugin", "lazy");
-            instance.settings.plugins["obsidian-excalidraw-plugin"].lazyOptions = {
+            instance.core.settingsService.activeProfile.settings.plugins["obsidian-excalidraw-plugin"].lazyOptions = {
                 useView: true,
                 viewTypes: ["excalidraw"],
                 useFile: true,
@@ -146,7 +146,7 @@ test.describe("README: long plugin list", () => {
         await plugin.evaluate(async (instance, pluginIds) => {
             for (const [i, id] of pluginIds.entries()) {
                 // Edit the live settings directly: updatePluginSettings saves immediately, which would leave no draft to review.
-                instance.settings.plugins[id] = { ...instance.settings.plugins[id], mode: (i + 1) % 2 === 0 ? "lazy" : "lazyOnLayoutReady", userConfigured: true };
+                instance.core.settingsService.activeProfile.settings.plugins[id] = { ...instance.core.settingsService.activeProfile.settings.plugins[id], mode: (i + 1) % 2 === 0 ? "lazy" : "lazyOnLayoutReady", userConfigured: true };
             }
         }, ids);
 

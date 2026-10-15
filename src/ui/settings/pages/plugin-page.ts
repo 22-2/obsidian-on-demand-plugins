@@ -287,8 +287,9 @@ export class PluginPage extends SettingPage {
         if (this.plugin.getPluginMode(pluginId) === mode && (current?.mode === undefined || current.mode === mode)) return;
         // Changing the mode should preserve advanced lazy options so
         // users can temporarily disable a plugin without reconfiguring it.
-        this.plugin.settings.plugins[pluginId] = {
-            ...(this.plugin.settings.plugins[pluginId] ?? {}),
+        const plugins = this.plugin.core.settingsService.pluginLayerForEdit(pluginId).plugins;
+        plugins[pluginId] = {
+            ...(plugins[pluginId] ?? {}),
             mode,
             userConfigured: true,
         };

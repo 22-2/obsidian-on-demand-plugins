@@ -78,14 +78,14 @@ test("manual enable/disable is stable for lazy + useView", async ({ obsidian }) 
     await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: ["markdown"],
                 useFile: false,
                 fileCriteria: {},
             };
-            plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
-            plugin.settings.lazyOnViews[pluginId] = ["markdown"];
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews = plugin.core.settingsService.activeProfile.settings.lazyOnViews || {};
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId] = ["markdown"];
             await plugin.saveSettings();
         }, targetPluginId),
     );

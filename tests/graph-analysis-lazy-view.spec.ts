@@ -23,7 +23,7 @@ test("apply collects view types from a plugin that registers views after async o
             // prevent real reload
 
             await plugin.updatePluginSettings(pluginId, "lazy");
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: [], // intentionally empty — must be auto-populated
                 useFile: false,
@@ -56,7 +56,7 @@ test("apply collects view types even when the plugin is already enabled", async 
     const result = await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: [],
                 useFile: false,
@@ -72,9 +72,9 @@ test("apply collects view types even when the plugin is already enabled", async 
             }
             // Wipe anything the registerView patch captured during that enable,
             // so the apply itself must re-capture via the disable→enable path.
-            plugin.settings.plugins[pluginId].lazyOptions.viewTypes = [];
-            plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
-            delete plugin.settings.lazyOnViews[pluginId];
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions.viewTypes = [];
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews = plugin.core.settingsService.activeProfile.settings.lazyOnViews || {};
+            delete plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId];
             await plugin.saveSettings();
 
             await plugin.applyStartupPolicyAndRestart([pluginId]);
@@ -94,14 +94,14 @@ test("opening the graph-analysis view lazily loads the plugin", async ({ obsidia
         pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
             // Simulate the post-capture state: view types already collected
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: ["graph-analysis-ex"],
                 useFile: false,
                 fileCriteria: {},
             };
-            plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
-            plugin.settings.lazyOnViews[pluginId] = ["graph-analysis-ex"];
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews = plugin.core.settingsService.activeProfile.settings.lazyOnViews || {};
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId] = ["graph-analysis-ex"];
             await plugin.saveSettings();
 
             if (app.plugins.enabledPlugins.has(pluginId)) {

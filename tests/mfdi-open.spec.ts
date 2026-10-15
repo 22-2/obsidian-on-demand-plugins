@@ -12,7 +12,7 @@ test.skip("mfdi-open-view command should lazy-load plugin and open mfdi-view", a
     // このテストは「キャッシュ済みコマンド実行で lazy-load されること」の検証に絞る。
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
     await pluginHandle.evaluate(async (plugin, targetPluginId) => {
-        plugin.settings.plugins[targetPluginId] = {
+        plugin.core.settingsService.activeProfile.settings.plugins[targetPluginId] = {
             mode: "lazy",
             userConfigured: true,
         };

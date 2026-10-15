@@ -8,8 +8,8 @@ test("lineage remains unloaded after location.reload during apply", async ({ obs
 
     // Configure lineage to be lazy + file-based (no view types)
     await pluginHandle.evaluate(async (plugin) => {
-        plugin.settings.plugins = plugin.settings.plugins || {};
-        plugin.settings.plugins["lineage"] = {
+        plugin.core.settingsService.activeProfile.settings.plugins = plugin.core.settingsService.activeProfile.settings.plugins || {};
+        plugin.core.settingsService.activeProfile.settings.plugins["lineage"] = {
             mode: "lazy",
             userConfigured: true,
             lazyOptions: {

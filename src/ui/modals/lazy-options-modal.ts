@@ -172,14 +172,16 @@ export class LazyOptionsModal extends Modal {
                         if (hasChanges) {
                             // Plugin settings are sparse until a mode is explicitly
                             // configured, but advanced options must still be saveable.
-                            const pluginSettings = (this.plugin.settings.plugins[this.pluginId] ??= {
-                                mode: this.plugin.getPluginMode(this.pluginId),
-                                userConfigured: false,
-                            });
+                            const mode = this.plugin.getPluginMode(this.pluginId);
+                            const hadEntry = this.plugin.settings.plugins[this.pluginId] !== undefined;
+                            const layer = this.plugin.core.settingsService.pluginLayerForEdit(this.pluginId);
+                            const pluginSettings = layer.plugins[this.pluginId];
+                            // A new entry records the mode the plugin ran with, as before.
+                            if (!hadEntry) Object.assign(pluginSettings, { mode, userConfigured: false });
                             pluginSettings.lazyOptions = this.options;
                             // For backward compatibility during transition, also update the global maps
-                            this.plugin.settings.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
-                            this.plugin.settings.lazyOnFiles[this.pluginId] = this.options.useFile ? this.options.fileCriteria : {};
+                            layer.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
+                            layer.lazyOnFiles[this.pluginId] = this.options.useFile ? this.options.fileCriteria : {};
                         }
                         // Notify caller (SettingsTab) so it can mark this plugin as pending
                         if (hasChanges) {

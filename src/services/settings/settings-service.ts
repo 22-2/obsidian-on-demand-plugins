@@ -2,10 +2,11 @@ import log from "loglevel";
 import type { DataAdapter } from "obsidian";
 import { Notice, Platform, normalizePath } from "obsidian";
 import { loadLocalStorage } from "src/core/storage";
-import type { DeviceSettings, DeviceType, LazySettings, Profile } from "src/core/types";
-import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, isPluginMode, isRestoreDraftBehavior } from "src/core/types";
+import type { DeviceSettings, DeviceType, LazySettings, Profile, ProfileSettings } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, INITIAL_BACKUP_PROFILE_ID, SETTINGS_SCHEMA_VERSION, isPluginMode, isRestoreDraftBehavior } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { ProfileStorage } from "src/services/settings/profile-storage";
+import { pluginLayerToEdit, resolveEffectiveSettings } from "src/services/settings/settings-layers";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsService");
 type SettingsSnapshot = { kind: "missing"; value?: undefined; fingerprint?: undefined } | { kind: "valid"; value: Record<string, unknown>; fingerprint: string } | { kind: "corrupt"; value?: undefined; fingerprint?: undefined };
@@ -41,8 +42,18 @@ export class SettingsService {
     // Populated in load().
     data!: LazySettings;
     /** Currently active device settings (points to the active profile's settings) */
-    // Populated in load() after profile resolution.
-    settings!: DeviceSettings;
+    // Computed from the active profile and the shared defaults on every read.
+    get settings(): DeviceSettings {
+        return resolveEffectiveSettings(this.activeProfile, this.data.defaults);
+    }
+    /** The active profile; edits to its `settings` are what the active profile overrides. */
+    get activeProfile(): Profile {
+        return this.data.profiles[this.currentProfileId];
+    }
+    /** The live layer a user edit of a plugin goes to: the active profile, which then overrides the plugin. */
+    pluginLayerForEdit(pluginId: string): ProfileSettings {
+        return pluginLayerToEdit(this.data, this.currentProfileId, pluginId);
+    }
     /** ID of the currently active profile */
     // Populated in load() after profile resolution.
     currentProfileId!: string;
@@ -89,9 +100,8 @@ export class SettingsService {
 
         this.currentProfileId = this.selectActiveProfileId();
         this.normalizeRestoreDraftBehavior(loaded);
-        Object.values(this.data.profiles).forEach((profile) => this.normalizeProfileSettings(profile));
+        this.normalizeLayers(loaded);
         this.dropDeadFields();
-        this.settings = this.data.profiles[this.currentProfileId].settings;
 
         if (source === "legacy") this.hydrateLegacyLazyOnViews();
         // Reason: nothing is saved yet on a first load, and startup keeps its defaults in memory on purpose,
@@ -101,7 +111,9 @@ export class SettingsService {
     }
 
     private assertSupportedFormat(loaded: Partial<LazySettings>) {
-        if (loaded.settingsSchemaVersion !== undefined && loaded.settingsSchemaVersion !== SETTINGS_SCHEMA_VERSION) {
+        // Older versions are migrated on load; only a newer one is refused, so this build never overwrites it.
+        const version = loaded.settingsSchemaVersion;
+        if (version !== undefined && (!Number.isInteger(version) || version < 1 || version > SETTINGS_SCHEMA_VERSION)) {
             this.blockSettings("These settings were saved by a newer or unsupported format. Update the plugin before changing them.");
         }
         if (loaded.profileStorageVersion !== undefined && loaded.profileStorageVersion !== 1) {
@@ -179,8 +191,9 @@ export class SettingsService {
     private hydrateLegacyLazyOnViews() {
         const storedViews = loadLocalStorage<Record<string, string[]>>(this.plugin.app, "lazyOnViews");
         if (!storedViews || Object.keys(storedViews).length === 0) return;
-        this.settings.lazyOnViews = {
-            ...(this.settings.lazyOnViews ?? {}),
+        const settings = this.activeProfile.settings;
+        settings.lazyOnViews = {
+            ...(settings.lazyOnViews ?? {}),
             ...storedViews,
         };
     }
@@ -297,28 +310,58 @@ export class SettingsService {
         delete this.data.dualConfigs;
     }
 
-    private normalizeProfileSettings(profile: Profile) {
-        if (!profile.settings || typeof profile.settings !== "object") {
+    /**
+     * Version 1 profiles stored every value. They keep all of them as overrides on top of
+     * built-in defaults, so each profile runs exactly as before; nothing is inherited until the
+     * user moves values to the defaults. Version 2 profiles keep their overrides as they are.
+     */
+    private normalizeLayers(loaded: Partial<LazySettings>) {
+        const layered = (loaded.settingsSchemaVersion ?? 1) >= 2;
+        if (layered) {
+            if (!this.isValidDeviceSettings(loaded.defaults)) {
+                this.blockSettings("The default settings in data.json are missing or damaged. Restore a valid backup before saving.");
+            }
+            this.data.defaults = loaded.defaults;
+            this.normalizeSettingsLayer(this.data.defaults, true);
+        } else {
+            this.data.defaults = structuredClone(DEFAULT_DEVICE_SETTINGS);
+            // The install-time backup must not change when defaults change later.
+            const backup = this.data.profiles[INITIAL_BACKUP_PROFILE_ID];
+            if (backup) backup.snapshot = true;
+        }
+        for (const profile of Object.values(this.data.profiles)) {
+            if (typeof profile.snapshot !== "boolean") delete profile.snapshot;
+            // A snapshot has no defaults to inherit, and version 1 profiles always held every value.
+            this.normalizeProfileSettings(profile, !layered || profile.snapshot === true);
+        }
+    }
+
+    private normalizeProfileSettings(profile: Profile, fillValues: boolean) {
+        if (!isRecord(profile.settings)) {
             profile.settings = structuredClone(DEFAULT_DEVICE_SETTINGS);
             return;
         }
+        this.normalizeSettingsLayer(profile.settings, fillValues);
+    }
 
-        if (profile.settings.defaultMode === undefined) {
-            profile.settings.defaultMode = DEFAULT_DEVICE_SETTINGS.defaultMode;
+    /** Fills a layer's maps; `fillValues` also fills unset profile-wide values with built-in defaults. */
+    private normalizeSettingsLayer(settings: ProfileSettings, fillValues: boolean) {
+        if (fillValues && settings.defaultMode === undefined) {
+            settings.defaultMode = DEFAULT_DEVICE_SETTINGS.defaultMode;
         }
-        if (profile.settings.pruneUninstalledEntries === undefined) {
-            profile.settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;
+        if (fillValues && settings.pruneUninstalledEntries === undefined) {
+            settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;
         }
         // This setting was removed; discard it from profiles created by older versions.
-        delete (profile.settings as unknown as Record<string, unknown>).showDescriptions;
-        if (!isRecord(profile.settings.plugins)) {
-            profile.settings.plugins = {};
+        delete (settings as unknown as Record<string, unknown>).showDescriptions;
+        if (!isRecord(settings.plugins)) {
+            settings.plugins = {};
         }
-        if (!isRecord(profile.settings.lazyOnViews)) {
-            profile.settings.lazyOnViews = {};
+        if (!isRecord(settings.lazyOnViews)) {
+            settings.lazyOnViews = {};
         }
-        if (!isRecord(profile.settings.lazyOnFiles)) {
-            profile.settings.lazyOnFiles = {};
+        if (!isRecord(settings.lazyOnFiles)) {
+            settings.lazyOnFiles = {};
         }
     }
 
@@ -331,7 +374,7 @@ export class SettingsService {
     }
 
     private async saveNow(snapshot?: LazySettings) {
-        if (this.writesBlocked || !this.data || !this.settings || !this.currentProfileId) {
+        if (this.writesBlocked || !this.data || !this.currentProfileId) {
             throw new Error("Settings cannot be saved until a valid settings file is loaded.");
         }
 
@@ -346,11 +389,6 @@ export class SettingsService {
             this.blockSettings("Settings changed on disk after this plugin loaded. Reload the plugin before saving to avoid overwriting newer data.");
         }
 
-        // Ensure the current settings are reflected in the data object
-        // (Since this.settings is a reference, it should be, but good to be safe)
-        if (this.data.profiles[this.currentProfileId]) {
-            this.data.profiles[this.currentProfileId].settings = this.settings;
-        }
         const persisted = structuredClone(snapshot ?? this.data);
         if (!this.isValidProfileMap(persisted.profiles)) {
             this.blockSettings("The in-memory profiles are incomplete. Restore a valid backup before saving.");
@@ -378,7 +416,6 @@ export class SettingsService {
             throw new Error(`Profile ${profileId} not found`);
         }
         this.currentProfileId = profileId;
-        this.settings = this.data.profiles[profileId].settings;
 
         // Update the default ID for this device type so it persists after restart
         if (Platform.isMobile) {

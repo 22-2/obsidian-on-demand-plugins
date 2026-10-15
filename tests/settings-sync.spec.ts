@@ -117,7 +117,7 @@ test("saved profiles survive a data.json-only replacement and reject stale write
                 desktopProfileId: plugin.data.desktopProfileId,
                 mobileProfileId: plugin.data.mobileProfileId,
                 activeProfileId: service.currentProfileId,
-                activeDefaultMode: plugin.settings.defaultMode,
+                activeDefaultMode: plugin.core.settingsService.activeProfile.settings.defaultMode,
                 desktopMarker: plugin.data.profiles[plugin.data.desktopProfileId]?.settings.plugins.__sync_e2e_desktop__?.mode ?? null,
                 mobileMarker: plugin.data.profiles[plugin.data.mobileProfileId]?.settings.plugins.__sync_e2e_mobile__?.mode ?? null,
                 mobileName: plugin.data.profiles[plugin.data.mobileProfileId]?.name ?? null,
@@ -141,7 +141,7 @@ test("saved profiles survive a data.json-only replacement and reject stale write
 
     const staleSave = await obsidian.page.evaluate(async (pluginId) => {
         const plugin = (app.plugins.plugins as unknown as Record<string, OnDemandPlugin>)[pluginId];
-        plugin.settings.defaultMode = "alwaysDisabled";
+        plugin.core.settingsService.activeProfile.settings.defaultMode = "alwaysDisabled";
         try {
             await plugin.saveSettings();
             return { rejected: false, message: "" };

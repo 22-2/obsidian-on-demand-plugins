@@ -15,13 +15,13 @@ test("prune removes uninstalled-plugin entries but keeps installed ones", async 
 
             // Seed stale state for a plugin that is no longer installed, across all
             // three per-profile maps the cleanup targets.
-            plugin.settings.plugins[ghostId] = { mode: "lazy", userConfigured: true };
-            plugin.settings.lazyOnViews[ghostId] = ["ghost-view"];
-            plugin.settings.lazyOnFiles[ghostId] = { suffixes: [".ghost"] };
+            plugin.core.settingsService.activeProfile.settings.plugins[ghostId] = { mode: "lazy", userConfigured: true };
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews[ghostId] = ["ghost-view"];
+            plugin.core.settingsService.activeProfile.settings.lazyOnFiles[ghostId] = { suffixes: [".ghost"] };
             // And a real entry for an installed plugin that must survive the prune.
-            plugin.settings.plugins[installedId] = { mode: "lazy", userConfigured: true };
+            plugin.core.settingsService.activeProfile.settings.plugins[installedId] = { mode: "lazy", userConfigured: true };
 
-            plugin.settings.pruneUninstalledEntries = true;
+            plugin.core.settingsService.activeProfile.settings.pruneUninstalledEntries = true;
             const pruned = await plugin.backupAndPruneUninstalledEntries();
             await plugin.saveSettings();
 
@@ -30,10 +30,10 @@ test("prune removes uninstalled-plugin entries but keeps installed ones", async 
 
             return {
                 pruned,
-                ghostInPlugins: ghostId in plugin.settings.plugins,
-                ghostInViews: ghostId in plugin.settings.lazyOnViews,
-                ghostInFiles: ghostId in plugin.settings.lazyOnFiles,
-                installedMode: plugin.settings.plugins[installedId]?.mode ?? null,
+                ghostInPlugins: ghostId in plugin.core.settingsService.activeProfile.settings.plugins,
+                ghostInViews: ghostId in plugin.core.settingsService.activeProfile.settings.lazyOnViews,
+                ghostInFiles: ghostId in plugin.core.settingsService.activeProfile.settings.lazyOnFiles,
+                installedMode: plugin.core.settingsService.activeProfile.settings.plugins[installedId]?.mode ?? null,
                 ghostInDisk: dataRaw.includes(ghostId),
             };
         },
@@ -51,14 +51,14 @@ test("prune removes uninstalled-plugin entries but keeps installed ones", async 
 test("prune is skipped while the toggle is off", async ({ obsidian }) => {
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);
     const result = await pluginHandle.evaluate(async (plugin: OnDemandPlugin, ghostId) => {
-        plugin.settings.plugins[ghostId] = { mode: "lazy", userConfigured: true };
-        plugin.settings.pruneUninstalledEntries = false;
+        plugin.core.settingsService.activeProfile.settings.plugins[ghostId] = { mode: "lazy", userConfigured: true };
+        plugin.core.settingsService.activeProfile.settings.pruneUninstalledEntries = false;
 
         // setupDefaultPluginConfigurations() runs the cleanup, but only when the
         // toggle is enabled, so the stale entry must remain.
         await plugin.setupDefaultPluginConfigurations();
 
-        return { ghostStillThere: ghostId in plugin.settings.plugins };
+        return { ghostStillThere: ghostId in plugin.core.settingsService.activeProfile.settings.plugins };
     }, GHOST_ID);
 
     expect(result.ghostStillThere).toBe(true);

@@ -14,12 +14,12 @@ test("rebuild captures async commands and views in one load, including empty sna
         handle.evaluate(async (plugin: OnDemandPlugin) => {
             const ids = ["cache-async", "cache-empty"];
             for (const id of ids) {
-                plugin.settings.plugins[id] = {
+                plugin.core.settingsService.activeProfile.settings.plugins[id] = {
                     mode: "lazy",
                     userConfigured: true,
                     lazyOptions: { useView: true, viewTypes: id === "cache-empty" ? [] : ["removed-view"], useFile: false, fileCriteria: {} },
                 };
-                plugin.settings.lazyOnViews[id] = ["removed-view"];
+                plugin.core.settingsService.activeProfile.settings.lazyOnViews[id] = ["removed-view"];
                 await app.plugins.disablePlugin(id);
             }
 
@@ -41,8 +41,8 @@ test("rebuild captures async commands and views in one load, including empty sna
                     elapsedMs,
                     firstLoads,
                     subsequentLoads: loads,
-                    views: ids.map((id) => plugin.settings.plugins[id].lazyOptions?.viewTypes),
-                    mappings: ids.map((id) => plugin.settings.lazyOnViews[id]),
+                    views: ids.map((id) => plugin.core.settingsService.activeProfile.settings.plugins[id].lazyOptions?.viewTypes),
+                    mappings: ids.map((id) => plugin.core.settingsService.activeProfile.settings.lazyOnViews[id]),
                     loaded: ids.map((id) => !!app.plugins.plugins[id]?._loaded),
                 };
             } finally {

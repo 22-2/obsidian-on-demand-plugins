@@ -1,5 +1,6 @@
 import type { DeviceSettings, LazySettings, PLUGIN_MODE, PluginSettings, RestoreDraftBehavior } from "src/core/types";
-import { PluginModes } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, PluginModes } from "src/core/types";
+import { resolveEffectiveSettings } from "src/services/settings/settings-layers";
 import { stableStringify } from "src/services/settings/settings-service";
 
 type DraftSource = {
@@ -100,8 +101,9 @@ export class PendingChanges {
         const source = this.getSource();
         if (!source?.data || !this.baselineData) return Array.from(this.pluginIds);
         const profileId = source.currentProfileId;
-        const currentPlugins = source.data.profiles[profileId]?.settings.plugins ?? {};
-        const baselinePlugins = this.baselineData.profiles[profileId]?.settings.plugins ?? {};
+        // Compare what the active profile runs with, so an edit in either layer counts.
+        const currentPlugins = effectiveOf(source.data, profileId)?.plugins ?? {};
+        const baselinePlugins = effectiveOf(this.baselineData, profileId)?.plugins ?? {};
         const ids = new Set([...Object.keys(currentPlugins), ...Object.keys(baselinePlugins)]);
         return [...ids].filter((id) => stableStringify(currentPlugins[id]) !== stableStringify(baselinePlugins[id]));
     }
@@ -116,28 +118,26 @@ export class PendingChanges {
         const baseline = this.baselineData;
         if (!data || !baseline) return [];
         const profileId = this.getSource()!.currentProfileId;
-        const current = data.profiles[profileId]?.settings;
-        const saved = baseline.profiles[profileId]?.settings;
+        const current = effectiveOf(data, profileId);
+        const saved = effectiveOf(baseline, profileId);
         const changes: PendingChange[] = [];
         if (current && saved) {
-            changes.push(...this.describePluginChanges(current, saved, describer));
-            changes.push(...describeDeviceSettings(current, saved));
+            const layers = { data, baseline, profileId };
+            changes.push(...this.describePluginChanges(current, saved, describer, layers));
+            changes.push(...describeDeviceSettings(current, saved, layers));
         }
         changes.push(...describeRootSettings(data, baseline));
         changes.push(...describeProfiles(data, baseline, profileId));
         return changes;
     }
 
-    private describePluginChanges(current: DeviceSettings, saved: DeviceSettings, describer: ChangeDescriber): PendingChange[] {
+    private describePluginChanges(current: DeviceSettings, saved: DeviceSettings, describer: ChangeDescriber, layers: Layers): PendingChange[] {
         return this.getChangedPluginIds().map((pluginId) => {
             const entry: PluginSettings | undefined = current.plugins[pluginId];
             const savedEntry: PluginSettings | undefined = saved.plugins[pluginId];
             const mode = entry?.mode ?? describer.fallbackMode(pluginId, current);
             const savedMode = savedEntry?.mode ?? describer.fallbackMode(pluginId, saved);
-            const revert = () => {
-                if (savedEntry) current.plugins[pluginId] = structuredClone(savedEntry);
-                else delete current.plugins[pluginId];
-            };
+            const revert = () => restorePluginUnit(layers, pluginId);
             const base = { group: "plugins" as const, label: describer.pluginName(pluginId), from: PluginModes[savedMode], revert };
             if (!entry) return { ...base, to: "Entry removed" };
             // Lazy options can change while the mode stays the same; say so instead of showing an identical pair.
@@ -267,7 +267,7 @@ function applySavedChanges(current: object, before: object, after: object) {
     }
 }
 
-function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings): PendingChange[] {
+function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings, layers: Layers): PendingChange[] {
     const changes: PendingChange[] = [];
     if (current.defaultMode !== saved.defaultMode) {
         changes.push({
@@ -275,7 +275,7 @@ function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings):
             label: "Default mode",
             from: PluginModes[saved.defaultMode],
             to: PluginModes[current.defaultMode],
-            revert: () => (current.defaultMode = saved.defaultMode),
+            revert: () => restoreDeviceKey(layers, "defaultMode"),
         });
     }
     if (current.pruneUninstalledEntries !== saved.pruneUninstalledEntries) {
@@ -284,7 +284,7 @@ function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings):
             label: "Auto-remove uninstalled entries",
             from: onOff(saved.pruneUninstalledEntries),
             to: onOff(current.pruneUninstalledEntries),
-            revert: () => (current.pruneUninstalledEntries = saved.pruneUninstalledEntries),
+            revert: () => restoreDeviceKey(layers, "pruneUninstalledEntries"),
         });
     }
     const currentRecord = current as unknown as Record<string, unknown>;
@@ -297,10 +297,49 @@ function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings):
             label: DEVICE_KEY_LABELS[key] ?? key,
             from: "Saved",
             to: "Edited",
-            revert: () => (currentRecord[key] = structuredClone(savedRecord[key])),
+            revert: () => restoreDeviceKey(layers, key),
         });
     }
     return changes;
+}
+
+/** The live data, its saved baseline and the active profile: what a revert restores. */
+type Layers = { data: LazySettings; baseline: LazySettings; profileId: string };
+
+/** The settings a profile runs with; older-shaped data without shared defaults is read as full profiles. */
+function effectiveOf(data: LazySettings, profileId: string): DeviceSettings | undefined {
+    const profile = data.profiles[profileId];
+    return profile ? resolveEffectiveSettings(profile, data.defaults ?? DEFAULT_DEVICE_SETTINGS) : undefined;
+}
+
+/** Each live layer holding the active profile's values: the shared defaults and the profile's overrides. */
+function layerPairs({ data, baseline, profileId }: Layers): [Record<string, unknown>, Record<string, unknown> | undefined][] {
+    const asRecord = (layer: unknown) => layer as Record<string, unknown> | undefined;
+    const pairs: [Record<string, unknown> | undefined, Record<string, unknown> | undefined][] = [
+        [asRecord(data.defaults), asRecord(baseline.defaults)],
+        [asRecord(data.profiles[profileId]?.settings), asRecord(baseline.profiles[profileId]?.settings)],
+    ];
+    return pairs.filter((pair): pair is [Record<string, unknown>, Record<string, unknown> | undefined] => pair[0] !== undefined);
+}
+
+/** Restores a profile-wide value in both layers, in place, since the settings service keeps references to them. */
+function restoreDeviceKey(layers: Layers, key: string) {
+    for (const [live, saved] of layerPairs(layers)) {
+        if (saved && Object.hasOwn(saved, key)) live[key] = structuredClone(saved[key]);
+        else delete live[key];
+    }
+}
+
+/** Restores one plugin's unit (mode, lazy options, view and file rules) in both layers. */
+function restorePluginUnit(layers: Layers, pluginId: string) {
+    for (const [live, saved] of layerPairs(layers)) {
+        for (const map of ["plugins", "lazyOnViews", "lazyOnFiles"]) {
+            const liveMap = (live[map] ??= {}) as Record<string, unknown>;
+            const savedMap = saved?.[map] as Record<string, unknown> | undefined;
+            if (savedMap && Object.hasOwn(savedMap, pluginId)) liveMap[pluginId] = structuredClone(savedMap[pluginId]);
+            else delete liveMap[pluginId];
+        }
+    }
 }
 
 function describeRootSettings(data: LazySettings, baseline: LazySettings): PendingChange[] {

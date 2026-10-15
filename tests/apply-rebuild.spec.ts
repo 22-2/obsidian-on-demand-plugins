@@ -44,14 +44,14 @@ test("lazy mode with useView loads plugin on view activation", async ({ obsidian
     const result = await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: ["markdown"],
                 useFile: false,
                 fileCriteria: {},
             };
-            plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
-            plugin.settings.lazyOnViews[pluginId] = ["markdown"];
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews = plugin.core.settingsService.activeProfile.settings.lazyOnViews || {};
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId] = ["markdown"];
             await plugin.saveSettings();
 
             return {
@@ -143,13 +143,13 @@ test("Apply changes records an empty view snapshot for a plugin without views", 
             // prevent reload
 
             // Ensure no pre-existing entry
-            if (plugin.settings.lazyOnViews && plugin.settings.lazyOnViews[pluginId]) {
-                delete plugin.settings.lazyOnViews[pluginId];
+            if (plugin.core.settingsService.activeProfile.settings.lazyOnViews && plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId]) {
+                delete plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId];
                 await plugin.saveSettings();
             }
 
             await plugin.updatePluginSettings(pluginId, "lazy");
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: [],
                 useFile: false,
@@ -157,7 +157,7 @@ test("Apply changes records an empty view snapshot for a plugin without views", 
             };
             await plugin.applyStartupPolicyAndRestart([pluginId]);
 
-            return plugin.settings.lazyOnViews?.[pluginId] ?? null;
+            return plugin.core.settingsService.activeProfile.settings.lazyOnViews?.[pluginId] ?? null;
         }, targetPluginId),
     );
 

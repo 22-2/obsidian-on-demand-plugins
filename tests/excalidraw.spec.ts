@@ -9,8 +9,8 @@ test("opening .excalidraw.md triggers lazy load and shows Excalidraw view", asyn
     const result = await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
-            // plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
-            // plugin.settings.lazyOnViews[pluginId] = [];
+            // plugin.core.settingsService.activeProfile.settings.lazyOnViews = plugin.core.settingsService.activeProfile.settings.lazyOnViews || {};
+            // plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId] = [];
             await plugin.saveSettings();
 
             return { mode: plugin.settings?.plugins?.[pluginId]?.mode ?? null };
@@ -38,8 +38,8 @@ test("layout-restore triggers lazy load for already-open Excalidraw file", async
     await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
-            plugin.settings.lazyOnViews = plugin.settings.lazyOnViews || {};
-            plugin.settings.lazyOnViews[pluginId] = [];
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews = plugin.core.settingsService.activeProfile.settings.lazyOnViews || {};
+            plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId] = [];
             await plugin.saveSettings();
         }, excalidrawPluginId),
     );

@@ -48,7 +48,7 @@ for (let attempt = 1; attempt <= 3; attempt++) {
         const result = await withReloadRecorded(obsidian, () =>
             handle.evaluate(async (plugin: OnDemandPlugin, pluginIds: string[]) => {
                 for (const id of pluginIds) {
-                    plugin.settings.plugins[id] = {
+                    plugin.core.settingsService.activeProfile.settings.plugins[id] = {
                         mode: "lazy",
                         userConfigured: true,
                         lazyOptions: { useView: true, viewTypes: [], useFile: false, fileCriteria: {} },
@@ -65,7 +65,7 @@ for (let attempt = 1; attempt <= 3; attempt++) {
                 }
                 return {
                     error,
-                    excalidrawViews: plugin.settings.plugins["obsidian-excalidraw-plugin"].lazyOptions?.viewTypes ?? [],
+                    excalidrawViews: plugin.core.settingsService.activeProfile.settings.plugins["obsidian-excalidraw-plugin"].lazyOptions?.viewTypes ?? [],
                     loaded: pluginIds.filter((id) => !!app.plugins.plugins[id]?._loaded),
                 };
             }, ids),

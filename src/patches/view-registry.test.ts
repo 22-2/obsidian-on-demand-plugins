@@ -57,6 +57,8 @@ describe("patchPluginRegisterView", () => {
     function createMockCtx(): PluginContext {
         return {
             getSettings: () => settings,
+            // The live layer the plugin's settings come from; here the single test layer.
+            getPluginLayer: () => settings,
             getPluginMode: (id: string) => settings.plugins[id]?.mode,
             saveSettingsChange: saveSettings,
         } as unknown as PluginContext;

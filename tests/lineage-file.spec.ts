@@ -8,8 +8,8 @@ test("lineage not loaded when lazy-with-file-only and no matching files", async 
 
     await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin) => {
-            plugin.settings.plugins = plugin.settings.plugins || {};
-            plugin.settings.plugins["lineage"] = {
+            plugin.core.settingsService.activeProfile.settings.plugins = plugin.core.settingsService.activeProfile.settings.plugins || {};
+            plugin.core.settingsService.activeProfile.settings.plugins["lineage"] = {
                 mode: "lazy",
                 userConfigured: true,
                 lazyOptions: {

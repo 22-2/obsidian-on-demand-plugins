@@ -11,6 +11,7 @@ describe("MaintenanceFeature", () => {
         getData: () => { showConsoleLog: boolean };
         getManifests: ReturnType<typeof vi.fn>;
         getSettings: () => typeof settingsState;
+        getPluginLayerForEdit: () => typeof settingsState;
         getPluginMode: (id: string) => string | undefined;
         saveSettings: ReturnType<typeof vi.fn>;
         _plugin: { manifest: { id: string } };
@@ -45,6 +46,7 @@ describe("MaintenanceFeature", () => {
                 { id: "plugin-2", name: "Plugin 2" },
             ]),
             getSettings: () => settingsState,
+            getPluginLayerForEdit: () => settingsState,
             getPluginMode: (id) => mockCtx.getSettings().plugins[id]?.mode,
             saveSettings: vi.fn().mockResolvedValue(undefined),
             _plugin: { manifest: { id: "on-demand-plugins" } },

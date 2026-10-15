@@ -15,6 +15,7 @@ import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature
 import { ManualToggleFeature } from "src/features/manual-toggle/manual-toggle-feature";
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { CoreContainer } from "src/services/core-container";
+import { pluginLayerToEdit, resolveDeviceValue, resolvePluginUnit } from "src/services/settings/settings-layers";
 import { SettingsTab } from "src/ui/settings-tab";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
@@ -22,7 +23,11 @@ const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
 export default class OnDemandPlugin extends Plugin {
     // Assigned during onload via loadSettings().
     data!: LazySettings;
-    // Assigned during onload via loadSettings().
+    /**
+     * The settings the active profile runs with: its overrides on top of the shared defaults.
+     * A fresh copy on every read, so edits must go to a layer (see settings-layers) to be kept.
+     * Defined as a getter in onload, since Obsidian's Plugin declares `settings` as a property.
+     */
     declare settings: DeviceSettings;
     device = "desktop/global";
     manifests: PluginManifest[] = [];
@@ -34,6 +39,7 @@ export default class OnDemandPlugin extends Plugin {
     settingsTab?: SettingsTab;
 
     async onload() {
+        Object.defineProperty(this, "settings", { configurable: true, get: () => this.core.settingsService.settings });
         const ctx = createPluginContext(this);
         this.core = new CoreContainer(ctx);
         this.events = new EventBus();
@@ -103,7 +109,6 @@ export default class OnDemandPlugin extends Plugin {
     async loadSettings() {
         await this.core.settingsService.load();
         this.data = this.core.settingsService.data;
-        this.settings = this.core.settingsService.settings;
         const profileId = this.core.settingsService.currentProfileId;
         this.device = this.core.settingsService.data.profiles[profileId]?.name ?? "Unknown";
     }
@@ -120,9 +125,9 @@ export default class OnDemandPlugin extends Plugin {
     async setupDefaultPluginConfigurations() {
         let hasChanges = false;
         for (const plugin of this.manifests) {
-            const current = this.settings.plugins?.[plugin.id];
+            const current = this.settings.plugins[plugin.id];
             if (!current || current.mode === undefined) {
-                this.settings.plugins[plugin.id] = {
+                pluginLayerToEdit(this.data, this.core.settingsService.currentProfileId, plugin.id).plugins[plugin.id] = {
                     mode: this.getDefaultModeForPlugin(plugin.id),
                     userConfigured: false,
                 };
@@ -131,7 +136,7 @@ export default class OnDemandPlugin extends Plugin {
             }
 
             if (!current.userConfigured && current.mode === PLUGIN_MODE.ALWAYS_DISABLED && this.isPluginEnabledOnDisk(plugin.id)) {
-                this.settings.plugins[plugin.id] = {
+                pluginLayerToEdit(this.data, this.core.settingsService.currentProfileId, plugin.id).plugins[plugin.id] = {
                     mode: PLUGIN_MODE.ALWAYS_ENABLED,
                     userConfigured: false,
                 };
@@ -158,7 +163,9 @@ export default class OnDemandPlugin extends Plugin {
      * is removed wholesale during settings load rather than pruned per key.
      */
     private pruneTargetMaps(): Record<string, unknown>[] {
-        return [this.settings.plugins, this.settings.lazyOnViews, this.settings.lazyOnFiles];
+        // Only the active profile's own entries: the shared defaults also serve devices where those plugins are installed.
+        const settings = this.core.settingsService.activeProfile.settings;
+        return [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
     }
 
     /** True when any prune target holds an entry for a plugin not in the current manifests. */
@@ -219,7 +226,7 @@ export default class OnDemandPlugin extends Plugin {
         // Mode changes must not erase the plugin's advanced lazy rules; those
         // rules are independent of whether the plugin is currently enabled.
         await this.saveSettingsChange((data, profileId) => {
-            const plugins = data.profiles[profileId].settings.plugins;
+            const plugins = pluginLayerToEdit(data, profileId, pluginId).plugins;
             plugins[pluginId] = { ...(plugins[pluginId] ?? {}), mode, userConfigured: true };
         });
         const lazyEngine = this.features.get(LazyEngineFeature);
@@ -246,7 +253,6 @@ export default class OnDemandPlugin extends Plugin {
         const drift = this.features.get(CommunityPluginsDriftFeature);
         if (drift && !(await drift.confirmOverwrite())) return false;
         this.core.settingsService.switchProfile(profileId);
-        this.settings = this.core.settingsService.settings;
         await this.saveSettings();
         const policyFeature = this.features.get(StartupPolicyFeature);
         await policyFeature?.applyWithProgress(null, undefined, { externalChangesConfirmed: true });
@@ -258,15 +264,18 @@ export default class OnDemandPlugin extends Plugin {
         this.manifests = this.core.registry.manifests;
     }
 
+    // These two read the layers directly: they run for every plugin, and building the effective settings each time would be wasteful.
     getPluginMode(pluginId: string): PLUGIN_MODE {
-        return this.settings.plugins?.[pluginId]?.mode ?? this.getDefaultModeForPlugin(pluginId);
+        const service = this.core.settingsService;
+        return resolvePluginUnit(service.activeProfile, service.data.defaults, pluginId).plugin?.mode ?? this.getDefaultModeForPlugin(pluginId);
     }
 
     getDefaultModeForPlugin(pluginId: string): PLUGIN_MODE {
         if (this.isPluginEnabledOnDisk(pluginId)) {
             return PLUGIN_MODE.ALWAYS_ENABLED;
         }
-        return this.settings.defaultMode;
+        const service = this.core.settingsService;
+        return resolveDeviceValue(service.activeProfile, service.data.defaults, "defaultMode");
     }
 
     isPluginEnabledOnDisk(pluginId: string): boolean {

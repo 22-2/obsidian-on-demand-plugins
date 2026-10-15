@@ -18,18 +18,18 @@ test("lazy mode with useView:true collects viewTypes during apply", async ({ obs
             // prevent real reload
 
             // Clear any pre-existing lazyOptions state
-            if (plugin.settings.plugins[pluginId]) {
-                delete plugin.settings.plugins[pluginId].lazyOptions;
+            if (plugin.core.settingsService.activeProfile.settings.plugins[pluginId]) {
+                delete plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions;
             }
-            if (plugin.settings.lazyOnViews?.[pluginId]) {
-                delete plugin.settings.lazyOnViews[pluginId];
+            if (plugin.core.settingsService.activeProfile.settings.lazyOnViews?.[pluginId]) {
+                delete plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId];
             }
 
             // Set to "lazy" mode with useView: true
             await plugin.updatePluginSettings(pluginId, "lazy");
 
             // Set lazyOptions.useView = true  (viewTypes intentionally empty — should be auto-populated)
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: [],
                 useFile: false,
@@ -66,17 +66,17 @@ test("lazy mode with useView:true loads plugin when matching view is activated",
     // Configure: lazy mode + useView=true with explicit viewType "markdown"
     const setupResult = await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
-            if (plugin.settings.plugins[pluginId]) {
-                delete plugin.settings.plugins[pluginId].lazyOptions;
+            if (plugin.core.settingsService.activeProfile.settings.plugins[pluginId]) {
+                delete plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions;
             }
-            if (plugin.settings.lazyOnViews?.[pluginId]) {
-                delete plugin.settings.lazyOnViews[pluginId];
+            if (plugin.core.settingsService.activeProfile.settings.lazyOnViews?.[pluginId]) {
+                delete plugin.core.settingsService.activeProfile.settings.lazyOnViews[pluginId];
             }
 
             await plugin.updatePluginSettings(pluginId, "lazy");
 
             // Manually specify viewType "markdown" so we don't depend on auto-detection
-            plugin.settings.plugins[pluginId].lazyOptions = {
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = {
                 useView: true,
                 viewTypes: ["markdown"],
                 useFile: false,

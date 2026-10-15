@@ -6,7 +6,7 @@
  * wiring that was previously spread across main.ts.
  */
 import type { PluginContext } from "src/core/plugin-context";
-import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, INITIAL_BACKUP_PROFILE_ID, PLUGIN_MODE } from "src/core/types";
 import { patchPluginEnableDisable } from "src/patches/plugin-enable-disable";
 import { PluginRegistry } from "src/services/registry/plugin-registry";
 import { SettingsService } from "src/services/settings/settings-service";
@@ -48,7 +48,7 @@ export class CoreContainer {
     private async handleInstallationAndBackups() {
         // Initial setup
         if (this.settingsService.isFirstLoad) {
-            const profileId = "initial-backup";
+            const profileId = INITIAL_BACKUP_PROFILE_ID;
             const currentPlugins = Array.from(this.registry.enabledPluginsFromDisk);
 
             // Generate a safe copy of default settings
@@ -66,6 +66,8 @@ export class CoreContainer {
                 id: profileId,
                 name: "Backup: Initial State",
                 settings: backupSettings,
+                // A backup keeps its own values even when the shared defaults change later.
+                snapshot: true,
             };
 
             // Reason: a missing data.json may be an unsynced file on a new device, so startup defaults stay in memory until a user saves.

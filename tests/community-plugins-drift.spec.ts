@@ -29,11 +29,11 @@ async function startFrom(obsidian: ObsidianAPI) {
     await obsidian.page.evaluate(
         async ({ enabled, disabled, desired }) => {
             const plugin = app.plugins.plugins["on-demand-plugins"] as unknown as {
-                settings: { plugins: Record<string, { mode: string; userConfigured: boolean }> };
+                core: { settingsService: { activeProfile: { settings: { plugins: Record<string, { mode: string; userConfigured: boolean }> } } } };
                 saveSettings: () => Promise<void>;
             };
-            for (const id of enabled) plugin.settings.plugins[id] = { mode: "alwaysEnabled", userConfigured: true };
-            for (const id of disabled) plugin.settings.plugins[id] = { mode: "alwaysDisabled", userConfigured: true };
+            for (const id of enabled) plugin.core.settingsService.activeProfile.settings.plugins[id] = { mode: "alwaysEnabled", userConfigured: true };
+            for (const id of disabled) plugin.core.settingsService.activeProfile.settings.plugins[id] = { mode: "alwaysDisabled", userConfigured: true };
             await plugin.saveSettings();
             app.plugins.enabledPlugins = new Set(desired);
             await app.vault.writeConfigJson("community-plugins", desired);
@@ -303,12 +303,12 @@ test.describe("unsaved draft when settings close", () => {
             await expect(page.locator(".lazy-review-changes-modal")).toHaveCount(0);
             await obsidian.page.evaluate(() => {
                 const plugin = app.plugins.plugins["on-demand-plugins"] as unknown as {
-                    settings: { plugins: Record<string, { mode: string; userConfigured: boolean }> };
+                    core: { settingsService: { activeProfile: { settings: { plugins: Record<string, { mode: string; userConfigured: boolean }> } } } };
                     settingsTab: { markDirty: () => void };
                 };
                 // One independent edit and one that supersedes the older batch draft.
-                plugin.settings.plugins["drift-dummy-00"] = { mode: "alwaysDisabled", userConfigured: true };
-                plugin.settings.plugins["drift-dummy-15"] = { mode: "alwaysEnabled", userConfigured: true };
+                plugin.core.settingsService.activeProfile.settings.plugins["drift-dummy-00"] = { mode: "alwaysDisabled", userConfigured: true };
+                plugin.core.settingsService.activeProfile.settings.plugins["drift-dummy-15"] = { mode: "alwaysEnabled", userConfigured: true };
                 plugin.settingsTab.markDirty();
             });
 
@@ -358,10 +358,10 @@ test.describe("unsaved draft when settings close", () => {
         await obsidian.openSettings(pluginUnderTestId, { subPage: "Plugin management" });
         await obsidian.page.evaluate((id) => {
             const plugin = app.plugins.plugins["on-demand-plugins"] as unknown as {
-                settings: { plugins: Record<string, { mode: string; userConfigured: boolean }> };
+                core: { settingsService: { activeProfile: { settings: { plugins: Record<string, { mode: string; userConfigured: boolean }> } } } };
                 settingsTab: { pendingPluginIds: Set<string>; markDirty: () => void };
             };
-            plugin.settings.plugins[id] = { mode: "lazy", userConfigured: true };
+            plugin.core.settingsService.activeProfile.settings.plugins[id] = { mode: "lazy", userConfigured: true };
             plugin.settingsTab.pendingPluginIds.add(id);
             plugin.settingsTab.markDirty();
         }, "drift-dummy-15");

@@ -88,7 +88,6 @@ export class MaintenanceFeature implements AppFeature {
         let changed = 0;
         const pluginIds: string[] = [];
         const manifests = this.ctx.getManifests();
-        const settings = this.ctx.getSettings();
 
         for (const manifest of manifests) {
             const isOnDisk = onDisk.has(manifest.id);
@@ -97,8 +96,9 @@ export class MaintenanceFeature implements AppFeature {
             const targetMode: PLUGIN_MODE | null = isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_DISABLED ? PLUGIN_MODE.ALWAYS_ENABLED : !isOnDisk && currentMode === PLUGIN_MODE.ALWAYS_ENABLED ? PLUGIN_MODE.ALWAYS_DISABLED : null;
 
             if (targetMode) {
-                settings.plugins[manifest.id] = {
-                    ...(settings.plugins[manifest.id] ?? {}),
+                const plugins = this.ctx.getPluginLayerForEdit(manifest.id).plugins;
+                plugins[manifest.id] = {
+                    ...(plugins[manifest.id] ?? {}),
                     mode: targetMode,
                     userConfigured: true,
                 };
@@ -140,12 +140,12 @@ export class MaintenanceFeature implements AppFeature {
     applyBatchModeReplace(fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE): number {
         let changed = 0;
         const manifests = this.ctx.getManifests();
-        const settings = this.ctx.getSettings();
 
         for (const manifest of manifests) {
             if (this.ctx.getPluginMode(manifest.id) === fromMode) {
-                settings.plugins[manifest.id] = {
-                    ...(settings.plugins[manifest.id] ?? {}),
+                const plugins = this.ctx.getPluginLayerForEdit(manifest.id).plugins;
+                plugins[manifest.id] = {
+                    ...(plugins[manifest.id] ?? {}),
                     mode: toMode,
                     userConfigured: true,
                 };

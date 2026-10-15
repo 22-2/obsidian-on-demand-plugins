@@ -36,10 +36,10 @@ test("expanding a collapsed sidebar loads the lazy plugin behind its restored vi
     const viewTypes = await withReloadRecorded(obsidian, () =>
         pluginHandle.evaluate(async (plugin: OnDemandPlugin, pluginId) => {
             await plugin.updatePluginSettings(pluginId, "lazy");
-            plugin.settings.plugins[pluginId].lazyOptions = { useView: true, viewTypes: [], useFile: false, fileCriteria: {} };
+            plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions = { useView: true, viewTypes: [], useFile: false, fileCriteria: {} };
             await plugin.saveSettings();
             await plugin.applyStartupPolicyAndRestart([pluginId]);
-            return plugin.settings.plugins[pluginId].lazyOptions?.viewTypes ?? [];
+            return plugin.core.settingsService.activeProfile.settings.plugins[pluginId].lazyOptions?.viewTypes ?? [];
         }, notebookNavigatorId),
     );
     expect(viewTypes).toContain(notebookNavigatorViewType);

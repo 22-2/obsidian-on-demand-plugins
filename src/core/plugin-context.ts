@@ -9,6 +9,10 @@ import type { Commands, Plugins } from "@obsidian-typings/obsidian-public-latest
 import type { App, EventRef, PluginManifest } from "obsidian";
 import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
 import type OnDemandPlugin from "src/main";
+import { layerProvidingPlugin } from "src/services/settings/settings-layers";
+
+/** The per-plugin maps of a settings layer: the shared defaults or a profile's overrides. */
+export type PluginLayer = Pick<DeviceSettings, "plugins" | "lazyOnViews" | "lazyOnFiles">;
 
 /** Edits a copy of the saved settings; `profileId` is the active profile. */
 export type SettingsChange = (data: LazySettings, profileId: string) => void | Promise<void>;
@@ -66,8 +70,14 @@ export interface PluginContext {
     /** Access the global LazySettings data object. */
     getData(): LazySettings;
 
-    /** Access the current device settings. */
+    /** The settings the active profile runs with. A fresh copy: edits go to a layer, not here. */
     getSettings(): DeviceSettings;
+
+    /** The live layer that holds a plugin's settings for the active profile (see layerProvidingPlugin). */
+    getPluginLayer(pluginId: string): PluginLayer;
+
+    /** The live layer a user edit of a plugin goes to; the active profile then overrides that plugin. */
+    getPluginLayerForEdit(pluginId: string): PluginLayer;
 
     /** Persist settings to disk. */
     saveSettings(): Promise<void>;
@@ -115,6 +125,8 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         },
         getData: () => plugin.data,
         getSettings: () => plugin.settings,
+        getPluginLayerForEdit: (pluginId) => plugin.core.settingsService.pluginLayerForEdit(pluginId),
+        getPluginLayer: (pluginId) => layerProvidingPlugin(plugin.core.settingsService.data, plugin.core.settingsService.currentProfileId, pluginId),
         saveSettings: () => plugin.saveSettings(),
         saveSettingsChange: (change) => plugin.saveSettingsChange(change),
         register: (unload) => plugin.register(unload),

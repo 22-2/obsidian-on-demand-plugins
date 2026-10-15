@@ -445,7 +445,8 @@ describe("SettingsService inline persistence", () => {
         await service.load();
         const saved = structuredClone(service.data);
         saved.showConsoleLog = true;
-        service.settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
+        // A live draft edit goes to the active profile's layer.
+        service.activeProfile.settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
 
         await service.save(saved);
         const persisted = JSON.parse(diskData) as LazySettings;
