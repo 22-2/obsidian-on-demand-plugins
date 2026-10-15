@@ -171,49 +171,61 @@ export class SettingsTab extends PluginSettingTab {
             {
                 type: "page",
                 name: "Behaviour",
-                desc: "Configure default loading behaviour.",
+                desc: "Configure loading and unsaved draft behaviour.",
                 items: [
-                    { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
                     {
-                        name: "Unsaved draft prompt",
-                        desc: "What to do with unsaved plugin changes when you return to plugin management or maintenance. Shared by all profiles.",
-                        // A render rather than a control: controls read and write the active profile, and this setting is shared.
-                        render: (setting) => {
-                            setting.addDropdown((dropdown) => {
-                                for (const [value, label] of Object.entries(RESTORE_DRAFT_BEHAVIOR_LABELS)) dropdown.addOption(value, label);
-                                dropdown.setValue(this.plugin.data.restoreDraftBehavior ?? "ask").onChange(async (value) => {
-                                    await this.saveImmediateChanges((data) => {
-                                        data.restoreDraftBehavior = value as RestoreDraftBehavior;
-                                    });
-                                });
-                            });
-                        },
+                        type: "group",
+                        heading: "Current profile",
+                        items: [
+                            { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
+                            {
+                                name: "Auto-remove uninstalled entries",
+                                desc: "Prune settings for plugins that are no longer installed.",
+                                render: (setting) => {
+                                    setting.addToggle((toggle) =>
+                                        toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange(async (value) => {
+                                            try {
+                                                await this.saveImmediateChanges(async (data, profileId) => {
+                                                    const settings = data.profiles[profileId].settings;
+                                                    settings.pruneUninstalledEntries = value;
+                                                    if (!value) return;
+                                                    const installed = new Set(this.plugin.manifests.map((manifest) => manifest.id));
+                                                    const maps = [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
+                                                    if (!maps.some((map) => Object.keys(map).some((id) => !installed.has(id)))) return;
+                                                    await this.plugin.features.get(BackupFeature)?.createBackup();
+                                                    for (const map of maps) {
+                                                        for (const id of Object.keys(map)) if (!installed.has(id)) delete map[id];
+                                                    }
+                                                });
+                                            } finally {
+                                                this.update();
+                                            }
+                                        }),
+                                    );
+                                },
+                            },
+                        ],
                     },
                     {
-                        name: "Auto-remove uninstalled entries",
-                        desc: "Prune settings for plugins that are no longer installed.",
-                        render: (setting) => {
-                            setting.addToggle((toggle) =>
-                                toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange(async (value) => {
-                                    try {
-                                        await this.saveImmediateChanges(async (data, profileId) => {
-                                            const settings = data.profiles[profileId].settings;
-                                            settings.pruneUninstalledEntries = value;
-                                            if (!value) return;
-                                            const installed = new Set(this.plugin.manifests.map((manifest) => manifest.id));
-                                            const maps = [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
-                                            if (!maps.some((map) => Object.keys(map).some((id) => !installed.has(id)))) return;
-                                            await this.plugin.features.get(BackupFeature)?.createBackup();
-                                            for (const map of maps) {
-                                                for (const id of Object.keys(map)) if (!installed.has(id)) delete map[id];
-                                            }
+                        type: "group",
+                        heading: "Shared across profiles",
+                        items: [
+                            {
+                                name: "Unsaved draft prompt",
+                                desc: "What to do with unsaved plugin changes when you return to plugin management or maintenance.",
+                                // A render rather than a control: controls read and write the active profile, and this setting is shared.
+                                render: (setting) => {
+                                    setting.addDropdown((dropdown) => {
+                                        for (const [value, label] of Object.entries(RESTORE_DRAFT_BEHAVIOR_LABELS)) dropdown.addOption(value, label);
+                                        dropdown.setValue(this.plugin.data.restoreDraftBehavior ?? "ask").onChange(async (value) => {
+                                            await this.saveImmediateChanges((data) => {
+                                                data.restoreDraftBehavior = value as RestoreDraftBehavior;
+                                            });
                                         });
-                                    } finally {
-                                        this.update();
-                                    }
-                                }),
-                            );
-                        },
+                                    });
+                                },
+                            },
+                        ],
                     },
                 ],
             },
