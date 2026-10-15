@@ -140,7 +140,9 @@ describe("CommandCacheStore", () => {
     describe("snapshot persistence", () => {
         it("preserves a valid empty snapshot across restarts", () => {
             const persisted: Record<string, unknown> = {};
-            vi.mocked(storageMs.saveLocalStorage).mockImplementation((_app, key, value) => { persisted[key] = value; });
+            vi.mocked(storageMs.saveLocalStorage).mockImplementation((_app, key, value) => {
+                persisted[key] = value;
+            });
             vi.mocked(storageMs.loadLocalStorage).mockImplementation((_app, key) => persisted[key]);
             store.set("test-plugin", []);
             store.persist();
@@ -160,7 +162,8 @@ describe("CommandCacheStore", () => {
             store.set("other-plugin", []);
             store.persist();
             expect(storageMs.saveLocalStorage).toHaveBeenCalledWith(mockCtx.app, "commandCacheVersions", {
-                "test-plugin": "0.9.0", "other-plugin": "2.0.0",
+                "test-plugin": "0.9.0",
+                "other-plugin": "2.0.0",
             });
         });
     });

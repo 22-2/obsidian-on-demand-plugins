@@ -47,7 +47,8 @@ function setup(count = 5, drift?: { confirmOverwrite: () => Promise<boolean> }) 
     const features = {
         get: (featureClass: unknown) => (featureClass === LazyEngineFeature ? { commandCache: cache } : featureClass === CommunityPluginsDriftFeature ? drift : undefined),
     };
-    feature.onload(ctx, { registry: { writeCommunityPluginsFile } } as never, features as never, {} as never);
+    const registry = { writeCommunityPluginsFile, loadEnabledPluginsFromDisk: vi.fn().mockResolvedValue(undefined), enabledPluginsFromDisk: new Set<string>() };
+    feature.onload(ctx, { registry } as never, features as never, {} as never);
     let cancel = () => {};
     const progress = {
         setOnCancel: (handler: () => void) => {
@@ -58,7 +59,7 @@ function setup(count = 5, drift?: { confirmOverwrite: () => Promise<boolean> }) 
         setProgress: vi.fn<(current: number) => void>(),
         close: vi.fn(),
     };
-    return { feature, plugins, cache, settings, saveSettings, reload, progress, writeCommunityPluginsFile, dialog: progress as unknown as ProgressDialog, cancel: () => cancel() };
+    return { feature, plugins, cache, settings, saveSettings, reload, progress, writeCommunityPluginsFile, registry, dialog: progress as unknown as ProgressDialog, cancel: () => cancel() };
 }
 
 describe("combined cache rebuild", () => {
@@ -206,5 +207,17 @@ describe("external community-plugins.json edits", () => {
         await t.feature.applyWithProgress(t.dialog);
 
         expect(t.writeCommunityPluginsFile).toHaveBeenCalled();
+    });
+
+    it("keeps entries for plugins this device does not manage, such as desktop-only ones on mobile", async () => {
+        const t = setup(3, { confirmOverwrite: vi.fn().mockResolvedValue(true) });
+        t.settings.plugins["plugin-1"] = { mode: "alwaysEnabled", userConfigured: true };
+        // plugin-0 is managed here and lazy; the other two are not installed (or hidden) on this device.
+        t.registry.enabledPluginsFromDisk = new Set(["plugin-0", "desktop-only", "other-device-only", "on-demand-plugins"]);
+
+        await t.feature.applyWithProgress(t.dialog);
+
+        expect(t.registry.loadEnabledPluginsFromDisk).toHaveBeenCalled();
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "other-device-only", "plugin-1"], false);
     });
 });

@@ -203,11 +203,13 @@ export class StartupPolicyFeature implements AppFeature {
             await this.ctx.saveSettings();
             saveLocalStorage(this.ctx.app, "lazyOnViews", lazyOnViews);
 
-            // Desired enabled set: always-enabled plugins plus this plugin.
+            // Desired enabled set: always-enabled plugins plus this plugin, keeping entries for plugins this device does not manage.
+            await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
             const desiredEnabled = computeDesiredCommunityPlugins(
                 this.ctx.getManifests().map((p) => p.id),
                 (id) => this.ctx.getPluginMode(id),
                 ON_DEMAND_PLUGIN_ID,
+                this.registry.enabledPluginsFromDisk,
             );
 
             // Update in-memory enabled set

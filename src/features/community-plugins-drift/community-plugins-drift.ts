@@ -26,11 +26,20 @@ export type DriftInput = {
     selfId: string;
 };
 
-/** IDs On-Demand writes to community-plugins.json: always-enabled plugins plus itself, sorted. */
-export function computeDesiredCommunityPlugins(manifestIds: Iterable<string>, getMode: (pluginId: string) => PLUGIN_MODE, selfId: string): string[] {
+/**
+ * IDs On-Demand writes to community-plugins.json: always-enabled plugins plus itself, sorted.
+ * IDs in `onDisk` that this device does not manage (plugins not installed here, or desktop-only
+ * plugins on mobile) are kept: the file is shared through Sync, and dropping them would disable
+ * those plugins on the devices that have them.
+ */
+export function computeDesiredCommunityPlugins(manifestIds: Iterable<string>, getMode: (pluginId: string) => PLUGIN_MODE, selfId: string, onDisk: Iterable<string> = []): string[] {
+    const managed = new Set(manifestIds);
     const ids = new Set<string>([selfId]);
-    for (const id of manifestIds) {
+    for (const id of managed) {
         if (getMode(id) === PLUGIN_MODE.ALWAYS_ENABLED) ids.add(id);
+    }
+    for (const id of onDisk) {
+        if (!managed.has(id)) ids.add(id);
     }
     return [...ids].sort((a, b) => a.localeCompare(b));
 }

@@ -37,6 +37,12 @@ describe("computeDesiredCommunityPlugins", () => {
         expect(computeDesiredCommunityPlugins(Object.keys(modes), (id) => modes[id], SELF)).toEqual(["alpha", SELF, "zeta"]);
     });
 
+    it("keeps on-disk entries for plugins this device does not manage", () => {
+        const modes: Record<string, PLUGIN_MODE> = { alpha: PLUGIN_MODE.ALWAYS_ENABLED, lazy: PLUGIN_MODE.LAZY };
+        const onDisk = ["lazy", "desktop-only", "not-installed-here", SELF];
+        expect(computeDesiredCommunityPlugins(Object.keys(modes), (id) => modes[id], SELF, onDisk)).toEqual(["alpha", "desktop-only", "not-installed-here", SELF]);
+    });
+
     it("never lists itself twice", () => {
         expect(computeDesiredCommunityPlugins([SELF], () => PLUGIN_MODE.ALWAYS_ENABLED, SELF)).toEqual([SELF]);
     });

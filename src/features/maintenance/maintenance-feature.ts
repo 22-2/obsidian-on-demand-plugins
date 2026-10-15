@@ -4,6 +4,7 @@ import type { AppFeature } from "src/core/feature";
 import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
+import { computeDesiredCommunityPlugins } from "src/features/community-plugins-drift/community-plugins-drift";
 import type { CoreContainer } from "src/services/core-container";
 import type { PluginRegistry } from "src/services/registry/plugin-registry";
 
@@ -154,17 +155,14 @@ export class MaintenanceFeature implements AppFeature {
         return changed;
     }
 
+    /** What exporting writes: always-enabled plugins and itself, keeping entries for plugins this device does not manage. */
     private getAlwaysEnabledIds(): string[] {
-        const ids = this.ctx
-            .getManifests()
-            .filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.ALWAYS_ENABLED)
-            .map((m) => m.id);
-
-        const selfId = this.ctx._plugin.manifest.id;
-        if (!ids.includes(selfId)) {
-            ids.push(selfId);
-        }
-        return ids;
+        return computeDesiredCommunityPlugins(
+            this.ctx.getManifests().map((m) => m.id),
+            (id) => this.ctx.getPluginMode(id),
+            this.ctx._plugin.manifest.id,
+            this.registry.enabledPluginsFromDisk,
+        );
     }
 
     private buildDiffSummary(header: string, toAdd: string[], toRemove: string[]): string {

@@ -256,7 +256,8 @@ test.describe("unsaved draft when settings close", () => {
         await expect(settingsPage.locator(".lazy-plugin-save-controls")).toContainText("15 plugins");
     }
     const changedPluginIds = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app.plugins.plugins["on-demand-plugins"] as unknown as { settingsTab: { getChangedPluginIds: () => string[] } }).settingsTab.getChangedPluginIds().sort());
-    const closeSettings = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app as unknown as { setting: { close: () => void } }).setting.close());
+    // Obsidian hides the tab only after the close animation, and skips it when settings reopen first, so wait for the window to go.
+    const closeSettings = (obsidian: ObsidianAPI) => obsidian.closeSettings();
     const waitForRestore = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app.plugins.plugins["on-demand-plugins"] as unknown as { settingsTab: { restoring: Promise<void> } }).settingsTab.restoring);
     // closePage is the action behind Obsidian's sub-page back button (hidden on desktop).
     const backToSettingsTop = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app.setting as unknown as { closePage: () => void }).closePage());
@@ -522,4 +523,26 @@ test("Sync now asks before writing Obsidian's config, then restarts to apply it"
         await reload.restore();
     }
     expect(await onDiskSorted(obsidian)).toEqual([pluginUnderTestId, ...initiallyEnabled].sort());
+});
+
+test("Apply and Sync now keep entries for plugins installed only on other devices", async ({ obsidian }) => {
+    await startFrom(obsidian);
+    // Another device's plugin, delivered through Sync; it is not installed in this vault.
+    const elsewhere = "installed-on-another-device";
+    await writeExternally(obsidian, [pluginUnderTestId, ...initiallyEnabled, elsewhere]);
+    // It is not reported as an external change, since applying no longer drops it.
+    expect(await detectDrift(obsidian)).toBeNull();
+
+    const pluginHandle = await obsidian.plugin(pluginUnderTestId);
+    await withReloadRecorded(obsidian, () => pluginHandle.evaluate((plugin: { applyStartupPolicyAndRestart: () => Promise<void> }) => plugin.applyStartupPolicyAndRestart()));
+    expect(await onDiskSorted(obsidian)).toEqual([pluginUnderTestId, ...initiallyEnabled, elsewhere].sort());
+
+    // Exporting On-Demand's settings keeps it too, after a change that does need writing.
+    await writeExternally(obsidian, [pluginUnderTestId, ...initiallyEnabled.slice(1), elsewhere]);
+    const result = await pluginHandle.evaluate(async (plugin: { features: { features: { executeSync?: (direction: string) => Promise<{ changed: number }> }[] } }) => {
+        const maintenance = plugin.features.features.find((candidate) => typeof candidate.executeSync === "function");
+        return maintenance!.executeSync!("lazyToCore");
+    });
+    expect(result.changed).toBe(1);
+    expect(await onDiskSorted(obsidian)).toEqual([pluginUnderTestId, ...initiallyEnabled, elsewhere].sort());
 });

@@ -117,6 +117,23 @@ describe("MaintenanceFeature", () => {
             expect([...mockCtx.obsidianPlugins.enabledPlugins].sort()).toEqual(["on-demand-plugins", "plugin-2"]);
         });
 
+        it("keeps entries for plugins this device does not manage when exporting", async () => {
+            mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "desktop-only", "on-demand-plugins"]);
+
+            const result = await feature.executeSync("lazyToCore");
+
+            expect(result.changed).toBe(1);
+            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "plugin-2"], false);
+        });
+
+        it("previews no removal for entries this device does not manage", async () => {
+            mockRegistry.enabledPluginsFromDisk = new Set(["plugin-2", "desktop-only", "on-demand-plugins"]);
+
+            const preview = await feature.buildSyncPreview("lazyToCore");
+
+            expect(preview.hasChanges).toBe(false);
+        });
+
         it("should do nothing if already in sync", async () => {
             mockCtx.getManifests.mockReturnValue([{ id: "plugin-1", name: "Plugin 1" }]);
             settingsState = {

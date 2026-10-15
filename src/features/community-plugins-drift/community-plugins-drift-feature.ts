@@ -38,7 +38,7 @@ export class CommunityPluginsDriftFeature implements AppFeature {
 
     getDesired(): string[] {
         const ids = this.ctx.getManifests().map((manifest) => manifest.id);
-        return computeDesiredCommunityPlugins(ids, (id) => this.ctx.getPluginMode(id), ON_DEMAND_PLUGIN_ID);
+        return computeDesiredCommunityPlugins(ids, (id) => this.ctx.getPluginMode(id), ON_DEMAND_PLUGIN_ID, this.registry.enabledPluginsFromDisk);
     }
 
     /** Re-reads the file and reports the entries the next write would undo. */
