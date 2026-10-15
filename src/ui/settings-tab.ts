@@ -13,7 +13,7 @@ import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { PluginPage } from "src/ui/settings/pages/plugin-page";
 import { ProfileManagementPage } from "src/ui/settings/pages/profile-management-page";
 import type { ChangeDescriber, DraftStash, ImmediateSettingsChange, PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
-import { PendingChanges } from "src/ui/settings/pending-changes";
+import { PendingChanges, RESTORE_DRAFT_BEHAVIOR_LABELS } from "src/ui/settings/pending-changes";
 
 export class SettingsTab extends PluginSettingTab {
     public plugin: OnDemandPlugin;
@@ -127,18 +127,18 @@ export class SettingsTab extends PluginSettingTab {
                 this.restoreOfferRequested.clear();
                 return;
             }
-            const behavior = this.plugin.settings.restoreDraftBehavior ?? "ask";
+            const behavior = this.plugin.data.restoreDraftBehavior ?? "ask";
             const choice = behavior === "ask" ? await showRestoreDraftModal(this.app, () => changes) : { action: behavior, dontAskAgain: false };
             // An automatic choice is otherwise invisible, so say what happened and how to change it.
             if (behavior !== "ask" && this.stash === stash) {
                 const count = `${changes.length} unsaved ${changes.length === 1 ? "change" : "changes"}`;
-                new Notice(`${behavior === "restore" ? "Restored" : "Discarded"} ${count}. Change this under Plugin management › Unsaved draft prompt.`);
+                new Notice(`${behavior === "restore" ? "Restored" : "Discarded"} ${count}. Change this under Behaviour › Unsaved draft prompt.`);
             }
             if (choice.action === "dismiss" || this.stash !== stash) return;
             if (choice.dontAskAgain) {
                 try {
-                    await this.saveImmediateChanges((data, profileId) => {
-                        data.profiles[profileId].settings.restoreDraftBehavior = choice.action as RestoreDraftBehavior;
+                    await this.saveImmediateChanges((data) => {
+                        data.restoreDraftBehavior = choice.action as RestoreDraftBehavior;
                     });
                 } catch {
                     new Notice("Could not save the restore preference. This choice still applies to this draft.");
@@ -174,6 +174,21 @@ export class SettingsTab extends PluginSettingTab {
                 desc: "Configure default loading behaviour.",
                 items: [
                     { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
+                    {
+                        name: "Unsaved draft prompt",
+                        desc: "What to do with unsaved plugin changes when you return to plugin management or maintenance. Shared by all profiles.",
+                        // A render rather than a control: controls read and write the active profile, and this setting is shared.
+                        render: (setting) => {
+                            setting.addDropdown((dropdown) => {
+                                for (const [value, label] of Object.entries(RESTORE_DRAFT_BEHAVIOR_LABELS)) dropdown.addOption(value, label);
+                                dropdown.setValue(this.plugin.data.restoreDraftBehavior ?? "ask").onChange(async (value) => {
+                                    await this.saveImmediateChanges((data) => {
+                                        data.restoreDraftBehavior = value as RestoreDraftBehavior;
+                                    });
+                                });
+                            });
+                        },
+                    },
                     {
                         name: "Auto-remove uninstalled entries",
                         desc: "Prune settings for plugins that are no longer installed.",

@@ -83,6 +83,30 @@ describe("SettingsService loading", () => {
         expect(service.data.profiles.Default.settings.lazyOnFiles).toEqual({});
     });
 
+    describe("unsaved draft prompt", () => {
+        const profileWith = (settings: Record<string, unknown>) => ({ Default: { id: "Default", name: "Default", settings: { defaultMode: "lazy", ...settings } } });
+
+        it("adopts a value pre-release builds kept on the active profile and removes it from profiles", async () => {
+            const { service } = createService(migratedDataWith({ profiles: profileWith({ restoreDraftBehavior: "discard" }) }));
+            await service.load();
+            expect(service.data.restoreDraftBehavior).toBe("discard");
+            expect(service.data.profiles.Default.settings).not.toHaveProperty("restoreDraftBehavior");
+        });
+
+        it("keeps the shared value over a leftover profile value", async () => {
+            const { service } = createService(migratedDataWith({ restoreDraftBehavior: "restore", profiles: profileWith({ restoreDraftBehavior: "discard" }) }));
+            await service.load();
+            expect(service.data.restoreDraftBehavior).toBe("restore");
+            expect(service.data.profiles.Default.settings).not.toHaveProperty("restoreDraftBehavior");
+        });
+
+        it.each([undefined, "sometimes", 1])("falls back to asking for a missing or unknown value (%s)", async (value) => {
+            const { service } = createService(migratedDataWith({ restoreDraftBehavior: value, profiles: profileWith({}) }));
+            await service.load();
+            expect(service.data.restoreDraftBehavior).toBe("ask");
+        });
+    });
+
     it("blocks invalid profile data instead of replacing it with defaults", async () => {
         const { service, plugin } = createService({ profiles: null, desktopProfileId: null, mobileProfileId: null });
 

@@ -88,6 +88,7 @@ export class SettingsService {
         if (source === "legacy") this.migrateLegacySettings();
 
         this.currentProfileId = this.selectActiveProfileId();
+        this.normalizeRestoreDraftBehavior(loaded);
         Object.values(this.data.profiles).forEach((profile) => this.normalizeProfileSettings(profile));
         this.dropDeadFields();
         this.settings = this.data.profiles[this.currentProfileId].settings;
@@ -159,6 +160,14 @@ export class SettingsService {
      * now lives in vault-scoped storage, so any copy here is stale bloat. Runs on
      * every load so already-migrated installs get cleaned too.
      */
+    /** Pre-release builds stored this per profile; adopt the active profile's value once, then keep it shared. */
+    private normalizeRestoreDraftBehavior(loaded: Partial<LazySettings>) {
+        const fromProfile = (this.data.profiles[this.currentProfileId]?.settings as unknown as Partial<Record<string, unknown>> | undefined)?.restoreDraftBehavior;
+        if (!Object.hasOwn(loaded, "restoreDraftBehavior") && isRestoreDraftBehavior(fromProfile)) this.data.restoreDraftBehavior = fromProfile;
+        if (!isRestoreDraftBehavior(this.data.restoreDraftBehavior)) this.data.restoreDraftBehavior = DEFAULT_SETTINGS.restoreDraftBehavior;
+        for (const profile of Object.values(this.data.profiles)) delete (profile.settings as unknown as Partial<Record<string, unknown>>).restoreDraftBehavior;
+    }
+
     private dropDeadFields() {
         const data: LazySettings & LegacyDeadFields = this.data;
         delete data.commandCache;
@@ -226,7 +235,6 @@ export class SettingsService {
     private isValidDeviceSettings(value: unknown): value is DeviceSettings {
         if (!isRecord(value)) return false;
         if (value.defaultMode !== undefined && !isPluginMode(value.defaultMode)) return false;
-        if (value.restoreDraftBehavior !== undefined && !isRestoreDraftBehavior(value.restoreDraftBehavior)) return false;
         if (value.pruneUninstalledEntries !== undefined && typeof value.pruneUninstalledEntries !== "boolean") return false;
         return ["plugins", "lazyOnViews", "lazyOnFiles"].every((key) => value[key] === undefined || isRecord(value[key]));
     }
@@ -297,9 +305,6 @@ export class SettingsService {
 
         if (profile.settings.defaultMode === undefined) {
             profile.settings.defaultMode = DEFAULT_DEVICE_SETTINGS.defaultMode;
-        }
-        if (profile.settings.restoreDraftBehavior === undefined) {
-            profile.settings.restoreDraftBehavior = DEFAULT_DEVICE_SETTINGS.restoreDraftBehavior;
         }
         if (profile.settings.pruneUninstalledEntries === undefined) {
             profile.settings.pruneUninstalledEntries = DEFAULT_DEVICE_SETTINGS.pruneUninstalledEntries;

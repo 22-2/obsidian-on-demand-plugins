@@ -42,7 +42,7 @@ Entries for plugins that are not installed on this device, or desktop-only plugi
 
 ### Unsaved changes
 
-Mode changes stay a draft until you click **Review & save…**. Moving between On-Demand's settings pages keeps the draft. If you close settings or switch to another settings tab, the draft is set aside and On-Demand keeps running on the saved settings. When you return to **Plugin management** or **Maintenance & batch**, it offers the draft back (**Restore** or **Discard**). **Plugin management › Unsaved draft prompt** can restore or discard it automatically instead. A set-aside draft lasts until Obsidian restarts.
+Mode changes stay a draft until you click **Review & save…**. Moving between On-Demand's settings pages keeps the draft. If you close settings or switch to another settings tab, the draft is set aside and On-Demand keeps running on the saved settings. When you return to **Plugin management** or **Maintenance & batch**, it offers the draft back (**Restore** or **Discard**). **Behaviour › Unsaved draft prompt** (shared by all profiles) can restore or discard it automatically instead. A set-aside draft lasts until Obsidian restarts.
 
 ### How it works
 

@@ -23,6 +23,7 @@ function setup() {
     const service = { data, persisted: structuredClone(data), currentProfileId: DEFAULT_PROFILE_ID };
     const plugin = {
         core: { settingsService: service },
+        data,
         settings,
         manifests: [{ id: "foo", name: "Foo" }],
         configureLogger: vi.fn(),
@@ -168,12 +169,12 @@ describe("settings draft lifecycle", () => {
     });
 
     it.each([
-        ["restore", PLUGIN_MODE.LAZY, "Restored 1 unsaved change. Change this under Plugin management › Unsaved draft prompt."],
-        ["discard", PLUGIN_MODE.ALWAYS_DISABLED, "Discarded 1 unsaved change. Change this under Plugin management › Unsaved draft prompt."],
+        ["restore", PLUGIN_MODE.LAZY, "Restored 1 unsaved change. Change this under Behaviour › Unsaved draft prompt."],
+        ["discard", PLUGIN_MODE.ALWAYS_DISABLED, "Discarded 1 unsaved change. Change this under Behaviour › Unsaved draft prompt."],
     ] as const)("announces an automatic %s instead of acting silently", async (behavior, expectedMode, message) => {
         const { tab, settings, service } = setup();
         // Save the preference so it is not part of the draft.
-        settings.restoreDraftBehavior = behavior;
+        service.data.restoreDraftBehavior = behavior;
         service.persisted = structuredClone(service.data);
         settings.defaultMode = PLUGIN_MODE.LAZY;
         tab.requestRestoreOnPageClose("maintenance");

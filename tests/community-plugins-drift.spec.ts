@@ -77,8 +77,10 @@ const onDiskSorted = async (obsidian: ObsidianAPI) => (await obsidian.enabledPlu
 const savedRestoreDraftBehavior = (obsidian: ObsidianAPI) =>
     obsidian.page.evaluate(async () => {
         const raw = await app.vault.adapter.read(`${app.vault.configDir}/plugins/on-demand-plugins/data.json`);
-        const data = JSON.parse(raw) as { desktopProfileId: string; profiles: Record<string, { settings: { restoreDraftBehavior?: string } }> };
-        return data.profiles[data.desktopProfileId].settings.restoreDraftBehavior;
+        const data = JSON.parse(raw) as { restoreDraftBehavior?: string; profiles: Record<string, { settings: Record<string, unknown> }> };
+        // The preference is shared, so no profile may carry its own copy.
+        if (Object.values(data.profiles).some((profile) => "restoreDraftBehavior" in profile.settings)) return "stored on a profile";
+        return data.restoreDraftBehavior;
     });
 
 const driftNotice = (obsidian: ObsidianAPI) => obsidian.page.locator(".notice").filter({ hasText: "changed outside On-Demand Plugins" });
@@ -275,6 +277,8 @@ test.describe("unsaved draft when settings close", () => {
 
         await page.getByText("Plugin management", { exact: true }).click();
         await expect(page.locator(".lazy-plugin-save-controls")).toContainText("15 plugins");
+        await backToSettingsTop(obsidian);
+        await page.getByText("Behaviour", { exact: true }).click();
         await page
             .locator(".setting-item")
             .filter({ has: page.getByText("Unsaved draft prompt", { exact: true }) })
@@ -370,9 +374,11 @@ test.describe("unsaved draft when settings close", () => {
         expect(await modesOf(obsidian, ["drift-dummy-15"])).toEqual(["lazy"]);
     });
 
-    test("the restore prompt preference can be changed from Plugin management", async ({ obsidian }) => {
+    test("the restore prompt preference is a shared setting on the Behaviour page", async ({ obsidian }) => {
         await startFrom(obsidian);
-        const settingsPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Plugin management" });
+        const pluginPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Plugin management" });
+        await expect(pluginPage.getByText("Unsaved draft prompt", { exact: true })).toHaveCount(0);
+        const settingsPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Behaviour" });
         const preference = settingsPage
             .locator(".setting-item")
             .filter({ has: settingsPage.getByText("Unsaved draft prompt", { exact: true }) })

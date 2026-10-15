@@ -53,8 +53,6 @@ export interface FileActivationCriteria {
 // Settings per device (desktop/mobile)
 export interface DeviceSettings {
     defaultMode: PLUGIN_MODE;
-    /** How to handle an unsaved draft when its settings page is reopened. */
-    restoreDraftBehavior: RestoreDraftBehavior;
     // When true, settings/cache entries for plugin IDs no longer present in the
     // installed manifests are pruned during the manifest reconcile pass.
     pruneUninstalledEntries: boolean;
@@ -65,7 +63,6 @@ export interface DeviceSettings {
 
 export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
     defaultMode: PLUGIN_MODE.ALWAYS_DISABLED,
-    restoreDraftBehavior: "ask",
     pruneUninstalledEntries: false,
     plugins: {},
     lazyOnViews: {},
@@ -82,6 +79,8 @@ export interface Profile {
 // Global settings for the plugin
 export interface LazySettings {
     showConsoleLog: boolean;
+    /** How to handle an unsaved draft when its settings page is reopened; shared by all profiles. */
+    restoreDraftBehavior: RestoreDraftBehavior;
     lastLazyPluginVersion?: string;
     // Reason: refusing unknown schema versions prevents older plugin builds from overwriting newer synced settings.
     settingsSchemaVersion?: number;
@@ -108,6 +107,7 @@ export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
+    restoreDraftBehavior: "ask",
     profiles: {
         [DEFAULT_PROFILE_ID]: {
             id: DEFAULT_PROFILE_ID,

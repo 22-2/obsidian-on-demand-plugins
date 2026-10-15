@@ -43,7 +43,7 @@ Obsidian プラグインの起動を遅延させ、必要なときだけ読み�
 
 ## 保存していない変更について
 
-モードの変更は **Review & save…** を押すまで下書きのままです。On-Demand の設定ページ間を移動しても下書きは残ります。設定画面を閉じたり別の設定タブに移ったりすると下書きは一時的に退避され、On-Demand は保存済みの設定で動きます。**Plugin management** または **Maintenance & batch** に戻ると、退避した下書きを戻すか（**Restore**）捨てるか（**Discard**）を聞かれます。**Plugin management › Unsaved draft prompt** で、自動で戻す・捨てるようにもできます。退避した下書きは Obsidian を再起動するまで保持されます。
+モードの変更は **Review & save…** を押すまで下書きのままです。On-Demand の設定ページ間を移動しても下書きは残ります。設定画面を閉じたり別の設定タブに移ったりすると下書きは一時的に退避され、On-Demand は保存済みの設定で動きます。**Plugin management** または **Maintenance & batch** に戻ると、退避した下書きを戻すか（**Restore**）捨てるか（**Discard**）を聞かれます。**Behaviour › Unsaved draft prompt**（全プロファイル共通）で、自動で戻す・捨てるようにもできます。退避した下書きは Obsidian を再起動するまで保持されます。
 
 ---
 

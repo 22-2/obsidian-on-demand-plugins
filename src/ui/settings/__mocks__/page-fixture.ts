@@ -9,6 +9,7 @@ export function createPageFixture(feature?: unknown) {
     const profile = (id: string, name: string) => ({ id, name, settings: structuredClone(DEFAULT_DEVICE_SETTINGS) });
     const data: LazySettings = {
         showConsoleLog: false,
+        restoreDraftBehavior: "ask",
         desktopProfileId: "home",
         mobileProfileId: "work",
         profiles: {

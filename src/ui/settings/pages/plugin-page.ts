@@ -4,7 +4,6 @@ import { ExtraButtonComponent, Menu, Notice, Setting, SettingPage, ToggleCompone
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
-import type { RestoreDraftBehavior } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
@@ -81,21 +80,6 @@ export class PluginPage extends SettingPage {
             .setName(pluginStatisticsText(this.plugin))
             .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
             .setClass("lazy-plugin-statistics");
-        new Setting(this.containerEl)
-            .setName("Unsaved draft prompt")
-            .setDesc("Choose what happens to unsaved changes when you return to plugin management or maintenance.")
-            .addDropdown((dropdown) => {
-                dropdown
-                    .addOption("ask", "Ask every time")
-                    .addOption("restore", "Always restore")
-                    .addOption("discard", "Always discard")
-                    .setValue(this.plugin.settings.restoreDraftBehavior ?? "ask")
-                    .onChange(async (value) => {
-                        await this.tab.saveImmediateChanges((data, profileId) => {
-                            data.profiles[profileId].settings.restoreDraftBehavior = value as RestoreDraftBehavior;
-                        });
-                    });
-            });
         // Phones show the refresh control on the heading's right; desktop shows it beside the filters (see CSS).
         new Setting(this.containerEl)
             .setName("Plugins")
