@@ -91,22 +91,8 @@ export async function triggerActiveLeafChange(obsidian: ObsidianAPI): Promise<vo
 
 async function readOnDemandStorageRecord(obsidian: ObsidianAPI, prefix: string): Promise<Record<string, unknown> | null> {
     return obsidian.page.evaluate((storagePrefix) => {
-        const appWithId = app as unknown as {
-            app?: {
-                appId?: string;
-            };
-            appId?: string;
-            manifest?: {
-                id?: string;
-            };
-        };
-        const appId = appWithId.appId ?? appWithId.app?.appId ?? appWithId.manifest?.id ?? null;
-        if (!appId) {
-            return null;
-        }
-
-        const raw = window.localStorage.getItem(`on-demand:${storagePrefix}:${appId}`);
-        return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+        const value: unknown = app.loadLocalStorage(`on-demand:${storagePrefix}`);
+        return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
     }, prefix);
 }
 

@@ -62,14 +62,10 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
     padding-block: var(--size-4-2);
     border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.lazy-review-changes-info {
-    /* Share the description's grid row with the revert button, independently of the name height. */
-    display: contents;
 }
 
 .lazy-review-changes-name {
@@ -79,14 +75,15 @@
 }
 
 .lazy-review-changes-desc {
-    grid-column: 1;
+    grid-column: 1 / -1;
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     overflow-wrap: anywhere;
 }
 
-.lazy-review-changes-info:only-child .lazy-review-changes-desc {
-    grid-column: 1 / -1;
+/* Share the description's grid row with the revert button, independently of the name height. */
+.lazy-review-changes-item.has-revert .lazy-review-changes-desc {
+    grid-column: 1;
 }
 
 .lazy-review-changes-item > .extra-setting-button {
@@ -230,7 +227,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
 }
 
 .lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge,
@@ -349,8 +347,12 @@
 }
 
 .lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-description {
-    /* Lets the badges become flex items of the info row instead of a separate block below the name. */
-    display: contents;
+    /* Keeps the badges on the name's line instead of a separate block below it. */
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
+    margin-top: 0;
 }
 
 .lazy-plugin-list-body.is-compact .lazy-plugin-description,
@@ -442,7 +444,8 @@ body:not(.is-mobile) .lazy-plugin-mode-row .setting-item-description {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
 }
 
 body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-description {
@@ -469,7 +472,8 @@ body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-meta-badge {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
 }
 
 .lazy-plugin-mode-row .setting-item-info > .setting-item-description {
