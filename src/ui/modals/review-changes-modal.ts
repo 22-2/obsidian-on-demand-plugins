@@ -12,7 +12,7 @@ const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
 export type ReviewChangesOptions = {
     /**
      * "save" offers per-item reverts before saving; "discard" only previews what will be lost;
-     * "restore" offers a draft left unsaved when settings closed, with Discard as the other choice.
+     * "restore" offers a draft set aside when leaving On-Demand settings, with Discard as the other choice.
      */
     mode: "save" | "discard" | "restore";
     getChanges: () => PendingChange[];
@@ -22,7 +22,7 @@ export type ReviewChangesOptions = {
 const MODE_TEXT = {
     save: { title: "Review changes", note: "Plugin mode changes are applied when saved." },
     discard: { title: "Discard changes", note: "These changes will be lost and the saved settings restored." },
-    restore: { title: "Restore unsaved changes", note: "These changes were not saved when settings closed. Restore them to keep editing, or discard them." },
+    restore: { title: "Restore unsaved changes", note: "These unsaved changes were set aside when you left On-Demand settings. Restore them to keep editing, or discard them." },
 };
 
 export type RestoreChoice = { action: "restore" | "discard" | "dismiss"; dontAskAgain: boolean };

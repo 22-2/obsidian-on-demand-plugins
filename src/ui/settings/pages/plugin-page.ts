@@ -152,7 +152,7 @@ export class PluginPage extends SettingPage {
         this.disconnectInfiniteScroll();
         this.unwatchPluginLoadState();
         this.communityPluginReadId++;
-        this.tab.stashDraftOnPageClose("plugin-management");
+        this.tab.requestRestoreOnPageClose("plugin-management");
         super.hide();
     }
     private renderInfiniteList() {

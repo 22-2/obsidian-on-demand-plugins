@@ -64,7 +64,7 @@ export class MaintenancePage extends SettingPage {
         return this.syncing;
     }
     hide() {
-        this.tab.stashDraftOnPageClose("maintenance");
+        this.tab.requestRestoreOnPageClose("maintenance");
         super.hide();
     }
     private async runSync(feature: MaintenanceFeature) {

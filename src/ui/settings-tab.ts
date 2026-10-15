@@ -48,7 +48,7 @@ export class SettingsTab extends PluginSettingTab {
         });
         this.update();
     }
-    /** A draft left unsaved when settings last closed; kept for this session only. */
+    /** A draft set aside when this settings tab was left; kept for this session only. */
     private stash?: DraftStash;
     /**
      * Obsidian has no event for a tab being shown and reuses its cached definitions, but it
@@ -86,21 +86,20 @@ export class SettingsTab extends PluginSettingTab {
             this.restoreQuietly();
         }
     }
-    /** Stash page edits and remember where the user can choose to restore them. */
-    stashDraftOnPageClose(page: "plugin-management" | "maintenance") {
-        if (this.stashPendingDraft()) this.restoreOfferRequested.add(page);
+    /** Remember the page to offer after a tab close; navigating within this tab keeps edits live. */
+    requestRestoreOnPageClose(page: "plugin-management" | "maintenance") {
+        if (this.pending.hasChanges) this.restoreOfferRequested.add(page);
     }
     /** Offer a stashed draft only after its page was previously left. */
     offerRestoreOnPageOpen(page: "plugin-management" | "maintenance") {
         if (this.restoreOfferRequested.has(page) && this.stash && !this.redrawing && !this.restoreOfferInProgress) this.restoring = this.offerRestore();
     }
-    private stashPendingDraft(): boolean {
+    private stashPendingDraft() {
         // Keep an older stash when there is nothing new, so a quick look does not lose it.
-        const stash = this.pending.stashDraft();
-        if (!stash) return false;
+        const stash = this.pending.stashDraft(this.stash);
+        if (!stash) return;
         this.stash = stash;
         this.plugin.configureLogger();
-        return true;
     }
     /** Stops watching renders; the stash goes with the plugin, as it lives for this session only. */
     dispose() {

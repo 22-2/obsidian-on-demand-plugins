@@ -252,10 +252,67 @@ test.describe("unsaved draft when settings close", () => {
     }
     const changedPluginIds = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app.plugins.plugins["on-demand-plugins"] as unknown as { settingsTab: { getChangedPluginIds: () => string[] } }).settingsTab.getChangedPluginIds().sort());
     const closeSettings = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app as unknown as { setting: { close: () => void } }).setting.close());
+    const waitForRestore = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app.plugins.plugins["on-demand-plugins"] as unknown as { settingsTab: { restoring: Promise<void> } }).settingsTab.restoring);
+    // closePage is the action behind Obsidian's sub-page back button (hidden on desktop).
+    const backToSettingsTop = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app.setting as unknown as { closePage: () => void }).closePage());
     const restoreModal = async (obsidian: ObsidianAPI) => {
         const page = await obsidian.findPage((candidate) => candidate.locator(".lazy-review-changes-modal").filter({ hasText: "Restore unsaved changes" }), { timeout: 10_000 });
         return page.locator(".lazy-review-changes-modal");
     };
+
+    test("sub-page navigation keeps the live draft even with automatic discard selected", async ({ obsidian }) => {
+        await startFrom(obsidian);
+        const page = await stageBatch(obsidian);
+        await backToSettingsTop(obsidian);
+        expect(await changedPluginIds(obsidian)).toEqual(initiallyDisabled);
+        expect(await modesOf(obsidian, initiallyDisabled)).toEqual(initiallyDisabled.map(() => "lazy"));
+
+        await page.getByText("Plugin management", { exact: true }).click();
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("15 plugins");
+        await page.locator(".setting-item").filter({ has: page.getByText("Unsaved draft prompt", { exact: true }) }).locator("select:visible").selectOption("discard");
+        await expect.poll(() => savedRestoreDraftBehavior(obsidian)).toBe("discard");
+        await backToSettingsTop(obsidian);
+        await page.getByText("Maintenance & batch", { exact: true }).click();
+
+        await expect(page.locator(".lazy-plugin-save-controls")).toContainText("15 plugins");
+        await expect(page.locator(".lazy-review-changes-modal")).toHaveCount(0);
+        expect(await changedPluginIds(obsidian)).toEqual(initiallyDisabled);
+        expect(await savedModes(obsidian, initiallyDisabled)).toEqual(initiallyDisabled.map(() => "alwaysDisabled"));
+    });
+
+    for (const closeBeforeRestore of [false, true]) {
+        test(`older and newer drafts survive editing another page (close before restore: ${closeBeforeRestore})`, async ({ obsidian }) => {
+            await startFrom(obsidian);
+            await stageBatch(obsidian);
+            await closeSettings(obsidian);
+            const page = await obsidian.openSettings(pluginUnderTestId, { subPage: "Plugin management" });
+            await expect(page.locator(".lazy-review-changes-modal")).toHaveCount(0);
+            await obsidian.page.evaluate(() => {
+                const plugin = app.plugins.plugins["on-demand-plugins"] as unknown as {
+                    settings: { plugins: Record<string, { mode: string; userConfigured: boolean }> };
+                    settingsTab: { markDirty: () => void };
+                };
+                // One independent edit and one that supersedes the older batch draft.
+                plugin.settings.plugins["drift-dummy-00"] = { mode: "alwaysDisabled", userConfigured: true };
+                plugin.settings.plugins["drift-dummy-15"] = { mode: "alwaysEnabled", userConfigured: true };
+                plugin.settingsTab.markDirty();
+            });
+
+            if (closeBeforeRestore) {
+                await closeSettings(obsidian);
+                await obsidian.openSettings(pluginUnderTestId, { subPage: "Maintenance & batch" });
+            } else {
+                await backToSettingsTop(obsidian);
+                await page.getByText("Maintenance & batch", { exact: true }).click();
+            }
+            const modal = await restoreModal(obsidian);
+            await modal.getByRole("button", { name: /^Restore \(/ }).click();
+
+            expect(await changedPluginIds(obsidian)).toEqual(["drift-dummy-00", ...initiallyDisabled]);
+            expect(await modesOf(obsidian, ["drift-dummy-00", "drift-dummy-15", "drift-dummy-16"])).toEqual(["alwaysDisabled", "alwaysEnabled", "lazy"]);
+            expect(await savedModes(obsidian, ["drift-dummy-00", "drift-dummy-15", "drift-dummy-16"])).toEqual(["alwaysEnabled", "alwaysDisabled", "alwaysDisabled"]);
+        });
+    }
 
     test("closing keeps the draft out of the running settings and offers it back on reopen", async ({ obsidian }) => {
         await startFrom(obsidian);
@@ -327,6 +384,7 @@ test.describe("unsaved draft when settings close", () => {
         const modal = await restoreModal(obsidian);
         await modal.getByLabel("Don't ask again").check();
         await modal.getByRole("button", { name: "Restore (15)" }).click();
+        await waitForRestore(obsidian);
         await expect.poll(() => savedRestoreDraftBehavior(obsidian)).toBe("restore");
 
         await closeSettings(obsidian);
@@ -346,6 +404,7 @@ test.describe("unsaved draft when settings close", () => {
         const modal = await restoreModal(obsidian);
         await modal.getByLabel("Don't ask again").check();
         await modal.getByRole("button", { name: "Discard" }).click();
+        await waitForRestore(obsidian);
         await expect.poll(() => savedRestoreDraftBehavior(obsidian)).toBe("discard");
         expect(await modesOf(obsidian, initiallyDisabled)).toEqual(initiallyDisabled.map(() => "alwaysDisabled"));
 

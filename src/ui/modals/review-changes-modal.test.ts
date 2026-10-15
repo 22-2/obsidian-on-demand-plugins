@@ -217,7 +217,7 @@ describe("showReviewChangesModal", () => {
             const modal = mockState.modals[0];
 
             expect(modal.titleEl.text).toBe("Restore unsaved changes");
-            expect(findElements(modal.contentEl, "lazy-review-changes-note")[0]?.text).toBe("These changes were not saved when settings closed. Restore them to keep editing, or discard them.");
+            expect(findElements(modal.contentEl, "lazy-review-changes-note")[0]?.text).toBe("These unsaved changes were set aside when you left On-Demand settings. Restore them to keep editing, or discard them.");
             expect(mockState.extraButtonCalls).toEqual([]);
             button(modal, "Restore (1)")?.clickHandler?.();
 

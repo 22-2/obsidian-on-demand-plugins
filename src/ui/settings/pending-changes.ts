@@ -148,15 +148,20 @@ export class PendingChanges {
 
     /**
      * Takes the draft out of the live settings, which return to the saved values,
-     * and returns it so it can be restored later. Undefined when there is no draft.
+     * and returns it so it can be restored later. Retains an earlier stash, with
+     * newer live edits winning conflicts. Undefined when there is no live draft.
      */
-    stashDraft(): DraftStash | undefined {
+    stashDraft(previous?: DraftStash): DraftStash | undefined {
         const source = this.getSource();
         const baseline = this.baselineData;
         if (!source?.data || !baseline || !this.hasChanges) return undefined;
-        const stash = { draft: structuredClone(source.data), base: structuredClone(baseline), currentProfileId: source.currentProfileId };
+        const liveDraft = structuredClone(source.data);
+        const draft = structuredClone(baseline);
+        if (previous) applySavedChanges(draft, previous.base, previous.draft);
+        applySavedChanges(draft, baseline, liveDraft);
+        const stash = { draft, base: structuredClone(baseline), currentProfileId: source.currentProfileId };
         // Edit in place: the settings service keeps references to these objects.
-        applySavedChanges(source.data, stash.draft, stash.base);
+        applySavedChanges(source.data, liveDraft, stash.base);
         this.pluginIds.clear();
         return stash;
     }
@@ -170,12 +175,16 @@ export class PendingChanges {
 
     /**
      * Puts a stashed draft back by applying only what it changed relative to its saved
-     * settings, so saves made in the meantime (e.g. a Community plugins toggle) are kept.
+     * settings, so unrelated saves made in the meantime are kept. Newer live draft
+     * edits win when the same field was edited again before the stash was restored.
      */
     restoreDraft(stash: DraftStash) {
         const data = this.getSource()?.data;
-        if (!data) return;
+        const baseline = this.baselineData;
+        if (!data || !baseline) return;
+        const liveDraft = structuredClone(data);
         applySavedChanges(data, stash.base, stash.draft);
+        applySavedChanges(data, baseline, liveDraft);
     }
 
     markDirty() {
