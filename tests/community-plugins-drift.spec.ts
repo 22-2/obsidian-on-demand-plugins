@@ -269,8 +269,10 @@ test.describe("unsaved draft when settings close", () => {
         await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), "drift-dummy-00");
         await expect.poll(() => savedModes(obsidian, ["drift-dummy-00"])).toEqual(["alwaysDisabled"]);
 
-        // The offer covers the reopened tab, so open the tab itself rather than a sub-page.
+        // Reopening the tab alone does not offer the draft; entering Plugin management does.
         await obsidian.openSettings(pluginUnderTestId);
+        await expect(obsidian.page.locator(".lazy-review-changes-modal")).toHaveCount(0);
+        await obsidian.page.getByText("Plugin management", { exact: true }).click();
         const modal = await restoreModal(obsidian);
         await expect(modal).toContainText("Plugins (15)");
         await modal.getByRole("button", { name: "Restore (15)" }).click();
@@ -311,6 +313,8 @@ test.describe("unsaved draft when settings close", () => {
             .filter({ hasText: /^On-Demand$/ })
             .click();
 
+        await expect(settingsPage.locator(".lazy-review-changes-modal")).toHaveCount(0);
+        await settingsPage.getByText("Plugin management", { exact: true }).click();
         const modal = await restoreModal(obsidian);
         await modal.getByRole("button", { name: "Restore (15)" }).click();
         await expect.poll(() => changedPluginIds(obsidian)).toEqual(initiallyDisabled);
@@ -322,12 +326,14 @@ test.describe("unsaved draft when settings close", () => {
         await closeSettings(obsidian);
 
         await obsidian.openSettings(pluginUnderTestId);
+        await obsidian.page.getByText("Plugin management", { exact: true }).click();
         let modal = await restoreModal(obsidian);
         await modal.page().keyboard.press("Escape");
         await expect(modal).toHaveCount(0);
         await closeSettings(obsidian);
 
         await obsidian.openSettings(pluginUnderTestId);
+        await obsidian.page.getByText("Plugin management", { exact: true }).click();
         modal = await restoreModal(obsidian);
         await modal.getByRole("button", { name: "Discard" }).click();
         await expect(modal).toHaveCount(0);

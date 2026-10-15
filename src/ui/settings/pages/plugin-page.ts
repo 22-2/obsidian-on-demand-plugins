@@ -63,6 +63,7 @@ export class PluginPage extends SettingPage {
     }
     display() {
         this.disconnectInfiniteScroll();
+        this.tab.offerRestoreOnPluginManagementOpen();
         this.watchPluginLoadState();
         // Plugin installations can happen while the settings modal is open.
         // Refresh the registry whenever this page is entered so the count and

@@ -84,7 +84,10 @@ export class SettingsTab extends PluginSettingTab {
         this.shown = true;
         if (!this.stash) return;
         if (this.redrawing) this.restoreQuietly();
-        else this.restoring = this.offerRestore();
+    }
+    /** Offer a stashed draft when the user enters Plugin management. */
+    offerRestoreOnPluginManagementOpen() {
+        if (this.stash && !this.redrawing) this.restoring = this.offerRestore();
     }
     /** Stops watching renders; the stash goes with the plugin, as it lives for this session only. */
     dispose() {
