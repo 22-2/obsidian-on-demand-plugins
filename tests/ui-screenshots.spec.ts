@@ -3,6 +3,7 @@ import type { ObsidianAPI } from "obsidian-e2e-toolkit";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "./fixtures";
+import { expectCompactList, toggleCompactList } from "./screenshot-helpers";
 import { pluginUnderTestId, useOnDemandPlugins } from "./test-utils";
 
 useOnDemandPlugins();
@@ -66,13 +67,12 @@ for (const theme of SCREENSHOT_THEMES) {
         }
 
         await pluginPage.setViewportSize({ width: primaryWidth, height: SCREENSHOT_HEIGHT });
-        const compactToggle = pluginPage.locator(".lazy-plugin-compact-control .checkbox-container");
-        await compactToggle.click();
-        await expect(pluginPage.locator(".lazy-plugin-list-body.is-compact")).toBeVisible();
+        await toggleCompactList(pluginPage);
+        await expectCompactList(pluginPage);
         const compactPath = path.join(artifactDir, `plugin-management-compact-${primaryWidth}.png`);
         await pluginPage.screenshot({ path: compactPath, animations: "disabled" });
         await testInfo.attach(`Compact plugin management ${primaryWidth}px`, { path: compactPath, contentType: "image/png" });
-        await compactToggle.click();
+        await toggleCompactList(pluginPage);
 
         // Obsidian renders Menu API popups as native menus on macOS, outside Playwright's DOM.
         if (process.platform === "darwin") return;

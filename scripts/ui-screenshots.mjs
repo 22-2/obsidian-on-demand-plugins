@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const device = process.argv[2];
-if (device !== "pc" && device !== "mobile") {
-    throw new Error("Usage: node scripts/ui-screenshots.mjs <pc|mobile>");
+if (device !== "pc" && device !== "mobile" && device !== "readme") {
+    throw new Error("Usage: node scripts/ui-screenshots.mjs <pc|mobile|readme>");
 }
 
 const cli = path.join(root, "node_modules/@playwright/test/cli.js");
