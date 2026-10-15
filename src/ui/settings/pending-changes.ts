@@ -5,6 +5,8 @@ import { stableStringify } from "src/services/settings/settings-service";
 type DraftSource = {
     readonly data?: LazySettings;
     readonly currentProfileId: string;
+    /** Last loaded or saved settings; when present it is the baseline, so saves made elsewhere never go stale here. */
+    readonly persisted?: LazySettings;
 };
 
 /** "external" lists edits made outside On-Demand that saving overwrites; they are never part of the draft. */
@@ -46,14 +48,30 @@ const differs = (a: unknown, b: unknown) => stableStringify(a) !== stableStringi
  */
 export class PendingChanges {
     readonly pluginIds = new Set<string>();
-    private baselineData?: LazySettings;
-    private baselineFingerprint?: string;
+    private capturedBaseline?: LazySettings;
+    private fingerprintSource?: LazySettings;
+    private fingerprint?: string;
     private readonly getSource: () => DraftSource | undefined;
     private immediateSaveQueue: Promise<void> = Promise.resolve();
 
     constructor(getSource: () => DraftSource | undefined) {
         this.getSource = getSource;
         this.captureBaseline();
+    }
+
+    /** The saved settings the draft is compared against. */
+    private get baselineData(): LazySettings | undefined {
+        return this.getSource()?.persisted ?? this.capturedBaseline;
+    }
+
+    private get baselineFingerprint(): string | undefined {
+        const baseline = this.baselineData;
+        if (!baseline) return undefined;
+        if (baseline !== this.fingerprintSource) {
+            this.fingerprintSource = baseline;
+            this.fingerprint = stableStringify(baseline);
+        }
+        return this.fingerprint;
     }
 
     get hasChanges(): boolean {
@@ -135,8 +153,7 @@ export class PendingChanges {
             if (!differs(baseline, saved)) return;
             await save(saved);
             applySavedChanges(data, baseline, saved);
-            this.baselineData = saved;
-            this.baselineFingerprint = stableStringify(saved);
+            this.capturedBaseline = saved;
         });
         this.immediateSaveQueue = pendingSave.catch(() => undefined);
         return pendingSave;
@@ -153,15 +170,14 @@ export class PendingChanges {
     }
 
     private ensureBaseline() {
-        if (this.baselineData === undefined || this.baselineFingerprint === undefined) this.captureBaseline();
+        if (this.baselineData === undefined) this.captureBaseline();
     }
 
     private captureBaseline() {
         const data = this.getSource()?.data;
         if (!data) return;
         // Deep clone so later in-memory edits cannot mutate the comparison source.
-        this.baselineData = structuredClone(data);
-        this.baselineFingerprint = stableStringify(data);
+        this.capturedBaseline = structuredClone(data);
     }
 }
 

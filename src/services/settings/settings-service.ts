@@ -48,6 +48,12 @@ export class SettingsService {
     currentProfileId!: string;
     /** True if no previous data.json was found during load */
     isFirstLoad = false;
+    /**
+     * The settings as last loaded or saved, whichever path saved them. The settings
+     * draft is compared against this, and changes that must not carry the draft are
+     * saved on top of it. Treat it as read-only.
+     */
+    persisted?: LazySettings;
 
     constructor(plugin: OnDemandPlugin) {
         this.plugin = plugin;
@@ -87,6 +93,9 @@ export class SettingsService {
         this.settings = this.data.profiles[this.currentProfileId].settings;
 
         if (source === "legacy") this.hydrateLegacyLazyOnViews();
+        // Reason: nothing is saved yet on a first load, and startup keeps its defaults in memory on purpose,
+        // so the settings tab baselines on the state it first sees until the first save.
+        this.persisted = this.isFirstLoad ? undefined : structuredClone(this.data);
         if (source === "external") await this.persistExternalProfileMigration();
     }
 
@@ -344,6 +353,7 @@ export class SettingsService {
         // complete configuration in one file; profiles/ remains the old migration copy for manual recovery.
         await this.plugin.saveData(persisted);
         this.persistedFingerprint = stableStringify(persisted);
+        this.persisted = persisted;
         this.isFirstLoad = false;
         // Reason: profile dialogs save through this service directly, so central emission keeps every successful save backed up.
         this.plugin.app.workspace.trigger("ondemand-plugins:settings-saved");

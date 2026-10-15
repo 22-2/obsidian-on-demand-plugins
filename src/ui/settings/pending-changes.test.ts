@@ -121,6 +121,36 @@ describe("PendingChanges", () => {
         expect(pending.describeChanges(describer).map((change) => change.label)).toEqual(["Foo plugin", "View activation rules"]);
     });
 
+    it("follows the saved settings when another code path saves them", () => {
+        const source: { data: LazySettings; currentProfileId: string; persisted?: LazySettings } = createSource();
+        source.persisted = structuredClone(source.data);
+        const pending = new PendingChanges(() => source);
+        const settings = source.data.profiles[DEFAULT_PROFILE_ID].settings;
+        settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
+        expect(pending.getChangedPluginIds()).toEqual(["foo"]);
+
+        // A save outside the settings tab (e.g. Save & apply, a profile switch) persisted the live state.
+        source.persisted = structuredClone(source.data);
+        expect(pending.hasChanges).toBe(false);
+        expect(pending.getChangedPluginIds()).toEqual([]);
+    });
+
+    it("builds immediate saves on the saved settings, keeping edits saved elsewhere", async () => {
+        const source: { data: LazySettings; currentProfileId: string; persisted?: LazySettings } = createSource();
+        source.persisted = structuredClone(source.data);
+        const pending = new PendingChanges(() => source);
+        // A captured view type was saved without the settings tab knowing about it.
+        source.data.profiles[DEFAULT_PROFILE_ID].settings.lazyOnViews.foo = ["foo-view"];
+        source.persisted = structuredClone(source.data);
+        const save = vi.fn<(data: LazySettings) => Promise<void>>().mockResolvedValue(undefined);
+
+        await pending.saveImmediately((data) => {
+            data.showConsoleLog = true;
+        }, save);
+
+        expect(save.mock.calls[0][0].profiles[DEFAULT_PROFILE_ID].settings.lazyOnViews).toEqual({ foo: ["foo-view"] });
+    });
+
     it("serializes rapid edits including a return to the original value", async () => {
         const source = createSource();
         const pending = new PendingChanges(() => source);

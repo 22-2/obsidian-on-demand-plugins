@@ -10,6 +10,7 @@ describe("patchPluginRegisterView", () => {
     let registerViewSpy: ReturnType<typeof vi.fn>;
     let settings: DeviceSettings;
     let saveSettings: ReturnType<typeof vi.fn>;
+    let saved: DeviceSettings;
     let uninstall: (() => void) | undefined;
 
     beforeEach(() => {
@@ -36,7 +37,11 @@ describe("patchPluginRegisterView", () => {
             },
             lazyOnViews: {},
         } as unknown as DeviceSettings;
-        saveSettings = vi.fn().mockResolvedValue(undefined);
+        // Draft-free saves edit a copy of the saved settings, which starts equal to the live ones here.
+        saved = structuredClone(settings);
+        saveSettings = vi.fn(async (change: (data: unknown, profileId: string) => void | Promise<void>) => {
+            await change({ profiles: { default: { settings: saved } } }, "default");
+        });
     });
 
     afterEach(() => {
@@ -53,7 +58,7 @@ describe("patchPluginRegisterView", () => {
         return {
             getSettings: () => settings,
             getPluginMode: (id: string) => settings.plugins[id]?.mode,
-            saveSettings,
+            saveSettingsChange: saveSettings,
         } as unknown as PluginContext;
     }
 
@@ -82,6 +87,18 @@ describe("patchPluginRegisterView", () => {
         expect(saveSettings).toHaveBeenCalled();
         // Original behavior must be preserved
         expect(registerViewSpy).toHaveBeenCalledWith("lazy-view", creator);
+    });
+
+    it("saves only the captured view type, not a pending settings draft", () => {
+        // An unsaved draft edit of another plugin lives in the live settings only.
+        settings.plugins["eager-plugin"].mode = PLUGIN_MODE.ALWAYS_DISABLED;
+        uninstall = patchPluginRegisterView(createMockCtx());
+
+        createPluginInstance("lazy-plugin").registerView("lazy-view", vi.fn());
+
+        expect(saved.lazyOnViews?.["lazy-plugin"]).toEqual(["lazy-view"]);
+        expect(saved.plugins["lazy-plugin"].lazyOptions?.viewTypes).toContain("lazy-view");
+        expect(saved.plugins["eager-plugin"].mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
     });
 
     it("ignores plugins that are not lazy with useView", () => {
@@ -129,10 +146,12 @@ describe("patchPluginRegisterView", () => {
         settings.plugins["lazy-plugin"].lazyOptions!.viewTypes = ["previous"];
         settings.lazyOnViews["lazy-plugin"] = ["previous"];
         const plugin = createPluginInstance("lazy-plugin");
-        await expect(capturePluginViews(ctx, "lazy-plugin", async () => {
-            plugin.registerView("partial", vi.fn());
-            throw new Error("failed");
-        })).rejects.toThrow("failed");
+        await expect(
+            capturePluginViews(ctx, "lazy-plugin", async () => {
+                plugin.registerView("partial", vi.fn());
+                throw new Error("failed");
+            }),
+        ).rejects.toThrow("failed");
         expect(settings.lazyOnViews["lazy-plugin"]).toEqual(["previous"]);
         plugin.registerView("later", vi.fn());
         expect(settings.lazyOnViews["lazy-plugin"]).toEqual(["previous", "later"]);
