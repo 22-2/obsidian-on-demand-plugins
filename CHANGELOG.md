@@ -1,5 +1,35 @@
 # Changelog
 
+## [3.8.0](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.7.0...3.8.0) (2026-10-15)
+
+### ✨ Features
+
+* **drift:** detect community-plugins.json edits made outside On-Demand ([4e03d12](https://github.com/22-2/obsidian-on-demand-plugins/commit/4e03d12e80026ac3cac95405815b640ad5140be3))
+* **lazy-engine:** show feedback while a lazy plugin loads ([0a09294](https://github.com/22-2/obsidian-on-demand-plugins/commit/0a092947e1676bae5214a76ca01053137621a6e8))
+* **settings:** configure unsaved draft recovery ([5a523db](https://github.com/22-2/obsidian-on-demand-plugins/commit/5a523db17c39a25fd90a0f8e7a417a50b1f4a345))
+* **settings:** confirm Sync now before rewriting community-plugins.json ([d9e1365](https://github.com/22-2/obsidian-on-demand-plugins/commit/d9e1365c90ec287069bc87af2ac49a2a41a91989))
+* **settings:** offer an unsaved draft back after settings close ([c8b4024](https://github.com/22-2/obsidian-on-demand-plugins/commit/c8b40249f06475ac5d946b10d7492a85bd41dce1))
+* **settings:** restart after Sync now writes Obsidian's config ([3ceced4](https://github.com/22-2/obsidian-on-demand-plugins/commit/3ceced45e3f922ee5749f902e16aaddab4ea0ab8))
+
+### 🛡 Bug Fixes
+
+* address community plugin review scan findings ([e08257f](https://github.com/22-2/obsidian-on-demand-plugins/commit/e08257f00f8235833e5d2ad9a9d16ed8cad9fde5))
+* **coverage:** handle missing E2E shard reports ([08b2eb4](https://github.com/22-2/obsidian-on-demand-plugins/commit/08b2eb42dd738055146d7f8f336ada8fd933878b))
+* **lazy-view:** load lazy plugins when a collapsed sidebar is expanded ([d2a5334](https://github.com/22-2/obsidian-on-demand-plugins/commit/d2a53340784d9d4c9d28447b1e87980f34138846))
+* offer draft restore on plugin management page ([0e0ac3d](https://github.com/22-2/obsidian-on-demand-plugins/commit/0e0ac3dca26690d4e556bb06d26272dfd9b43108))
+* **settings:** distinguish shared and profile behaviour settings ([6863524](https://github.com/22-2/obsidian-on-demand-plugins/commit/68635246b64988931f8356e7633a92acd5c706be))
+* **settings:** ignore repeated clicks on long-running settings buttons ([3bb1cbe](https://github.com/22-2/obsidian-on-demand-plugins/commit/3bb1cbef1c58b1137d78a780a7069ab027a38ec1))
+* **settings:** keep the rebuild button responsive while confirming ([a3efb05](https://github.com/22-2/obsidian-on-demand-plugins/commit/a3efb05168444ee7fc8ef64fb546915b5b78f8db))
+* **settings:** keep the settings draft out of background saves ([5c63bc8](https://github.com/22-2/obsidian-on-demand-plugins/commit/5c63bc8c4adf30ca1ec45dc8fa988116ccb18b92))
+* **settings:** preserve unsaved drafts across page navigation ([3722e41](https://github.com/22-2/obsidian-on-demand-plugins/commit/3722e41df8b0185f73b5a4f9272fad9512da0100))
+* **settings:** show what a draft restore changes and announce automatic choices ([d266d08](https://github.com/22-2/obsidian-on-demand-plugins/commit/d266d08eb1ac50f0e8e326d86881c48bd7432146))
+* **sync:** keep community-plugins.json entries this device does not manage ([db0f2b9](https://github.com/22-2/obsidian-on-demand-plugins/commit/db0f2b9b76150f78b3ddeda98390a6c080561e9a))
+
+### 🤖 Build
+
+* **test:** pin portable toolkit and Obsidian runtime ([0861ec4](https://github.com/22-2/obsidian-on-demand-plugins/commit/0861ec4b6df1e125aba969af998a6e2cc4ffd2c6))
+* **test:** use toolkit 1.7.1 release package ([5d095c2](https://github.com/22-2/obsidian-on-demand-plugins/commit/5d095c28c2ee89fff1ab8116aaf09425394f1271))
+
 ## [3.7.0](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.6.3...3.7.0) (2026-10-14)
 
 ### ✨ Features
