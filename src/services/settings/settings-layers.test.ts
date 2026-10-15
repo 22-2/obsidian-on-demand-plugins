@@ -39,7 +39,7 @@ describe("resolveEffectiveSettings", () => {
         expect(resolveEffectiveSettings(own, defaults()).plugins.shared).toBeUndefined();
     });
 
-    it("ignores the shared defaults for a snapshot profile", () => {
+    it("ignores the Base for a snapshot profile", () => {
         const effective = resolveEffectiveSettings(profile({}, true), defaults());
         expect(effective).toEqual(DEFAULT_DEVICE_SETTINGS);
     });
@@ -53,14 +53,14 @@ describe("resolveEffectiveSettings", () => {
 });
 
 describe("editing layers", () => {
-    const data = (own: Profile): Pick<LazySettings, "defaults" | "profiles"> => ({ defaults: defaults(), profiles: { p: own } });
+    const data = (own: Profile): Pick<LazySettings, "base" | "profiles"> => ({ base: defaults(), profiles: { p: own } });
 
     it("starts an override from the inherited unit, so editing the mode keeps the lazy options", () => {
         const layers = data(profile());
         pluginLayerToEdit(layers, "p", "shared").plugins.shared.mode = PLUGIN_MODE.ALWAYS_ENABLED;
         expect(layers.profiles.p.settings.plugins.shared).toEqual({ mode: PLUGIN_MODE.ALWAYS_ENABLED, lazyOptions });
         expect(layers.profiles.p.settings.lazyOnViews.shared).toEqual(["shared-view"]);
-        expect(layers.defaults.plugins.shared.mode).toBe(PLUGIN_MODE.LAZY);
+        expect(layers.base.plugins.shared.mode).toBe(PLUGIN_MODE.LAZY);
     });
 
     it("marks an override even for a plugin with nothing to inherit", () => {
@@ -77,9 +77,9 @@ describe("editing layers", () => {
         expect(resolveEffectiveSettings(own, defaults()).plugins.shared.mode).toBe(PLUGIN_MODE.LAZY);
     });
 
-    it("records facts about an inherited plugin in the shared defaults, keeping it inherited", () => {
+    it("records facts about an inherited plugin in the Base, keeping it inherited", () => {
         const layers = data(profile());
-        expect(layerProvidingPlugin(layers, "p", "shared")).toBe(layers.defaults);
+        expect(layerProvidingPlugin(layers, "p", "shared")).toBe(layers.base);
         expect(overridesPlugin(layers.profiles.p.settings, "shared")).toBe(false);
     });
 
@@ -88,7 +88,7 @@ describe("editing layers", () => {
         expect(layerProvidingPlugin(overriding, "p", "shared")).toBe(overriding.profiles.p.settings);
         const snapshot = data(profile({}, true));
         expect(layerProvidingPlugin(snapshot, "p", "shared")).toBe(snapshot.profiles.p.settings);
-        expect(snapshot.defaults).toEqual(defaults());
+        expect(snapshot.base).toEqual(defaults());
     });
 
     it("resolves a profile-wide value from the profile, then its base layer", () => {

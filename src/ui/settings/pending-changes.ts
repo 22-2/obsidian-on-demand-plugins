@@ -306,17 +306,17 @@ function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings, 
 /** The live data, its saved baseline and the active profile: what a revert restores. */
 type Layers = { data: LazySettings; baseline: LazySettings; profileId: string };
 
-/** The settings a profile runs with; older-shaped data without shared defaults is read as full profiles. */
+/** The settings a profile runs with; older-shaped data without Base is read as full profiles. */
 function effectiveOf(data: LazySettings, profileId: string): DeviceSettings | undefined {
     const profile = data.profiles[profileId];
-    return profile ? resolveEffectiveSettings(profile, data.defaults ?? DEFAULT_DEVICE_SETTINGS) : undefined;
+    return profile ? resolveEffectiveSettings(profile, data.base ?? DEFAULT_DEVICE_SETTINGS) : undefined;
 }
 
-/** Each live layer holding the active profile's values: the shared defaults and the profile's overrides. */
+/** Each live layer holding the active profile's values: the Base and the profile's overrides. */
 function layerPairs({ data, baseline, profileId }: Layers): [Record<string, unknown>, Record<string, unknown> | undefined][] {
     const asRecord = (layer: unknown) => layer as Record<string, unknown> | undefined;
     const pairs: [Record<string, unknown> | undefined, Record<string, unknown> | undefined][] = [
-        [asRecord(data.defaults), asRecord(baseline.defaults)],
+        [asRecord(data.base), asRecord(baseline.base)],
         [asRecord(data.profiles[profileId]?.settings), asRecord(baseline.profiles[profileId]?.settings)],
     ];
     return pairs.filter((pair): pair is [Record<string, unknown>, Record<string, unknown> | undefined] => pair[0] !== undefined);

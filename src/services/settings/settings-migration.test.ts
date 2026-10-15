@@ -76,7 +76,7 @@ function randomV1Data(seed: number) {
     };
 }
 
-describe("migrating version 1 profiles to defaults with overrides", () => {
+describe("migrating version 1 profiles to a Base with overrides", () => {
     it.each(Array.from({ length: 40 }, (_, i) => i + 1))("keeps every profile's effective settings identical (seed %i)", async (seed) => {
         const before = randomV1Data(seed);
         const { service } = createService(before);
@@ -84,9 +84,9 @@ describe("migrating version 1 profiles to defaults with overrides", () => {
         await service.load();
 
         for (const [id, profile] of Object.entries(before.profiles)) {
-            expect(resolveEffectiveSettings(service.data.profiles[id], service.data.defaults)).toEqual(v1Effective(profile.settings));
+            expect(resolveEffectiveSettings(service.data.profiles[id], service.data.base)).toEqual(v1Effective(profile.settings));
         }
-        // Every plugin a profile had settings for stays overridden there, so later default edits do not reach it.
+        // Every plugin a profile had settings for stays overridden there, so later Base edits do not reach it.
         for (const [id, profile] of Object.entries(before.profiles)) {
             const raw = profile.settings as { plugins?: object; lazyOnViews?: object; lazyOnFiles?: object };
             const configured = new Set([...Object.keys(raw.plugins ?? {}), ...Object.keys(raw.lazyOnViews ?? {}), ...Object.keys(raw.lazyOnFiles ?? {})]);
@@ -106,25 +106,25 @@ describe("migrating version 1 profiles to defaults with overrides", () => {
         await second.service.load();
 
         for (const [id, profile] of Object.entries(before.profiles)) {
-            expect(resolveEffectiveSettings(second.service.data.profiles[id], second.service.data.defaults)).toEqual(v1Effective(profile.settings));
+            expect(resolveEffectiveSettings(second.service.data.profiles[id], second.service.data.base)).toEqual(v1Effective(profile.settings));
         }
     });
 
-    it("starts the shared defaults from the built-in defaults and marks the install-time backup as a snapshot", async () => {
+    it("starts the Base from the built-in defaults and marks the install-time backup as a snapshot", async () => {
         const { service } = createService(randomV1Data(5));
         await service.load();
-        expect(service.data.defaults).toEqual(DEFAULT_DEVICE_SETTINGS);
+        expect(service.data.base).toEqual(DEFAULT_DEVICE_SETTINGS);
         for (const profile of Object.values(service.data.profiles)) {
             expect(profile.snapshot === true).toBe(profile.id === INITIAL_BACKUP_PROFILE_ID);
         }
     });
 
-    it("leaves the values a version 2 profile does not set unset, so they come from the defaults", async () => {
+    it("leaves the values a version 2 profile does not set unset, so they come from the Base", async () => {
         const defaults = { ...structuredClone(DEFAULT_DEVICE_SETTINGS), defaultMode: PLUGIN_MODE.LAZY, plugins: { shared: { mode: PLUGIN_MODE.ALWAYS_ENABLED } } };
         const { service } = createService({
             settingsSchemaVersion: 2,
             showConsoleLog: false,
-            defaults,
+            base: defaults,
             profiles: { Default: { id: "Default", name: "Default", settings: { plugins: { own: { mode: PLUGIN_MODE.LAZY } } } } },
             desktopProfileId: "Default",
             mobileProfileId: "Default",
@@ -143,8 +143,8 @@ describe("migrating version 1 profiles to defaults with overrides", () => {
         await expect(service.load()).rejects.toThrow("newer or unsupported format");
     });
 
-    it("refuses version 2 settings whose defaults are missing", async () => {
+    it("refuses version 2 settings whose Base is missing", async () => {
         const { service } = createService({ ...randomV1Data(1), settingsSchemaVersion: 2 });
-        await expect(service.load()).rejects.toThrow("default settings in data.json are missing or damaged");
+        await expect(service.load()).rejects.toThrow("Base settings in data.json are missing or damaged");
     });
 });

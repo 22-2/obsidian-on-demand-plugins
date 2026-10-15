@@ -66,7 +66,7 @@ export class CoreContainer {
                 id: profileId,
                 name: "Backup: Initial State",
                 settings: backupSettings,
-                // A backup keeps its own values even when the shared defaults change later.
+                // A backup keeps its own values even when the Base change later.
                 snapshot: true,
             };
 

@@ -11,7 +11,7 @@ import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { layerProvidingPlugin } from "src/services/settings/settings-layers";
 
-/** The per-plugin maps of a settings layer: the shared defaults or a profile's overrides. */
+/** The per-plugin maps of a settings layer: the Base or a profile's overrides. */
 export type PluginLayer = Pick<DeviceSettings, "plugins" | "lazyOnViews" | "lazyOnFiles">;
 
 /** Edits a copy of the saved settings; `profileId` is the active profile. */

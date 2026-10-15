@@ -24,7 +24,7 @@ export default class OnDemandPlugin extends Plugin {
     // Assigned during onload via loadSettings().
     data!: LazySettings;
     /**
-     * The settings the active profile runs with: its overrides on top of the shared defaults.
+     * The settings the active profile runs with: its overrides on top of the Base.
      * A fresh copy on every read, so edits must go to a layer (see settings-layers) to be kept.
      * Defined as a getter in onload, since Obsidian's Plugin declares `settings` as a property.
      */
@@ -163,7 +163,7 @@ export default class OnDemandPlugin extends Plugin {
      * is removed wholesale during settings load rather than pruned per key.
      */
     private pruneTargetMaps(): Record<string, unknown>[] {
-        // Only the active profile's own entries: the shared defaults also serve devices where those plugins are installed.
+        // Only the active profile's own entries: the Base also serve devices where those plugins are installed.
         const settings = this.core.settingsService.activeProfile.settings;
         return [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
     }
@@ -267,7 +267,7 @@ export default class OnDemandPlugin extends Plugin {
     // These two read the layers directly: they run for every plugin, and building the effective settings each time would be wasteful.
     getPluginMode(pluginId: string): PLUGIN_MODE {
         const service = this.core.settingsService;
-        return resolvePluginUnit(service.activeProfile, service.data.defaults, pluginId).plugin?.mode ?? this.getDefaultModeForPlugin(pluginId);
+        return resolvePluginUnit(service.activeProfile, service.data.base, pluginId).plugin?.mode ?? this.getDefaultModeForPlugin(pluginId);
     }
 
     getDefaultModeForPlugin(pluginId: string): PLUGIN_MODE {
@@ -275,7 +275,7 @@ export default class OnDemandPlugin extends Plugin {
             return PLUGIN_MODE.ALWAYS_ENABLED;
         }
         const service = this.core.settingsService;
-        return resolveDeviceValue(service.activeProfile, service.data.defaults, "defaultMode");
+        return resolveDeviceValue(service.activeProfile, service.data.base, "defaultMode");
     }
 
     isPluginEnabledOnDisk(pluginId: string): boolean {

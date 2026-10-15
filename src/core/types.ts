@@ -70,7 +70,7 @@ export const DEFAULT_DEVICE_SETTINGS: DeviceSettings = {
 };
 
 /**
- * What a profile stores: only the values it overrides, the rest coming from `LazySettings.defaults`.
+ * What a profile stores: only the values it overrides, the rest coming from `LazySettings.base`.
  * A plugin is overridden as a whole (mode, lazy options and its view/file rules together) once any
  * of `plugins`, `lazyOnViews` or `lazyOnFiles` has an entry for it.
  */
@@ -81,7 +81,7 @@ export interface Profile {
     id: string;
     name: string;
     settings: ProfileSettings;
-    /** A frozen copy (e.g. the install-time backup): it ignores `defaults` and keeps its own values only. */
+    /** A frozen copy (e.g. the install-time backup): it ignores the Base and keeps its own values only. */
     snapshot?: boolean;
 }
 
@@ -96,8 +96,8 @@ export interface LazySettings {
     profileStorageVersion?: number;
 
     // Profile Management
-    /** Values every non-snapshot profile inherits unless it overrides them. */
-    defaults: DeviceSettings;
+    /** "Base": values every non-snapshot profile inherits unless it overrides them. */
+    base: DeviceSettings;
     profiles: Record<string, Profile>;
     desktopProfileId: string;
     mobileProfileId: string;
@@ -116,14 +116,14 @@ export interface LazySettings {
 export const DEFAULT_PROFILE_ID = "Default";
 /** The profile capturing the state at install time; kept as a snapshot. */
 export const INITIAL_BACKUP_PROFILE_ID = "initial-backup";
-/** 2: profiles store overrides on top of `defaults`. Version 1 profiles stored every value. */
+/** 2: profiles store overrides on top of `base`. Version 1 profiles stored every value. */
 export const SETTINGS_SCHEMA_VERSION = 2;
 
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
     restoreDraftBehavior: "ask",
     // A separate copy: structuredClone keeps shared references, so sharing the object with the profile would tie them together.
-    defaults: structuredClone(DEFAULT_DEVICE_SETTINGS),
+    base: structuredClone(DEFAULT_DEVICE_SETTINGS),
     profiles: {
         [DEFAULT_PROFILE_ID]: {
             id: DEFAULT_PROFILE_ID,

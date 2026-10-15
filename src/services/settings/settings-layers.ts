@@ -21,9 +21,9 @@ export function overridesPlugin(profile: ProfileSettings, pluginId: string): boo
     return PLUGIN_MAPS.some((key) => Object.hasOwn(profile[key] ?? {}, pluginId));
 }
 
-/** The layer a profile's values fall back to: the shared defaults, or built-in defaults for a snapshot. */
-export function baseLayerFor(profile: Profile, defaults: DeviceSettings): DeviceSettings {
-    return profile.snapshot ? DEFAULT_DEVICE_SETTINGS : defaults;
+/** The layer a profile's values fall back to: the Base, or built-in defaults for a snapshot. */
+export function baseLayerFor(profile: Profile, base: DeviceSettings): DeviceSettings {
+    return profile.snapshot ? DEFAULT_DEVICE_SETTINGS : base;
 }
 
 export function readPluginUnit(layer: Pick<DeviceSettings, (typeof PLUGIN_MAPS)[number]>, pluginId: string): PluginUnit {
@@ -35,26 +35,26 @@ export function readPluginUnit(layer: Pick<DeviceSettings, (typeof PLUGIN_MAPS)[
 }
 
 /** The unit the active profile uses for a plugin: its own when it overrides it, otherwise the base layer's. */
-export function resolvePluginUnit(profile: Profile, defaults: DeviceSettings, pluginId: string): PluginUnit {
-    return overridesPlugin(profile.settings, pluginId) ? readPluginUnit(profile.settings, pluginId) : readPluginUnit(baseLayerFor(profile, defaults), pluginId);
+export function resolvePluginUnit(profile: Profile, base: DeviceSettings, pluginId: string): PluginUnit {
+    return overridesPlugin(profile.settings, pluginId) ? readPluginUnit(profile.settings, pluginId) : readPluginUnit(baseLayerFor(profile, base), pluginId);
 }
 
 /**
  * The settings a profile actually runs with. A fresh copy: callers may read it freely, but edits
  * must go to a layer, since changes to this object are not saved.
  */
-export function resolveEffectiveSettings(profile: Profile, defaults: DeviceSettings): DeviceSettings {
-    const base = baseLayerFor(profile, defaults);
+export function resolveEffectiveSettings(profile: Profile, base: DeviceSettings): DeviceSettings {
+    const inherited = baseLayerFor(profile, base);
     const own = profile.settings;
     const effective: DeviceSettings = {
-        defaultMode: own.defaultMode ?? base.defaultMode,
-        pruneUninstalledEntries: own.pruneUninstalledEntries ?? base.pruneUninstalledEntries,
+        defaultMode: own.defaultMode ?? inherited.defaultMode,
+        pruneUninstalledEntries: own.pruneUninstalledEntries ?? inherited.pruneUninstalledEntries,
         plugins: {},
         lazyOnViews: {},
         lazyOnFiles: {},
     };
-    for (const pluginId of new Set([...pluginIdsIn(base), ...pluginIdsIn(own)])) {
-        const unit = resolvePluginUnit(profile, defaults, pluginId);
+    for (const pluginId of new Set([...pluginIdsIn(inherited), ...pluginIdsIn(own)])) {
+        const unit = resolvePluginUnit(profile, base, pluginId);
         if (unit.plugin !== undefined) effective.plugins[pluginId] = unit.plugin;
         if (unit.lazyOnViews !== undefined) effective.lazyOnViews[pluginId] = unit.lazyOnViews;
         if (unit.lazyOnFiles !== undefined) effective.lazyOnFiles[pluginId] = unit.lazyOnFiles;
@@ -66,9 +66,9 @@ export function resolveEffectiveSettings(profile: Profile, defaults: DeviceSetti
  * Makes a profile override a plugin, starting from the unit it inherits, so editing one part
  * (say its mode) keeps the inherited rest (its lazy options). A no-op when it already overrides it.
  */
-export function overridePlugin(profile: Profile, defaults: DeviceSettings, pluginId: string): void {
+export function overridePlugin(profile: Profile, base: DeviceSettings, pluginId: string): void {
     if (overridesPlugin(profile.settings, pluginId)) return;
-    const unit = structuredClone(readPluginUnit(baseLayerFor(profile, defaults), pluginId));
+    const unit = structuredClone(readPluginUnit(baseLayerFor(profile, base), pluginId));
     // An empty entry still marks the override, so the plugin stops following the base layer.
     profile.settings.plugins[pluginId] = unit.plugin ?? {};
     if (unit.lazyOnViews !== undefined) profile.settings.lazyOnViews[pluginId] = unit.lazyOnViews;
@@ -81,17 +81,17 @@ export function inheritPlugin(profile: ProfileSettings, pluginId: string): void 
 }
 
 /** A profile-wide value as the profile runs with it. */
-export function resolveDeviceValue<K extends "defaultMode" | "pruneUninstalledEntries">(profile: Profile, defaults: DeviceSettings, key: K): DeviceSettings[K] {
-    return (profile.settings[key] ?? baseLayerFor(profile, defaults)[key]) as DeviceSettings[K];
+export function resolveDeviceValue<K extends "defaultMode" | "pruneUninstalledEntries">(profile: Profile, base: DeviceSettings, key: K): DeviceSettings[K] {
+    return (profile.settings[key] ?? baseLayerFor(profile, base)[key]) as DeviceSettings[K];
 }
 
 /**
  * Where an edit of a plugin's settings for a profile goes: the profile, which then overrides
  * the plugin (starting from the inherited unit). Works on live data and on copies alike.
  */
-export function pluginLayerToEdit(data: Pick<LazySettings, "defaults" | "profiles">, profileId: string, pluginId: string): ProfileSettings {
+export function pluginLayerToEdit(data: Pick<LazySettings, "base" | "profiles">, profileId: string, pluginId: string): ProfileSettings {
     const profile = data.profiles[profileId];
-    overridePlugin(profile, data.defaults, pluginId);
+    overridePlugin(profile, data.base, pluginId);
     return profile.settings;
 }
 
@@ -100,9 +100,9 @@ export function pluginLayerToEdit(data: Pick<LazySettings, "defaults" | "profile
  * (such as captured view types) that should not turn an inherited plugin into an override.
  * A snapshot has no shared layer to write to, so it overrides the plugin instead.
  */
-export function layerProvidingPlugin(data: Pick<LazySettings, "defaults" | "profiles">, profileId: string, pluginId: string): Pick<DeviceSettings, (typeof PLUGIN_MAPS)[number]> {
+export function layerProvidingPlugin(data: Pick<LazySettings, "base" | "profiles">, profileId: string, pluginId: string): Pick<DeviceSettings, (typeof PLUGIN_MAPS)[number]> {
     const profile = data.profiles[profileId];
     if (overridesPlugin(profile.settings, pluginId)) return profile.settings;
-    if (!profile.snapshot) return data.defaults;
+    if (!profile.snapshot) return data.base;
     return pluginLayerToEdit(data, profileId, pluginId);
 }

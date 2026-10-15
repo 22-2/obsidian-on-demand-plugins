@@ -42,9 +42,9 @@ export class SettingsService {
     // Populated in load().
     data!: LazySettings;
     /** Currently active device settings (points to the active profile's settings) */
-    // Computed from the active profile and the shared defaults on every read.
+    // Computed from the active profile and the Base on every read.
     get settings(): DeviceSettings {
-        return resolveEffectiveSettings(this.activeProfile, this.data.defaults);
+        return resolveEffectiveSettings(this.activeProfile, this.data.base);
     }
     /** The active profile; edits to its `settings` are what the active profile overrides. */
     get activeProfile(): Profile {
@@ -313,25 +313,25 @@ export class SettingsService {
     /**
      * Version 1 profiles stored every value. They keep all of them as overrides on top of
      * built-in defaults, so each profile runs exactly as before; nothing is inherited until the
-     * user moves values to the defaults. Version 2 profiles keep their overrides as they are.
+     * user moves values to the Base. Version 2 profiles keep their overrides as they are.
      */
     private normalizeLayers(loaded: Partial<LazySettings>) {
         const layered = (loaded.settingsSchemaVersion ?? 1) >= 2;
         if (layered) {
-            if (!this.isValidDeviceSettings(loaded.defaults)) {
-                this.blockSettings("The default settings in data.json are missing or damaged. Restore a valid backup before saving.");
+            if (!this.isValidDeviceSettings(loaded.base)) {
+                this.blockSettings("The Base settings in data.json are missing or damaged. Restore a valid backup before saving.");
             }
-            this.data.defaults = loaded.defaults;
-            this.normalizeSettingsLayer(this.data.defaults, true);
+            this.data.base = loaded.base;
+            this.normalizeSettingsLayer(this.data.base, true);
         } else {
-            this.data.defaults = structuredClone(DEFAULT_DEVICE_SETTINGS);
-            // The install-time backup must not change when defaults change later.
+            this.data.base = structuredClone(DEFAULT_DEVICE_SETTINGS);
+            // The install-time backup must not change when the Base changes later.
             const backup = this.data.profiles[INITIAL_BACKUP_PROFILE_ID];
             if (backup) backup.snapshot = true;
         }
         for (const profile of Object.values(this.data.profiles)) {
             if (typeof profile.snapshot !== "boolean") delete profile.snapshot;
-            // A snapshot has no defaults to inherit, and version 1 profiles always held every value.
+            // A snapshot has no Base to inherit, and version 1 profiles always held every value.
             this.normalizeProfileSettings(profile, !layered || profile.snapshot === true);
         }
     }

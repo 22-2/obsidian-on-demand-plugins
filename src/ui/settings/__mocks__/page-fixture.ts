@@ -10,7 +10,7 @@ export function createPageFixture(feature?: unknown) {
     const data: LazySettings = {
         showConsoleLog: false,
         restoreDraftBehavior: "ask",
-        defaults: structuredClone(DEFAULT_DEVICE_SETTINGS),
+        base: structuredClone(DEFAULT_DEVICE_SETTINGS),
         desktopProfileId: "home",
         mobileProfileId: "work",
         profiles: {
