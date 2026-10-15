@@ -23,7 +23,12 @@ function setup() {
     const page = new MaintenancePage(fixture.plugin, fixture.tab);
     page.display();
     const setting = (name: string) => ui.setting(name, page.containerEl as unknown as UiElement);
-    return { ...fixture, feature, page, setting };
+    /** Clicks the first button of a setting and waits for the work it started in the background. */
+    const clickAndSettle = async (name: string) => {
+        await setting(name).buttons[0].click();
+        await Promise.all([page.rebuilding, page.syncing]);
+    };
+    return { ...fixture, feature, page, setting, clickAndSettle };
 }
 
 describe("MaintenancePage", () => {
@@ -85,6 +90,38 @@ describe("MaintenancePage", () => {
         expect(Notice.messages).toEqual([]);
     });
 
+    it("starts one rebuild and one sync however often the buttons are clicked", async () => {
+        const { feature, page, setting } = setup();
+        const answer = Promise.withResolvers<boolean>();
+        feature.confirmOverwrite.mockReturnValueOnce(answer.promise);
+        const syncing = Promise.withResolvers<{ changed: number; message: string }>();
+        feature.executeSync.mockReturnValueOnce(syncing.promise);
+        const rebuild = setting("Rebuild command and view caches").buttons[0];
+        const sync = setting("Sync direction").buttons[0];
+
+        await rebuild.click();
+        await rebuild.click();
+        await sync.click();
+        expect(sync.disabled).toBe(true);
+        await sync.click();
+        answer.resolve(true);
+        syncing.resolve({ changed: 0, message: "Already in sync" });
+        await Promise.all([page.rebuilding, page.syncing]);
+
+        expect(feature.confirmOverwrite).toHaveBeenCalledTimes(1);
+        expect(feature.rebuildAndApplyCommandCache).toHaveBeenCalledTimes(1);
+        expect(feature.executeSync).toHaveBeenCalledTimes(1);
+        expect(sync.disabled).toBe(false);
+    });
+
+    it("reports a failed sync instead of leaving the rejection unhandled", async () => {
+        const { feature, setting, clickAndSettle } = setup();
+        feature.executeSync.mockRejectedValueOnce(new Error("write failed"));
+        await clickAndSettle("Sync direction");
+        expect(setting("Sync direction").buttons[0].disabled).toBe(false);
+        expect(Notice.messages).toEqual(["Failed to sync settings. See the console for details."]);
+    });
+
     it("restores the rebuild button after a failure and reports it instead of a success", async () => {
         const { feature, page, setting } = setup();
         feature.rebuildAndApplyCommandCache.mockRejectedValueOnce(new Error("cache failed"));
@@ -96,21 +133,21 @@ describe("MaintenancePage", () => {
     });
 
     it("blocks rebuilding and exporting while a plugin draft is pending", async () => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, tabMock, clickAndSettle } = setup();
         tabMock.hasPendingChanges = true;
-        await setting("Rebuild command and view caches").buttons[0].click();
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Rebuild command and view caches");
+        await clickAndSettle("Sync direction");
         expect(feature.rebuildAndApplyCommandCache).not.toHaveBeenCalled();
         expect(feature.executeSync).not.toHaveBeenCalled();
         expect(Notice.messages).toEqual(["Review & save or discard pending plugin changes before rebuilding caches.", "Save or discard pending settings before syncing to Obsidian config."]);
     });
 
     it("ignores maintenance operations when the feature is unavailable", async () => {
-        const { feature, pluginMock, page, setting } = setup();
+        const { feature, pluginMock, page, setting, clickAndSettle } = setup();
         pluginMock.features.get.mockReturnValue(undefined);
         page.display();
-        await setting("Rebuild command and view caches").buttons[0].click();
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Rebuild command and view caches");
+        await clickAndSettle("Sync direction");
         await setting("To mode").buttons[0].click();
         expect(feature.rebuildAndApplyCommandCache).not.toHaveBeenCalled();
         expect(feature.executeSync).not.toHaveBeenCalled();
@@ -118,9 +155,9 @@ describe("MaintenancePage", () => {
     });
 
     it.each(["lazyToCore", "coreToLazy"])("leaves pending state untouched when %s has no changes", async (direction) => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, setting, tabMock, clickAndSettle } = setup();
         await setting("Sync direction").dropdowns[0].change(direction);
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Sync direction");
         expect(feature.executeSync).toHaveBeenCalledWith(direction);
         expect(tabMock.markDirty).not.toHaveBeenCalled();
         expect(tabMock.renderPendingControls).toHaveBeenCalledTimes(1);
@@ -128,21 +165,21 @@ describe("MaintenancePage", () => {
     });
 
     it("exports saved configuration without staging another plugin draft", async () => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, tabMock, clickAndSettle } = setup();
         feature.executeSync.mockResolvedValueOnce({ changed: 1, message: "Config updated" });
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Sync direction");
         expect(tabMock.markDirty).not.toHaveBeenCalled();
         expect(tabMock.pendingPluginIds.size).toBe(0);
         expect(tabMock.renderPendingControls).toHaveBeenCalledTimes(2);
     });
 
     it.each([true, false])("stages imported changes without overwriting an existing draft (IDs returned: %s)", async (withIds) => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, setting, tabMock, clickAndSettle } = setup();
         tabMock.hasPendingChanges = true;
         tabMock.pendingPluginIds.add("existing");
         feature.executeSync.mockResolvedValueOnce({ changed: 2, message: "Imported", ...(withIds ? { pluginIds: ["alpha", "beta"] } : {}) });
         await setting("Sync direction").dropdowns[0].change("coreToLazy");
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Sync direction");
         expect(tabMock.pendingPluginIds).toEqual(new Set(withIds ? ["existing", "alpha", "beta"] : ["existing"]));
         expect(tabMock.markDirty).toHaveBeenCalledOnce();
         expect(tabMock.saveImmediateChanges).not.toHaveBeenCalled();

@@ -172,3 +172,27 @@ test("the rebuild button does not spin while the overwrite confirmation is open"
     await expect(obsidian.page.locator(".notice").filter({ hasText: "rebuilt successfully" })).toHaveCount(0);
     expect(await onDiskSorted(obsidian)).toEqual([pluginUnderTestId, ...dummyIds].sort());
 });
+
+test("double-clicking Review & save opens one review that lists the external edits", async ({ obsidian }) => {
+    await startFrom(obsidian);
+    // Enable two plugins outside On-Demand that the staged batch change leaves alone.
+    await obsidian.page.evaluate((ids) => app.vault.writeConfigJson("community-plugins", ids), [pluginUnderTestId, ...initiallyEnabled, "drift-dummy-15", "drift-dummy-16"]);
+    const settingsPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Maintenance & batch" });
+    await settingsPage.locator(".lazy-maintenance-advanced summary").click();
+    // Stage always enabled → always disabled for the first 15 plugins.
+    const modeSelect = (name: string) => settingsPage.locator(".setting-item", { has: settingsPage.locator(".setting-item-name", { hasText: new RegExp(`^${name}$`) }) }).locator("select:visible");
+    await modeSelect("From mode").selectOption("alwaysEnabled");
+    await modeSelect("To mode").selectOption("alwaysDisabled");
+    await settingsPage.getByRole("button", { name: "Replace all" }).click();
+
+    await settingsPage.getByRole("button", { name: "Review & save…", exact: true }).dblclick();
+    const reviewPage = await obsidian.findPage((candidate) => candidate.locator(".lazy-review-changes-modal"), { timeout: 10_000 });
+    const review = reviewPage.locator(".lazy-review-changes-modal");
+    await expect(review).toContainText("Changed outside On-Demand (overwritten on save) (2)");
+    await expect(review).toContainText("Plugins (15)");
+    // Give a second, unguarded review the same time to appear before counting.
+    await reviewPage.waitForTimeout(500);
+    await expect(reviewPage.locator(".lazy-review-changes-modal")).toHaveCount(1);
+    await expect(obsidian.page.locator(".lazy-review-changes-modal")).toHaveCount(reviewPage === obsidian.page ? 1 : 0);
+    await review.getByRole("button", { name: "Cancel" }).click();
+});

@@ -21,6 +21,12 @@ export class MaintenancePage extends SettingPage {
     private advancedOpen = false;
     /** The last rebuild started from this page, for callers that need to wait for it. */
     rebuilding: Promise<void> = Promise.resolve();
+    /** The last sync started from this page, for callers that need to wait for it. */
+    syncing: Promise<void> = Promise.resolve();
+    // Obsidian buttons ignore clicks only while disabled, not while their spinner shows,
+    // so these flags stop a double click from starting a second run.
+    private rebuildBusy = false;
+    private syncBusy = false;
     constructor(plugin: OnDemandPlugin, tab: SettingsTab) {
         super();
         this.plugin = plugin;
@@ -28,11 +34,54 @@ export class MaintenancePage extends SettingPage {
     }
     /** Resolves once the rebuild finished, failed or was declined; failures are reported, not thrown. */
     rebuildCaches(button: ButtonComponent, feature: MaintenanceFeature): Promise<void> {
-        this.rebuilding = this.runRebuild(button, feature).catch((error: unknown) => {
-            logger.error("Failed to rebuild command and view caches", error);
-            new Notice("Failed to rebuild command and view caches. See the console for details.");
-        });
+        if (this.rebuildBusy) return this.rebuilding;
+        this.rebuildBusy = true;
+        this.rebuilding = this.runRebuild(button, feature)
+            .catch((error: unknown) => {
+                logger.error("Failed to rebuild command and view caches", error);
+                new Notice("Failed to rebuild command and view caches. See the console for details.");
+            })
+            .finally(() => {
+                this.rebuildBusy = false;
+            });
         return this.rebuilding;
+    }
+    /** Resolves once the sync finished or was refused; failures are reported, not thrown. */
+    syncNow(button: ButtonComponent, feature: MaintenanceFeature): Promise<void> {
+        if (this.syncBusy) return this.syncing;
+        this.syncBusy = true;
+        button.setDisabled(true);
+        this.syncing = this.runSync(feature)
+            .catch((error: unknown) => {
+                logger.error("Failed to sync settings", error);
+                new Notice("Failed to sync settings. See the console for details.");
+            })
+            .finally(() => {
+                this.syncBusy = false;
+                button.setDisabled(false);
+            });
+        return this.syncing;
+    }
+    private async runSync(feature: MaintenanceFeature) {
+        await this.tab.waitForImmediateSaves();
+        if (this.syncDirection === "lazyToCore" && this.tab.hasPendingChanges) {
+            // This direction writes Obsidian's config immediately, so
+            // do not let it persist a draft that Discard could undo only
+            // on the plugin-data side.
+            new Notice("Save or discard pending settings before syncing to Obsidian config.");
+            return;
+        }
+        const result = await feature.executeSync(this.syncDirection);
+        new Notice(result.message);
+        if (result.changed > 0) {
+            if (this.syncDirection === "coreToLazy") {
+                // coreToLazy stages plugin data in memory; retain the
+                // exact IDs so Save applies only the affected policies.
+                result.pluginIds?.forEach((pluginId) => this.tab.pendingPluginIds.add(pluginId));
+                this.tab.markDirty();
+            }
+            this.display();
+        }
     }
     private async runRebuild(button: ButtonComponent, feature: MaintenanceFeature) {
         await this.tab.waitForImmediateSaves();
@@ -91,27 +140,8 @@ export class MaintenancePage extends SettingPage {
                 b
                     .setButtonText("Sync now")
                     .setCta()
-                    .onClick(async () => {
-                        if (!f) return;
-                        await this.tab.waitForImmediateSaves();
-                        if (this.syncDirection === "lazyToCore" && this.tab.hasPendingChanges) {
-                            // This direction writes Obsidian's config immediately, so
-                            // do not let it persist a draft that Discard could undo only
-                            // on the plugin-data side.
-                            new Notice("Save or discard pending settings before syncing to Obsidian config.");
-                            return;
-                        }
-                        const result = await f.executeSync(this.syncDirection);
-                        new Notice(result.message);
-                        if (result.changed > 0) {
-                            if (this.syncDirection === "coreToLazy") {
-                                // coreToLazy stages plugin data in memory; retain the
-                                // exact IDs so Save applies only the affected policies.
-                                result.pluginIds?.forEach((pluginId) => this.tab.pendingPluginIds.add(pluginId));
-                                this.tab.markDirty();
-                            }
-                            this.display();
-                        }
+                    .onClick(() => {
+                        if (f) void this.syncNow(b, f);
                     }),
             );
         new Setting(advancedContent).setName("Batch operations").setHeading();

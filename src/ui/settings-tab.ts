@@ -160,7 +160,18 @@ export class SettingsTab extends PluginSettingTab {
     }
     // Obsidian shows a loading spinner on a button while its click handler is pending, so the
     // handlers stay synchronous and the awaiting happens here. Otherwise the spinner would stay on for the whole review.
+    private reviewing = false;
     private async reviewAndSave(onRefresh?: () => void) {
+        // The file read below runs before the modal covers the button, so a double click could open two reviews.
+        if (this.reviewing) return;
+        this.reviewing = true;
+        try {
+            await this.runReview(onRefresh);
+        } finally {
+            this.reviewing = false;
+        }
+    }
+    private async runReview(onRefresh?: () => void) {
         const drift = await this.detectExternalChanges();
         const confirmed = await showReviewChangesModal(this.app, {
             mode: "save",
