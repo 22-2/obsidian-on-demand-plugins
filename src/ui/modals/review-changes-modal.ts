@@ -116,9 +116,8 @@ class ReviewChangesModal extends Modal {
     private renderChange(list: HTMLElement, change: PendingChange) {
         // A plain row rather than a Setting: mobile Setting styles stack the revert button below long text.
         const item = list.createDiv({ cls: "lazy-review-changes-item" });
-        const info = item.createDiv({ cls: "lazy-review-changes-info" });
-        info.createDiv({ cls: "lazy-review-changes-name", text: change.label });
-        const desc = info.createDiv({ cls: "lazy-review-changes-desc" });
+        item.createDiv({ cls: "lazy-review-changes-name", text: change.label });
+        const desc = item.createDiv({ cls: "lazy-review-changes-desc" });
         if (this.options.mode === "discard") {
             // Discarding drops the draft value (`to`) and restores the saved one (`from`). Say so in words,
             // since an arrow would read as a change being made.
@@ -139,6 +138,7 @@ class ReviewChangesModal extends Modal {
         const revert = change.revert;
         // A restore is all or nothing; edits continue in the settings once it is back.
         if (!revert || this.options.mode === "restore") return;
+        item.addClass("has-revert");
         new ExtraButtonComponent(item)
             .setIcon("rotate-ccw")
             .setTooltip("Revert this change")
