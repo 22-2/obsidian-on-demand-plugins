@@ -1,11 +1,11 @@
 import { expect, test } from "./fixtures";
 import type { ObsidianAPI } from "obsidian-e2e-toolkit";
-import { pluginUnderTestId, readOnDemandStorageValue, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
+import { pluginUnderTestId, readOnDemandStorageValue, useOnDemandPluginsWithFixture, withReloadRecorded } from "./test-utils";
 
 const myCommandsPluginId = "my-commands-plugin";
 const duplicateCurrentTabCommandId = `${myCommandsPluginId}:duplicate-current-tab`;
 
-useOnDemandPluginsWithTargets(myCommandsPluginId);
+useOnDemandPluginsWithFixture(myCommandsPluginId);
 
 async function configureMyCommandsPluginAsLazy(obsidian: ObsidianAPI) {
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);

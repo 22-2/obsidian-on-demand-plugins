@@ -22,6 +22,10 @@ export function resolveMyfilesPluginPath(pluginId: string): string {
     return path.resolve(repoRoot, "myfiles", pluginId);
 }
 
+export function resolveFixturePluginPath(fixtureName: string): string {
+    return path.resolve(repoRoot, "tests", "fixtures", fixtureName);
+}
+
 export function useVaultPlugins(pluginPaths: readonly string[], options: TestVaultOptions = {}) {
     test.use({
         vaultOptions: {
@@ -43,6 +47,11 @@ export function useOnDemandPluginsWithTargets(targetPluginIds: string | readonly
         enableBrowserConsoleLogging: true,
         ...options,
     });
+}
+
+export function useOnDemandPluginsWithFixture(fixtureName: string) {
+    // Reason: fixture plugins live in the repo, unlike the downloaded plugins in myfiles.
+    useVaultPlugins([repoRoot, resolveFixturePluginPath(fixtureName)], { enableBrowserConsoleLogging: true });
 }
 
 export function useOnDemandPluginOnly(options: TestVaultOptions = {}) {
