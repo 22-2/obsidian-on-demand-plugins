@@ -2,15 +2,18 @@ import type { App, SettingDefinitionItem } from "obsidian";
 import { Notice, PluginSettingTab, Setting } from "obsidian";
 import { FeatureEvents } from "src/core/event-bus";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE, PluginModes } from "src/core/types";
+import type { RestoreDraftBehavior } from "src/core/types";
 import { BackupFeature } from "src/features/backup/backup-feature";
+import type { CommunityPluginsDrift } from "src/features/community-plugins-drift/community-plugins-drift";
+import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import type OnDemandPlugin from "src/main";
-import { showReviewChangesModal } from "src/ui/modals/review-changes-modal";
+import { showRestoreDraftModal, showReviewChangesModal } from "src/ui/modals/review-changes-modal";
 import { pluginManagementSummary } from "src/ui/settings/helpers";
 import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { PluginPage } from "src/ui/settings/pages/plugin-page";
 import { ProfileManagementPage } from "src/ui/settings/pages/profile-management-page";
-import type { ImmediateSettingsChange, PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
-import { PendingChanges } from "src/ui/settings/pending-changes";
+import type { ChangeDescriber, DraftStash, ImmediateSettingsChange, PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
+import { PendingChanges, RESTORE_DRAFT_BEHAVIOR_LABELS } from "src/ui/settings/pending-changes";
 
 export class SettingsTab extends PluginSettingTab {
     public plugin: OnDemandPlugin;
@@ -19,6 +22,13 @@ export class SettingsTab extends PluginSettingTab {
         super(app, plugin);
         this.plugin = plugin;
         this.pending = new PendingChanges(() => this.plugin.core?.settingsService);
+        const view = this.containerEl.ownerDocument.defaultView;
+        if (view) {
+            this.renderObserver = new view.MutationObserver((records) => {
+                if (records.some((record) => record.addedNodes.length > 0)) this.onRendered();
+            });
+            this.renderObserver.observe(this.containerEl, { childList: true });
+        }
     }
     get pendingPluginIds() {
         return this.pending.pluginIds;
@@ -38,6 +48,113 @@ export class SettingsTab extends PluginSettingTab {
         });
         this.update();
     }
+    /** A draft set aside when this settings tab was left; kept for this session only. */
+    private stash?: DraftStash;
+    /**
+     * Obsidian has no event for a tab being shown and reuses its cached definitions, but it
+     * renders the tab's content into containerEl each time, so a render marks the tab as shown.
+     */
+    private readonly renderObserver?: MutationObserver;
+    private shown = false;
+    private readonly restoreOfferRequested = new Set<"plugin-management" | "maintenance">();
+    private restoreOfferInProgress = false;
+    /** Set when a shown tab hides; a render before the current task ends is the same tab redrawn, not a reopen. */
+    private redrawing = false;
+    /** The last restore offer, for callers that need to wait for it. */
+    restoring: Promise<void> = Promise.resolve();
+    /**
+     * Obsidian cannot keep settings open, so an unsaved draft is taken out when the tab
+     * closes: until the user decides, On-Demand keeps running on the saved settings.
+     */
+    hide() {
+        super.hide();
+        // Obsidian also calls hide() just before showing a tab that is still its active one,
+        // e.g. when settings open again, so only a hide while shown is the user leaving.
+        const wasShown = this.shown;
+        this.shown = false;
+        this.stashPendingDraft();
+        if (!wasShown || !this.stash) return;
+        // Clicking the open tab again makes Obsidian hide and redraw it in one go.
+        this.redrawing = true;
+        this.containerEl.ownerDocument.defaultView?.setTimeout(() => (this.redrawing = false), 0);
+    }
+    private onRendered() {
+        this.shown = true;
+        if (!this.stash) return;
+        if (this.redrawing) {
+            this.restoreOfferRequested.clear();
+            this.restoreQuietly();
+        }
+    }
+    /** Remember the page to offer after a tab close; navigating within this tab keeps edits live. */
+    requestRestoreOnPageClose(page: "plugin-management" | "maintenance") {
+        if (this.pending.hasChanges) this.restoreOfferRequested.add(page);
+    }
+    /** Offer a stashed draft only after its page was previously left. */
+    offerRestoreOnPageOpen(page: "plugin-management" | "maintenance") {
+        if (this.restoreOfferRequested.has(page) && this.stash && !this.redrawing && !this.restoreOfferInProgress) this.restoring = this.offerRestore();
+    }
+    private stashPendingDraft() {
+        // Keep an older stash when there is nothing new, so a quick look does not lose it.
+        const stash = this.pending.stashDraft(this.stash);
+        if (!stash) return;
+        this.stash = stash;
+        this.plugin.configureLogger();
+    }
+    /** Stops watching renders; the stash goes with the plugin, as it lives for this session only. */
+    dispose() {
+        this.renderObserver?.disconnect();
+        this.stash = undefined;
+        this.restoreOfferRequested.clear();
+    }
+    private restoreQuietly() {
+        const stash = this.stash;
+        if (!stash) return;
+        this.stash = undefined;
+        this.pending.restoreDraft(stash);
+        this.plugin.configureLogger();
+        this.update();
+    }
+    private async offerRestore() {
+        if (this.restoreOfferInProgress) return;
+        this.restoreOfferInProgress = true;
+        try {
+            const stash = this.stash;
+            if (!stash) return;
+            const changes = this.pending.describeStash(stash, this.describer());
+            if (changes.length === 0) {
+                this.stash = undefined;
+                this.restoreOfferRequested.clear();
+                return;
+            }
+            const behavior = this.plugin.data.restoreDraftBehavior ?? "ask";
+            const choice = behavior === "ask" ? await showRestoreDraftModal(this.app, () => changes) : { action: behavior, dontAskAgain: false };
+            // An automatic choice is otherwise invisible, so say what happened and how to change it.
+            if (behavior !== "ask" && this.stash === stash) {
+                const count = `${changes.length} unsaved ${changes.length === 1 ? "change" : "changes"}`;
+                new Notice(`${behavior === "restore" ? "Restored" : "Discarded"} ${count}. Change this under Behaviour › Unsaved draft prompt.`);
+            }
+            if (choice.action === "dismiss" || this.stash !== stash) return;
+            if (choice.dontAskAgain) {
+                try {
+                    await this.saveImmediateChanges((data) => {
+                        data.restoreDraftBehavior = choice.action as RestoreDraftBehavior;
+                    });
+                } catch {
+                    new Notice("Could not save the restore preference. This choice still applies to this draft.");
+                }
+            }
+            this.stash = undefined;
+            this.restoreOfferRequested.clear();
+            if (choice.action === "restore") {
+                this.pending.restoreDraft(stash);
+                this.plugin.configureLogger();
+            }
+            this.update();
+        } finally {
+            this.restoreOfferInProgress = false;
+        }
+    }
     getSettingDefinitions(): SettingDefinitionItem[] {
         this.plugin.updateManifests();
         const modes: Record<string, string> = { ...PluginModes };
@@ -54,34 +171,61 @@ export class SettingsTab extends PluginSettingTab {
             {
                 type: "page",
                 name: "Behaviour",
-                desc: "Configure default loading behaviour.",
+                desc: "Configure loading and unsaved draft behaviour.",
                 items: [
-                    { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
                     {
-                        name: "Auto-remove uninstalled entries",
-                        desc: "Prune settings for plugins that are no longer installed.",
-                        render: (setting) => {
-                            setting.addToggle((toggle) =>
-                                toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange(async (value) => {
-                                    try {
-                                        await this.saveImmediateChanges(async (data, profileId) => {
-                                            const settings = data.profiles[profileId].settings;
-                                            settings.pruneUninstalledEntries = value;
-                                            if (!value) return;
-                                            const installed = new Set(this.plugin.manifests.map((manifest) => manifest.id));
-                                            const maps = [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
-                                            if (!maps.some((map) => Object.keys(map).some((id) => !installed.has(id)))) return;
-                                            await this.plugin.features.get(BackupFeature)?.createBackup();
-                                            for (const map of maps) {
-                                                for (const id of Object.keys(map)) if (!installed.has(id)) delete map[id];
+                        type: "group",
+                        heading: "Current profile",
+                        items: [
+                            { name: "Default mode", desc: "Default mode for newly discovered plugins.", control: { type: "dropdown", key: "defaultMode", options: modes } },
+                            {
+                                name: "Auto-remove uninstalled entries",
+                                desc: "Prune settings for plugins that are no longer installed.",
+                                render: (setting) => {
+                                    setting.addToggle((toggle) =>
+                                        toggle.setValue(this.plugin.settings.pruneUninstalledEntries).onChange(async (value) => {
+                                            try {
+                                                await this.saveImmediateChanges(async (data, profileId) => {
+                                                    const settings = data.profiles[profileId].settings;
+                                                    settings.pruneUninstalledEntries = value;
+                                                    if (!value) return;
+                                                    const installed = new Set(this.plugin.manifests.map((manifest) => manifest.id));
+                                                    const maps = [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
+                                                    if (!maps.some((map) => Object.keys(map).some((id) => !installed.has(id)))) return;
+                                                    await this.plugin.features.get(BackupFeature)?.createBackup();
+                                                    for (const map of maps) {
+                                                        for (const id of Object.keys(map)) if (!installed.has(id)) delete map[id];
+                                                    }
+                                                });
+                                            } finally {
+                                                this.update();
                                             }
+                                        }),
+                                    );
+                                },
+                            },
+                        ],
+                    },
+                    {
+                        type: "group",
+                        heading: "Shared across profiles",
+                        items: [
+                            {
+                                name: "Unsaved draft prompt",
+                                desc: "What to do with unsaved plugin changes when you return to plugin management or maintenance.",
+                                // A render rather than a control: controls read and write the active profile, and this setting is shared.
+                                render: (setting) => {
+                                    setting.addDropdown((dropdown) => {
+                                        for (const [value, label] of Object.entries(RESTORE_DRAFT_BEHAVIOR_LABELS)) dropdown.addOption(value, label);
+                                        dropdown.setValue(this.plugin.data.restoreDraftBehavior ?? "ask").onChange(async (value) => {
+                                            await this.saveImmediateChanges((data) => {
+                                                data.restoreDraftBehavior = value as RestoreDraftBehavior;
+                                            });
                                         });
-                                    } finally {
-                                        this.update();
-                                    }
-                                }),
-                            );
-                        },
+                                    });
+                                },
+                            },
+                        ],
                     },
                 ],
             },
@@ -105,10 +249,28 @@ export class SettingsTab extends PluginSettingTab {
         });
     }
     describeChanges(): PendingChange[] {
-        return this.pending.describeChanges({
+        return this.pending.describeChanges(this.describer());
+    }
+    private describer(): ChangeDescriber {
+        return {
             pluginName: (pluginId) => this.plugin.manifests.find((manifest) => manifest.id === pluginId)?.name ?? pluginId,
             fallbackMode: (pluginId, settings) => (this.plugin.isPluginEnabledOnDisk(pluginId) ? PLUGIN_MODE.ALWAYS_ENABLED : settings.defaultMode),
-        });
+        };
+    }
+    private async detectExternalChanges(): Promise<CommunityPluginsDrift | null> {
+        try {
+            return (await this.plugin.features.get(CommunityPluginsDriftFeature)?.detect()) ?? null;
+        } catch {
+            return null;
+        }
+    }
+    private describeExternalChanges(drift: CommunityPluginsDrift): PendingChange[] {
+        const nameOf = (pluginId: string) => this.plugin.manifests.find((manifest) => manifest.id === pluginId)?.name ?? pluginId;
+        const removed = (label: string): PendingChange => ({ group: "external", label, from: "Enabled outside On-Demand", to: "Removed from community-plugins.json" });
+        const readded = (label: string): PendingChange => ({ group: "external", label, from: "Disabled outside On-Demand", to: "Re-added to community-plugins.json" });
+        const changes = [...drift.enabledExternally.map((id) => removed(nameOf(id))), ...drift.disabledExternally.map((id) => readded(nameOf(id)))];
+        if (drift.selfMissing) changes.push(readded("On-Demand Plugins"));
+        return changes;
     }
     private saveButtonText() {
         const count = this.getChangedPluginIds().length;
@@ -143,15 +305,31 @@ export class SettingsTab extends PluginSettingTab {
     }
     // Obsidian shows a loading spinner on a button while its click handler is pending, so the
     // handlers stay synchronous and the awaiting happens here. Otherwise the spinner would stay on for the whole review.
+    private reviewing = false;
     private async reviewAndSave(onRefresh?: () => void) {
+        // The file read below runs before the modal covers the button, so a double click could open two reviews.
+        if (this.reviewing) return;
+        this.reviewing = true;
+        try {
+            await this.runReview(onRefresh);
+        } finally {
+            this.reviewing = false;
+        }
+    }
+    private async runReview(onRefresh?: () => void) {
+        const drift = await this.detectExternalChanges();
         const confirmed = await showReviewChangesModal(this.app, {
             mode: "save",
-            getChanges: () => this.describeChanges(),
+            // Only an apply rewrites community-plugins.json, so external edits matter only while plugin changes remain.
+            getChanges: () => {
+                const changes = this.describeChanges();
+                return drift && this.getChangedPluginIds().length > 0 ? [...changes, ...this.describeExternalChanges(drift)] : changes;
+            },
             getConfirmLabel: () => this.saveButtonText(),
         });
         // Reverts in the modal edit the draft even when the save is cancelled.
         this.plugin.configureLogger();
-        if (confirmed) await this.saveChanges();
+        if (confirmed) await this.saveChanges({ externalChangesConfirmed: true });
         else this.update();
         onRefresh?.();
     }
@@ -169,13 +347,13 @@ export class SettingsTab extends PluginSettingTab {
     resetPending() {
         this.pending.reset();
     }
-    async saveChanges() {
+    async saveChanges(options?: { externalChangesConfirmed?: boolean }) {
         await this.waitForImmediateSaves();
         if (!this.hasPendingChanges) return;
         const pluginIds = this.getChangedPluginIds();
         await this.plugin.saveSettings();
         if (pluginIds.length > 0) {
-            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds });
+            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds, externalChangesConfirmed: options?.externalChangesConfirmed });
         }
         this.resetPending();
         new Notice(pluginIds.length > 0 ? "Settings saved and applied" : "Settings saved");
@@ -207,6 +385,7 @@ const GROUP_NOUNS: Record<PendingChangeGroup, [string, string]> = {
     plugins: ["plugin", "plugins"],
     settings: ["setting", "settings"],
     profiles: ["profile change", "profile changes"],
+    external: ["external change", "external changes"],
 };
 
 function pendingSummary(changes: PendingChange[]): DocumentFragment {

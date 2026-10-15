@@ -63,6 +63,7 @@ export class PluginPage extends SettingPage {
     }
     display() {
         this.disconnectInfiniteScroll();
+        this.tab.offerRestoreOnPageOpen("plugin-management");
         this.watchPluginLoadState();
         // Plugin installations can happen while the settings modal is open.
         // Refresh the registry whenever this page is entered so the count and
@@ -135,6 +136,7 @@ export class PluginPage extends SettingPage {
         this.disconnectInfiniteScroll();
         this.unwatchPluginLoadState();
         this.communityPluginReadId++;
+        this.tab.requestRestoreOnPageClose("plugin-management");
         super.hide();
     }
     private renderInfiniteList() {

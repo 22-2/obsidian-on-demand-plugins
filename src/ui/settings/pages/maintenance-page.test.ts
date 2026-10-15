@@ -1,10 +1,13 @@
 import { Notice } from "src/__mocks__/obsidian";
+import { showConfirmModal } from "src/core/confirm-modal";
 import { PLUGIN_MODE } from "src/core/types";
 import { createPageFixture } from "src/ui/settings/__mocks__/page-fixture";
 import { elements, ui } from "src/ui/settings/__mocks__/settings-ui";
 import type { UiElement } from "src/ui/settings/__mocks__/settings-ui";
 import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("src/core/confirm-modal", () => ({ showConfirmModal: vi.fn() }));
 
 vi.mock("obsidian", async () => ({
     ...(await import("src/__mocks__/obsidian")),
@@ -14,14 +17,22 @@ vi.mock("obsidian", async () => ({
 function setup() {
     const feature = {
         rebuildAndApplyCommandCache: vi.fn().mockResolvedValue(undefined),
+        // The fixture returns this object for every feature, including the drift check.
+        confirmOverwrite: vi.fn().mockResolvedValue(true),
         executeSync: vi.fn().mockResolvedValue({ changed: 0, message: "Already in sync" }),
+        buildSyncPreview: vi.fn().mockResolvedValue({ label: "On-Demand → file", summary: "✅ Already in sync", hasChanges: false }),
         applyBatchModeReplace: vi.fn().mockReturnValue(0),
     };
     const fixture = createPageFixture(feature);
     const page = new MaintenancePage(fixture.plugin, fixture.tab);
     page.display();
     const setting = (name: string) => ui.setting(name, page.containerEl as unknown as UiElement);
-    return { ...fixture, feature, page, setting };
+    /** Clicks the first button of a setting and waits for the work it started in the background. */
+    const clickAndSettle = async (name: string) => {
+        await setting(name).buttons[0].click();
+        await Promise.all([page.rebuilding, page.syncing]);
+    };
+    return { ...fixture, feature, page, setting, clickAndSettle };
 }
 
 describe("MaintenancePage", () => {
@@ -51,45 +62,120 @@ describe("MaintenancePage", () => {
     });
 
     it("waits for immediate saves and keeps the rebuild button disabled until rebuilding finishes", async () => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, page, setting, tabMock } = setup();
         const rebuilding = Promise.withResolvers<void>();
         feature.rebuildAndApplyCommandCache.mockReturnValue(rebuilding.promise);
         const button = setting("Rebuild command and view caches").buttons[0];
-        const clicked = button.click();
+        await button.click();
         await vi.waitFor(() => expect(button.disabled).toBe(true));
         expect(tabMock.waitForImmediateSaves.mock.invocationCallOrder[0]).toBeLessThan(feature.rebuildAndApplyCommandCache.mock.invocationCallOrder[0]);
-        expect(feature.rebuildAndApplyCommandCache).toHaveBeenCalledWith({ force: true });
+        expect(feature.confirmOverwrite.mock.invocationCallOrder[0]).toBeLessThan(feature.rebuildAndApplyCommandCache.mock.invocationCallOrder[0]);
+        expect(feature.rebuildAndApplyCommandCache).toHaveBeenCalledWith({ force: true, externalChangesConfirmed: true });
         rebuilding.resolve();
-        await clicked;
+        await page.rebuilding;
         expect(button.disabledHistory).toEqual([true, false]);
         expect(Notice.messages).toContain("Command and view caches rebuilt successfully");
     });
 
-    it("restores the rebuild button after a failure without announcing success", async () => {
-        const { feature, setting } = setup();
-        feature.rebuildAndApplyCommandCache.mockRejectedValueOnce(new Error("cache failed"));
+    it("returns from the click handler at once so Obsidian shows no spinner while the confirmation is open", async () => {
+        const { feature, page, setting } = setup();
+        const answer = Promise.withResolvers<boolean>();
+        feature.confirmOverwrite.mockReturnValueOnce(answer.promise);
         const button = setting("Rebuild command and view caches").buttons[0];
-        await expect(button.click()).rejects.toThrow("cache failed");
+
+        // The click settles while the confirmation is still unanswered.
+        await button.click();
+        await vi.waitFor(() => expect(feature.confirmOverwrite).toHaveBeenCalled());
         expect(button.disabled).toBe(false);
+
+        answer.resolve(false);
+        await page.rebuilding;
+        expect(feature.rebuildAndApplyCommandCache).not.toHaveBeenCalled();
         expect(Notice.messages).toEqual([]);
     });
 
+    it("starts one rebuild and one sync however often the buttons are clicked", async () => {
+        const { feature, page, setting } = setup();
+        const answer = Promise.withResolvers<boolean>();
+        feature.confirmOverwrite.mockReturnValueOnce(answer.promise);
+        const syncing = Promise.withResolvers<{ changed: number; message: string }>();
+        feature.executeSync.mockReturnValueOnce(syncing.promise);
+        const rebuild = setting("Rebuild command and view caches").buttons[0];
+        const sync = setting("Sync direction").buttons[0];
+
+        await rebuild.click();
+        await rebuild.click();
+        await sync.click();
+        expect(sync.disabled).toBe(true);
+        await sync.click();
+        answer.resolve(true);
+        syncing.resolve({ changed: 0, message: "Already in sync" });
+        await Promise.all([page.rebuilding, page.syncing]);
+
+        expect(feature.confirmOverwrite).toHaveBeenCalledTimes(1);
+        expect(feature.rebuildAndApplyCommandCache).toHaveBeenCalledTimes(1);
+        expect(feature.executeSync).toHaveBeenCalledTimes(1);
+        expect(sync.disabled).toBe(false);
+    });
+
+    it("shows what writing Obsidian's config changes and writes it only after confirmation", async () => {
+        const { feature, clickAndSettle } = setup();
+        feature.buildSyncPreview.mockResolvedValue({ label: "On-Demand → file", summary: "➕ Will enable: 1 (alpha)\n", hasChanges: true });
+        vi.mocked(showConfirmModal).mockResolvedValueOnce(false).mockResolvedValueOnce(null).mockResolvedValueOnce(true);
+
+        await clickAndSettle("Sync direction");
+        await clickAndSettle("Sync direction");
+        expect(feature.executeSync).not.toHaveBeenCalled();
+        expect(vi.mocked(showConfirmModal).mock.calls[0][1].message).toBe("On-Demand → file\n➕ Will enable: 1 (alpha)\n\ncommunity-plugins.json is rewritten now and Obsidian restarts to apply it. Continue?");
+
+        await clickAndSettle("Sync direction");
+        expect(feature.executeSync).toHaveBeenCalledWith("lazyToCore");
+    });
+
+    it("syncs without asking when nothing would change or when only staging a draft", async () => {
+        const { feature, setting, clickAndSettle } = setup();
+        await clickAndSettle("Sync direction");
+        await setting("Sync direction").dropdowns[0].change("coreToLazy");
+        await clickAndSettle("Sync direction");
+        expect(showConfirmModal).not.toHaveBeenCalled();
+        expect(feature.buildSyncPreview).toHaveBeenCalledTimes(1);
+        expect(feature.executeSync.mock.calls).toEqual([["lazyToCore"], ["coreToLazy"]]);
+    });
+
+    it("reports a failed sync instead of leaving the rejection unhandled", async () => {
+        const { feature, setting, clickAndSettle } = setup();
+        feature.executeSync.mockRejectedValueOnce(new Error("write failed"));
+        await clickAndSettle("Sync direction");
+        expect(setting("Sync direction").buttons[0].disabled).toBe(false);
+        expect(Notice.messages).toEqual(["Failed to sync settings. See the console for details."]);
+    });
+
+    it("restores the rebuild button after a failure and reports it instead of a success", async () => {
+        const { feature, page, setting } = setup();
+        feature.rebuildAndApplyCommandCache.mockRejectedValueOnce(new Error("cache failed"));
+        const button = setting("Rebuild command and view caches").buttons[0];
+        await button.click();
+        await page.rebuilding;
+        expect(button.disabled).toBe(false);
+        expect(Notice.messages).toEqual(["Failed to rebuild command and view caches. See the console for details."]);
+    });
+
     it("blocks rebuilding and exporting while a plugin draft is pending", async () => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, tabMock, clickAndSettle } = setup();
         tabMock.hasPendingChanges = true;
-        await setting("Rebuild command and view caches").buttons[0].click();
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Rebuild command and view caches");
+        await clickAndSettle("Sync direction");
         expect(feature.rebuildAndApplyCommandCache).not.toHaveBeenCalled();
         expect(feature.executeSync).not.toHaveBeenCalled();
         expect(Notice.messages).toEqual(["Review & save or discard pending plugin changes before rebuilding caches.", "Save or discard pending settings before syncing to Obsidian config."]);
     });
 
     it("ignores maintenance operations when the feature is unavailable", async () => {
-        const { feature, pluginMock, page, setting } = setup();
+        const { feature, pluginMock, page, setting, clickAndSettle } = setup();
         pluginMock.features.get.mockReturnValue(undefined);
         page.display();
-        await setting("Rebuild command and view caches").buttons[0].click();
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Rebuild command and view caches");
+        await clickAndSettle("Sync direction");
         await setting("To mode").buttons[0].click();
         expect(feature.rebuildAndApplyCommandCache).not.toHaveBeenCalled();
         expect(feature.executeSync).not.toHaveBeenCalled();
@@ -97,31 +183,40 @@ describe("MaintenancePage", () => {
     });
 
     it.each(["lazyToCore", "coreToLazy"])("leaves pending state untouched when %s has no changes", async (direction) => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, setting, tabMock, clickAndSettle } = setup();
         await setting("Sync direction").dropdowns[0].change(direction);
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Sync direction");
         expect(feature.executeSync).toHaveBeenCalledWith(direction);
         expect(tabMock.markDirty).not.toHaveBeenCalled();
         expect(tabMock.renderPendingControls).toHaveBeenCalledTimes(1);
         expect(Notice.messages).toEqual(["Already in sync"]);
     });
 
-    it("exports saved configuration without staging another plugin draft", async () => {
-        const { feature, setting, tabMock } = setup();
+    it("exports saved configuration without staging a draft and restarts Obsidian to apply it", async () => {
+        const { feature, pluginMock, tabMock, clickAndSettle } = setup();
         feature.executeSync.mockResolvedValueOnce({ changed: 1, message: "Config updated" });
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Sync direction");
         expect(tabMock.markDirty).not.toHaveBeenCalled();
         expect(tabMock.pendingPluginIds.size).toBe(0);
-        expect(tabMock.renderPendingControls).toHaveBeenCalledTimes(2);
+        expect(pluginMock.app.commands.executeCommandById).toHaveBeenCalledWith("app:reload");
+    });
+
+    it("does not restart when the export changed nothing or only staged an import", async () => {
+        const { feature, pluginMock, setting, clickAndSettle } = setup();
+        await clickAndSettle("Sync direction");
+        await setting("Sync direction").dropdowns[0].change("coreToLazy");
+        feature.executeSync.mockResolvedValueOnce({ changed: 1, message: "Staged", pluginIds: ["alpha"] });
+        await clickAndSettle("Sync direction");
+        expect(pluginMock.app.commands.executeCommandById).not.toHaveBeenCalled();
     });
 
     it.each([true, false])("stages imported changes without overwriting an existing draft (IDs returned: %s)", async (withIds) => {
-        const { feature, setting, tabMock } = setup();
+        const { feature, setting, tabMock, clickAndSettle } = setup();
         tabMock.hasPendingChanges = true;
         tabMock.pendingPluginIds.add("existing");
         feature.executeSync.mockResolvedValueOnce({ changed: 2, message: "Imported", ...(withIds ? { pluginIds: ["alpha", "beta"] } : {}) });
         await setting("Sync direction").dropdowns[0].change("coreToLazy");
-        await setting("Sync direction").buttons[0].click();
+        await clickAndSettle("Sync direction");
         expect(tabMock.pendingPluginIds).toEqual(new Set(withIds ? ["existing", "alpha", "beta"] : ["existing"]));
         expect(tabMock.markDirty).toHaveBeenCalledOnce();
         expect(tabMock.saveImmediateChanges).not.toHaveBeenCalled();

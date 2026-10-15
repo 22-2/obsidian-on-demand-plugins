@@ -3,6 +3,7 @@ import { around } from "monkey-around";
 import type { ViewCreator } from "obsidian";
 import { Plugin } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
+import type { DeviceSettings } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 
 const logger = log.getLogger("OnDemandPlugin/ViewRegistryPatch");
@@ -46,11 +47,10 @@ function isLazyWithUseView(ctx: PluginContext, pluginId: string): boolean {
  *
  * @returns true when the view type was newly recorded in either map.
  */
-function trackViewType(ctx: PluginContext, pluginId: string, viewType: string): boolean {
+function trackViewType(settings: DeviceSettings, pluginId: string, viewType: string): boolean {
     let added = false;
 
     // The legacy map is still consulted when resolving which plugin owns an opened view.
-    const settings = ctx.getSettings();
     settings.lazyOnViews ??= {};
     const lazyOnViews = settings.lazyOnViews;
     lazyOnViews[pluginId] ??= [];
@@ -101,12 +101,13 @@ export function patchPluginRegisterView(ctx: PluginContext): () => void {
                         const capture = captures.get(ctx)?.get(pluginId);
                         if (capture) {
                             capture.add(type);
-                        } else if (trackViewType(ctx, pluginId, type)) {
+                        } else if (trackViewType(ctx.getSettings(), pluginId, type)) {
                             logger.debug(`registerView: attributed view type "${type}" to ${pluginId}`);
                             // Persist immediately: lazy plugins get disabled right after
                             // their capture windows (apply / cache rebuild), so deferring
                             // the save risks losing the only chance to record the mapping.
-                            void ctx.saveSettings();
+                            // Save only this mapping so a pending settings draft is not written without review.
+                            ctx.saveSettingsChange((data, profileId) => void trackViewType(data.profiles[profileId].settings, pluginId, type)).catch((error: unknown) => logger.warn("Failed to save a captured view type", error));
                         }
                     }
                 } catch (error) {

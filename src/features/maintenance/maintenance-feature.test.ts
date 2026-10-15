@@ -14,6 +14,7 @@ describe("MaintenanceFeature", () => {
         getPluginMode: (id: string) => string | undefined;
         saveSettings: ReturnType<typeof vi.fn>;
         _plugin: { manifest: { id: string } };
+        obsidianPlugins: { enabledPlugins: Set<string> };
     };
     let mockRegistry: {
         loadEnabledPluginsFromDisk: ReturnType<typeof vi.fn>;
@@ -47,6 +48,7 @@ describe("MaintenanceFeature", () => {
             getPluginMode: (id) => mockCtx.getSettings().plugins[id]?.mode,
             saveSettings: vi.fn().mockResolvedValue(undefined),
             _plugin: { manifest: { id: "on-demand-plugins" } },
+            obsidianPlugins: { enabledPlugins: new Set(["plugin-1", "on-demand-plugins"]) },
         };
 
         mockRegistry = {
@@ -111,6 +113,25 @@ describe("MaintenanceFeature", () => {
 
             expect(result.changed).toBe(1);
             expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(expect.arrayContaining(["plugin-2", "on-demand-plugins"]), false);
+            // Obsidian's own config save writes this set back, so it must match the file.
+            expect([...mockCtx.obsidianPlugins.enabledPlugins].sort()).toEqual(["on-demand-plugins", "plugin-2"]);
+        });
+
+        it("keeps entries for plugins this device does not manage when exporting", async () => {
+            mockRegistry.enabledPluginsFromDisk = new Set(["plugin-1", "desktop-only", "on-demand-plugins"]);
+
+            const result = await feature.executeSync("lazyToCore");
+
+            expect(result.changed).toBe(1);
+            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "plugin-2"], false);
+        });
+
+        it("previews no removal for entries this device does not manage", async () => {
+            mockRegistry.enabledPluginsFromDisk = new Set(["plugin-2", "desktop-only", "on-demand-plugins"]);
+
+            const preview = await feature.buildSyncPreview("lazyToCore");
+
+            expect(preview.hasChanges).toBe(false);
         });
 
         it("should do nothing if already in sync", async () => {

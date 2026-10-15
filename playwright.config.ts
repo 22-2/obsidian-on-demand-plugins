@@ -4,6 +4,9 @@ import { defineObsidianConfig } from "obsidian-e2e-toolkit";
 export default defineObsidianConfig({
     testDir: "./tests",
 
+    // README screenshots are an on-demand asset capture (`pnpm ui:shots:readme`), not a regression test.
+    testIgnore: "readme-screenshots.spec.ts",
+
     timeout: 1_000 * 60 * 2,
 
     expect: { timeout: 5_000 },

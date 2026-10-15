@@ -3,7 +3,7 @@ import type { DataAdapter } from "obsidian";
 import { Notice, Platform, normalizePath } from "obsidian";
 import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, DeviceType, LazySettings, Profile } from "src/core/types";
-import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, isPluginMode } from "src/core/types";
+import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, isPluginMode, isRestoreDraftBehavior } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { ProfileStorage } from "src/services/settings/profile-storage";
 
@@ -48,6 +48,12 @@ export class SettingsService {
     currentProfileId!: string;
     /** True if no previous data.json was found during load */
     isFirstLoad = false;
+    /**
+     * The settings as last loaded or saved, whichever path saved them. The settings
+     * draft is compared against this, and changes that must not carry the draft are
+     * saved on top of it. Treat it as read-only.
+     */
+    persisted?: LazySettings;
 
     constructor(plugin: OnDemandPlugin) {
         this.plugin = plugin;
@@ -82,11 +88,15 @@ export class SettingsService {
         if (source === "legacy") this.migrateLegacySettings();
 
         this.currentProfileId = this.selectActiveProfileId();
+        this.normalizeRestoreDraftBehavior(loaded);
         Object.values(this.data.profiles).forEach((profile) => this.normalizeProfileSettings(profile));
         this.dropDeadFields();
         this.settings = this.data.profiles[this.currentProfileId].settings;
 
         if (source === "legacy") this.hydrateLegacyLazyOnViews();
+        // Reason: nothing is saved yet on a first load, and startup keeps its defaults in memory on purpose,
+        // so the settings tab baselines on the state it first sees until the first save.
+        this.persisted = this.isFirstLoad ? undefined : structuredClone(this.data);
         if (source === "external") await this.persistExternalProfileMigration();
     }
 
@@ -150,6 +160,14 @@ export class SettingsService {
      * now lives in vault-scoped storage, so any copy here is stale bloat. Runs on
      * every load so already-migrated installs get cleaned too.
      */
+    /** Pre-release builds stored this per profile; adopt the active profile's value once, then keep it shared. */
+    private normalizeRestoreDraftBehavior(loaded: Partial<LazySettings>) {
+        const fromProfile = (this.data.profiles[this.currentProfileId]?.settings as unknown as Partial<Record<string, unknown>> | undefined)?.restoreDraftBehavior;
+        if (!Object.hasOwn(loaded, "restoreDraftBehavior") && isRestoreDraftBehavior(fromProfile)) this.data.restoreDraftBehavior = fromProfile;
+        if (!isRestoreDraftBehavior(this.data.restoreDraftBehavior)) this.data.restoreDraftBehavior = DEFAULT_SETTINGS.restoreDraftBehavior;
+        for (const profile of Object.values(this.data.profiles)) delete (profile.settings as unknown as Partial<Record<string, unknown>>).restoreDraftBehavior;
+    }
+
     private dropDeadFields() {
         const data: LazySettings & LegacyDeadFields = this.data;
         delete data.commandCache;
@@ -344,6 +362,7 @@ export class SettingsService {
         // complete configuration in one file; profiles/ remains the old migration copy for manual recovery.
         await this.plugin.saveData(persisted);
         this.persistedFingerprint = stableStringify(persisted);
+        this.persisted = persisted;
         this.isFirstLoad = false;
         // Reason: profile dialogs save through this service directly, so central emission keeps every successful save backed up.
         this.plugin.app.workspace.trigger("ondemand-plugins:settings-saved");

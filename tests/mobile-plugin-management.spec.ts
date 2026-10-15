@@ -3,6 +3,7 @@ import type { ObsidianAPI } from "obsidian-e2e-toolkit";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "./fixtures";
+import { seedFixturePlugins } from "./screenshot-helpers";
 import { pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
 
 useOnDemandPlugins();
@@ -84,30 +85,7 @@ for (const width of [320, 390]) {
     test(`mobile ${width}px Actions menu and pinned save controls in a long plugin list`, async ({ obsidian }, testInfo) => {
         test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
 
-        // Install small inert plugins in the isolated vault so the real registry,
-        // list pagination and scroll container are exercised without large downloads.
-        await obsidian.page.evaluate(async () => {
-            for (let index = 1; index <= 36; index++) {
-                const number = String(index).padStart(2, "0");
-                const id = `mobile-ui-fixture-${number}`;
-                const dir = `${app.vault.configDir}/plugins/${id}`;
-                await app.vault.adapter.mkdir(dir);
-                await app.vault.adapter.write(
-                    `${dir}/manifest.json`,
-                    JSON.stringify({
-                        id,
-                        name: `Mobile fixture ${number}`,
-                        version: "1.0.0",
-                        minAppVersion: "1.0.0",
-                        description: "A plugin with a longer description to check mobile wrapping, scrolling and access to its loading mode.",
-                        author: "Mobile UI test",
-                        isDesktopOnly: false,
-                    }),
-                );
-                await app.vault.adapter.write(`${dir}/main.js`, 'module.exports = class extends require("obsidian").Plugin {};');
-            }
-            await (app.plugins as unknown as { loadManifests: () => Promise<void> }).loadManifests();
-        });
+        await seedFixturePlugins(obsidian);
         const page = await openMobilePluginManagement(obsidian);
         await page.setViewportSize({ width, height: 844 });
         await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(width);

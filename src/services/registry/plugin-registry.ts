@@ -15,6 +15,8 @@ export class PluginRegistry {
 
     manifests: PluginManifest[] = [];
     enabledPluginsFromDisk = new Set<string>();
+    /** What On-Demand expects community-plugins.json to hold: derived at startup, then whatever it last wrote. */
+    knownOnDisk = new Set<string>();
 
     constructor(
         app: App,
@@ -68,6 +70,7 @@ export class PluginRegistry {
     async writeCommunityPluginsFile(enabledPlugins: string[], showConsoleLog?: boolean) {
         try {
             await this.app.vault.writeConfigJson("community-plugins", enabledPlugins);
+            this.knownOnDisk = new Set(enabledPlugins);
         } catch (error) {
             if (showConsoleLog) {
                 logger.error("Failed to write community-plugins.json using writeConfigJson", error);
@@ -78,5 +81,6 @@ export class PluginRegistry {
     clear() {
         this.manifests = [];
         this.enabledPluginsFromDisk.clear();
+        this.knownOnDisk.clear();
     }
 }

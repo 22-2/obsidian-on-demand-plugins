@@ -37,4 +37,13 @@ export default defineConfig(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		// Unit tests run in Node under vitest, never inside Obsidian, so the mobile and popout-window rules do not apply.
+		files: ['src/**/*.test.ts'],
+		rules: {
+			'obsidianmd/no-nodejs-modules': 'off',
+			'obsidianmd/no-tfile-tfolder-cast': 'off',
+			'obsidianmd/prefer-window-timers': 'off',
+		},
+	},
 );

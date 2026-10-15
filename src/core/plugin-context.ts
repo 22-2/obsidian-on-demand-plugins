@@ -10,6 +10,9 @@ import type { App, EventRef, PluginManifest } from "obsidian";
 import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 
+/** Edits a copy of the saved settings; `profileId` is the active profile. */
+export type SettingsChange = (data: LazySettings, profileId: string) => void | Promise<void>;
+
 /**
  * Minimal view of Obsidian's `Commands` object used by services.
  */
@@ -69,6 +72,9 @@ export interface PluginContext {
     /** Persist settings to disk. */
     saveSettings(): Promise<void>;
 
+    /** Persist one change without the unsaved settings draft; use for saves the user did not review. */
+    saveSettingsChange(change: SettingsChange): Promise<void>;
+
     /** Register event/unload handler (for monkey-patches). */
     register(unload: () => void): void;
 
@@ -110,6 +116,7 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         getData: () => plugin.data,
         getSettings: () => plugin.settings,
         saveSettings: () => plugin.saveSettings(),
+        saveSettingsChange: (change) => plugin.saveSettingsChange(change),
         register: (unload) => plugin.register(unload),
         registerEvent: (eventRef) => plugin.registerEvent(eventRef),
         isPluginEnabledOnDisk: (pluginId) => plugin.isPluginEnabledOnDisk(pluginId),
