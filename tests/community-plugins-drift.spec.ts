@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -244,11 +245,15 @@ test("a Community plugins toggle saves only that plugin while a settings draft i
 test.describe("unsaved draft when settings close", () => {
     async function stageBatch(obsidian: ObsidianAPI) {
         const settingsPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Maintenance & batch" });
-        await settingsPage.locator(".lazy-maintenance-advanced summary").click();
+        await stageBatchOnPage(settingsPage);
+        return settingsPage;
+    }
+    async function stageBatchOnPage(settingsPage: Page) {
+        const advanced = settingsPage.locator(".lazy-maintenance-advanced");
+        if (!(await advanced.evaluate((details: HTMLDetailsElement) => details.open))) await advanced.locator("summary").click();
         // Stage always disabled → lazy for the last 15 plugins.
         await settingsPage.getByRole("button", { name: "Replace all" }).click();
         await expect(settingsPage.locator(".lazy-plugin-save-controls")).toContainText("15 plugins");
-        return settingsPage;
     }
     const changedPluginIds = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app.plugins.plugins["on-demand-plugins"] as unknown as { settingsTab: { getChangedPluginIds: () => string[] } }).settingsTab.getChangedPluginIds().sort());
     const closeSettings = (obsidian: ObsidianAPI) => obsidian.page.evaluate(() => (app as unknown as { setting: { close: () => void } }).setting.close());
@@ -413,7 +418,9 @@ test.describe("unsaved draft when settings close", () => {
         await expect.poll(() => savedRestoreDraftBehavior(obsidian)).toBe("discard");
         expect(await modesOf(obsidian, initiallyDisabled)).toEqual(initiallyDisabled.map(() => "alwaysDisabled"));
 
-        await stageBatch(obsidian);
+        // The Discard prompt leaves Maintenance open. Reuse it: openSettings would clear
+        // the page stack and race its existing navigation/repaint before staging again.
+        await stageBatchOnPage(settingsPage);
         await closeSettings(obsidian);
         const reopenedPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Maintenance & batch" });
         await expect.poll(() => changedPluginIds(obsidian)).toEqual([]);
