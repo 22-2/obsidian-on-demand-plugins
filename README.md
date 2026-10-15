@@ -36,7 +36,13 @@ To refresh cached commands and view types together, open **Maintenance → Rebui
 
 When settings change, `.obsidian/community-plugins.json` is updated automatically. Up to three generations of backups are created; please keep your own backups as well.
 
-If `community-plugins.json` is changed outside On-Demand Plugins (by Sync, Git, a manual edit, the Obsidian CLI or another plugin), a notice appears at startup, and applying changes asks before overwriting those edits. To keep them instead, use **Maintenance › Sync settings** to copy them into the On-Demand settings.
+If `community-plugins.json` is changed outside On-Demand Plugins (by Sync, Git, a manual edit, the Obsidian CLI or another plugin), a notice appears at startup, and applying changes asks before overwriting those edits. To keep them instead, use **Maintenance › Sync settings** to copy them into the On-Demand settings. Syncing **Plugin data → Obsidian config** shows what changes, asks first, and restarts Obsidian to apply it.
+
+Entries for plugins that are not installed on this device, or desktop-only plugins on mobile, are kept as they are, so a device that shares `community-plugins.json` through Sync never disables another device's plugins.
+
+### Unsaved changes
+
+Mode changes stay a draft until you click **Review & save…**. Moving between On-Demand's settings pages keeps the draft. If you close settings or switch to another settings tab, the draft is set aside and On-Demand keeps running on the saved settings. When you return to **Plugin management** or **Maintenance & batch**, it offers the draft back (**Restore** or **Discard**). **Plugin management › Unsaved draft prompt** can restore or discard it automatically instead. A set-aside draft lasts until Obsidian restarts.
 
 ### How it works
 
