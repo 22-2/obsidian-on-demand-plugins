@@ -93,6 +93,7 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     onunload() {
+        this.settingsTab?.dispose();
         void this.features?.unloadAll();
         this.core?.destroy();
     }

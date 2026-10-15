@@ -245,3 +245,85 @@ describe("PendingChanges", () => {
         expect(pending.getChangedPluginIds()).toEqual(["foo"]);
     });
 });
+
+describe("PendingChanges draft stash", () => {
+    function persistedSource() {
+        const source: { data: LazySettings; currentProfileId: string; persisted?: LazySettings } = createSource();
+        const settings = source.data.profiles[DEFAULT_PROFILE_ID].settings;
+        settings.plugins.foo = { mode: PLUGIN_MODE.ALWAYS_ENABLED };
+        settings.plugins.bar = { mode: PLUGIN_MODE.ALWAYS_DISABLED };
+        source.persisted = structuredClone(source.data);
+        return { source, settings };
+    }
+
+    it("returns nothing and changes nothing without a draft", () => {
+        const { source } = persistedSource();
+        const pending = new PendingChanges(() => source);
+        const before = structuredClone(source.data);
+        expect(pending.stashDraft()).toBeUndefined();
+        expect(source.data).toEqual(before);
+    });
+
+    it("takes the draft out in place and restores it", () => {
+        const { source, settings } = persistedSource();
+        const pending = new PendingChanges(() => source);
+        const plugins = settings.plugins;
+        settings.plugins.foo.mode = PLUGIN_MODE.LAZY;
+        settings.plugins.baz = { mode: PLUGIN_MODE.LAZY_ON_LAYOUT_READY };
+        settings.defaultMode = PLUGIN_MODE.LAZY_ON_LAYOUT_READY;
+        source.data.showConsoleLog = true;
+        pending.pluginIds.add("foo");
+
+        const stash = pending.stashDraft()!;
+
+        // The service keeps references to these objects, so they must be edited in place.
+        expect(source.data.profiles[DEFAULT_PROFILE_ID].settings).toBe(settings);
+        expect(settings.plugins).toBe(plugins);
+        expect(source.data).toEqual(source.persisted);
+        expect(pending.hasChanges).toBe(false);
+        expect(pending.pluginIds.size).toBe(0);
+        expect(
+            pending
+                .describeStash(stash, describer)
+                .map((change) => change.label)
+                .sort(),
+        ).toEqual(["Baz plugin", "Debug log output", "Default mode", "Foo plugin"]);
+
+        pending.restoreDraft(stash);
+
+        expect(settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
+        expect(settings.plugins.baz).toEqual({ mode: PLUGIN_MODE.LAZY_ON_LAYOUT_READY });
+        expect(settings.defaultMode).toBe(PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
+        expect(source.data.showConsoleLog).toBe(true);
+        expect(pending.getChangedPluginIds().sort()).toEqual(["baz", "foo"]);
+    });
+
+    it("restores on top of changes saved while settings were closed", () => {
+        const { source, settings } = persistedSource();
+        const pending = new PendingChanges(() => source);
+        settings.plugins.foo.mode = PLUGIN_MODE.LAZY;
+        const stash = pending.stashDraft()!;
+
+        // A Community plugins toggle saved bar meanwhile.
+        settings.plugins.bar.mode = PLUGIN_MODE.ALWAYS_ENABLED;
+        source.persisted = structuredClone(source.data);
+
+        pending.restoreDraft(stash);
+
+        expect(settings.plugins.bar.mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
+        expect(settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
+        expect(pending.getChangedPluginIds()).toEqual(["foo"]);
+    });
+
+    it("describes a stash without changing it", () => {
+        const { source, settings } = persistedSource();
+        const pending = new PendingChanges(() => source);
+        settings.plugins.foo.mode = PLUGIN_MODE.LAZY;
+        const stash = pending.stashDraft()!;
+        const snapshot = structuredClone(stash);
+
+        pending.describeStash(stash, describer).forEach((change) => change.revert?.());
+
+        expect(stash).toEqual(snapshot);
+    });
+});

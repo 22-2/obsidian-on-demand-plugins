@@ -6,12 +6,12 @@ import { BackupFeature } from "src/features/backup/backup-feature";
 import type { CommunityPluginsDrift } from "src/features/community-plugins-drift/community-plugins-drift";
 import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import type OnDemandPlugin from "src/main";
-import { showReviewChangesModal } from "src/ui/modals/review-changes-modal";
+import { showRestoreDraftModal, showReviewChangesModal } from "src/ui/modals/review-changes-modal";
 import { pluginManagementSummary } from "src/ui/settings/helpers";
 import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { PluginPage } from "src/ui/settings/pages/plugin-page";
 import { ProfileManagementPage } from "src/ui/settings/pages/profile-management-page";
-import type { ImmediateSettingsChange, PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
+import type { ChangeDescriber, DraftStash, ImmediateSettingsChange, PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 import { PendingChanges } from "src/ui/settings/pending-changes";
 
 export class SettingsTab extends PluginSettingTab {
@@ -21,6 +21,13 @@ export class SettingsTab extends PluginSettingTab {
         super(app, plugin);
         this.plugin = plugin;
         this.pending = new PendingChanges(() => this.plugin.core?.settingsService);
+        const view = this.containerEl.ownerDocument.defaultView;
+        if (view) {
+            this.renderObserver = new view.MutationObserver((records) => {
+                if (records.some((record) => record.addedNodes.length > 0)) this.onRendered();
+            });
+            this.renderObserver.observe(this.containerEl, { childList: true });
+        }
     }
     get pendingPluginIds() {
         return this.pending.pluginIds;
@@ -38,6 +45,75 @@ export class SettingsTab extends PluginSettingTab {
         await this.saveImmediateChanges((data, profileId) => {
             (data.profiles[profileId].settings as unknown as Record<string, unknown>)[key] = value;
         });
+        this.update();
+    }
+    /** A draft left unsaved when settings last closed; kept for this session only. */
+    private stash?: DraftStash;
+    /**
+     * Obsidian has no event for a tab being shown and reuses its cached definitions, but it
+     * renders the tab's content into containerEl each time, so a render marks the tab as shown.
+     */
+    private readonly renderObserver?: MutationObserver;
+    private shown = false;
+    /** Set when a shown tab hides; a render before the current task ends is the same tab redrawn, not a reopen. */
+    private redrawing = false;
+    /** The last restore offer, for callers that need to wait for it. */
+    restoring: Promise<void> = Promise.resolve();
+    /**
+     * Obsidian cannot keep settings open, so an unsaved draft is taken out when the tab
+     * closes: until the user decides, On-Demand keeps running on the saved settings.
+     */
+    hide() {
+        super.hide();
+        // Obsidian also calls hide() just before showing a tab that is still its active one,
+        // e.g. when settings open again, so only a hide while shown is the user leaving.
+        const wasShown = this.shown;
+        this.shown = false;
+        // Keep an older stash when there is nothing new, so a quick look does not lose it.
+        const stash = this.pending.stashDraft();
+        if (stash) {
+            this.stash = stash;
+            this.plugin.configureLogger();
+        }
+        if (!wasShown || !this.stash) return;
+        // Clicking the open tab again makes Obsidian hide and redraw it in one go.
+        this.redrawing = true;
+        this.containerEl.ownerDocument.defaultView?.setTimeout(() => (this.redrawing = false), 0);
+    }
+    private onRendered() {
+        this.shown = true;
+        if (!this.stash) return;
+        if (this.redrawing) this.restoreQuietly();
+        else this.restoring = this.offerRestore();
+    }
+    /** Stops watching renders; the stash goes with the plugin, as it lives for this session only. */
+    dispose() {
+        this.renderObserver?.disconnect();
+        this.stash = undefined;
+    }
+    private restoreQuietly() {
+        const stash = this.stash;
+        if (!stash) return;
+        this.stash = undefined;
+        this.pending.restoreDraft(stash);
+        this.plugin.configureLogger();
+        this.update();
+    }
+    private async offerRestore() {
+        const stash = this.stash;
+        if (!stash) return;
+        const changes = this.pending.describeStash(stash, this.describer());
+        if (changes.length === 0) {
+            this.stash = undefined;
+            return;
+        }
+        const choice = await showRestoreDraftModal(this.app, () => changes);
+        if (choice === "dismiss" || this.stash !== stash) return;
+        this.stash = undefined;
+        if (choice === "restore") {
+            this.pending.restoreDraft(stash);
+            this.plugin.configureLogger();
+        }
         this.update();
     }
     getSettingDefinitions(): SettingDefinitionItem[] {
@@ -107,10 +183,13 @@ export class SettingsTab extends PluginSettingTab {
         });
     }
     describeChanges(): PendingChange[] {
-        return this.pending.describeChanges({
+        return this.pending.describeChanges(this.describer());
+    }
+    private describer(): ChangeDescriber {
+        return {
             pluginName: (pluginId) => this.plugin.manifests.find((manifest) => manifest.id === pluginId)?.name ?? pluginId,
             fallbackMode: (pluginId, settings) => (this.plugin.isPluginEnabledOnDisk(pluginId) ? PLUGIN_MODE.ALWAYS_ENABLED : settings.defaultMode),
-        });
+        };
     }
     private async detectExternalChanges(): Promise<CommunityPluginsDrift | null> {
         try {

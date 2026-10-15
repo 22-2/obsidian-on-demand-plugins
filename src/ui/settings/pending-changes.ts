@@ -30,6 +30,13 @@ export type ChangeDescriber = {
 
 export type ImmediateSettingsChange = (data: LazySettings, profileId: string) => void | Promise<void>;
 
+/** An unsaved draft taken out of the live settings: the draft and the saved settings it was made against. */
+export type DraftStash = {
+    readonly draft: LazySettings;
+    readonly base: LazySettings;
+    readonly currentProfileId: string;
+};
+
 /** Top-level keys described explicitly; any other differing key is reported generically so nothing pending stays hidden. */
 const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog"]);
 const DESCRIBED_DEVICE_KEYS = new Set<string>(["plugins", "defaultMode", "pruneUninstalledEntries"]);
@@ -132,6 +139,38 @@ export class PendingChanges {
             if (mode === savedMode) return { ...base, to: `${PluginModes[mode]} (options changed)` };
             return { ...base, to: PluginModes[mode] };
         });
+    }
+
+    /**
+     * Takes the draft out of the live settings, which return to the saved values,
+     * and returns it so it can be restored later. Undefined when there is no draft.
+     */
+    stashDraft(): DraftStash | undefined {
+        const source = this.getSource();
+        const baseline = this.baselineData;
+        if (!source?.data || !baseline || !this.hasChanges) return undefined;
+        const stash = { draft: structuredClone(source.data), base: structuredClone(baseline), currentProfileId: source.currentProfileId };
+        // Edit in place: the settings service keeps references to these objects.
+        applySavedChanges(source.data, stash.draft, stash.base);
+        this.pluginIds.clear();
+        return stash;
+    }
+
+    /** Lists what a stashed draft changes, for offering it back. */
+    describeStash(stash: DraftStash, describer: ChangeDescriber): PendingChange[] {
+        // A throwaway view over copies keeps the stash itself unchanged.
+        const view = { data: structuredClone(stash.draft), currentProfileId: stash.currentProfileId, persisted: stash.base };
+        return new PendingChanges(() => view).describeChanges(describer);
+    }
+
+    /**
+     * Puts a stashed draft back by applying only what it changed relative to its saved
+     * settings, so saves made in the meantime (e.g. a Community plugins toggle) are kept.
+     */
+    restoreDraft(stash: DraftStash) {
+        const data = this.getSource()?.data;
+        if (!data) return;
+        applySavedChanges(data, stash.base, stash.draft);
     }
 
     markDirty() {

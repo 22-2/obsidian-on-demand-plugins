@@ -114,13 +114,10 @@ vi.mock("obsidian", () => {
     return { ExtraButtonComponent: MockExtraButtonComponent, Modal: MockModal, setIcon: mockState.setIcon };
 });
 
-const { showReviewChangesModal } = await import("src/ui/modals/review-changes-modal");
+const { showRestoreDraftModal, showReviewChangesModal } = await import("src/ui/modals/review-changes-modal");
 
 function findElements(root: MockElement, className: string): MockElement[] {
-    return [
-        ...(root.className.split(" ").includes(className) ? [root] : []),
-        ...root.children.flatMap((child) => findElements(child, className)),
-    ];
+    return [...(root.className.split(" ").includes(className) ? [root] : []), ...root.children.flatMap((child) => findElements(child, className))];
 }
 
 function allElements(root: MockElement): MockElement[] {
@@ -138,23 +135,14 @@ describe("showReviewChangesModal", () => {
     it("groups save changes, supports reverting one item, and resolves true on confirmation", async () => {
         const changes: PendingChange[] = [];
         const revertPlugin = vi.fn(() => changes.splice(0, 1));
-        changes.push(
-            { group: "plugins", label: "Sample plugin", from: "Lazy", to: "Enabled", revert: revertPlugin },
-            { group: "settings", label: "Default mode", from: "Lazy", to: "Enabled" },
-            { group: "profiles", label: "Desktop default profile", from: "Work", to: "Home" },
-            { group: "profiles", label: "New profile", to: "Travel" },
-        );
+        changes.push({ group: "plugins", label: "Sample plugin", from: "Lazy", to: "Enabled", revert: revertPlugin }, { group: "settings", label: "Default mode", from: "Lazy", to: "Enabled" }, { group: "profiles", label: "Desktop default profile", from: "Work", to: "Home" }, { group: "profiles", label: "New profile", to: "Travel" });
         const getChanges = vi.fn(() => changes);
         const result = showReviewChangesModal({} as never, { mode: "save", getChanges, getConfirmLabel: () => "Save changes" });
         const modal = mockState.modals[0];
 
         expect(modal?.modalEl.className).toContain("lazy-review-changes-modal");
         expect(modal?.titleEl.text).toBe("Review changes");
-        expect(findElements(modal.contentEl, "lazy-review-changes-group").map((element) => element.text)).toEqual([
-            "Plugins (1)",
-            "Settings (1)",
-            "Profiles (2)",
-        ]);
+        expect(findElements(modal.contentEl, "lazy-review-changes-group").map((element) => element.text)).toEqual(["Plugins (1)", "Settings (1)", "Profiles (2)"]);
         expect(findElements(modal.contentEl, "lazy-review-changes-note")[0]?.text).toBe("Plugin mode changes are applied when saved.");
         expect(mockState.setIcon).toHaveBeenCalledWith(expect.anything(), "arrow-right");
         expect(mockState.extraButtonCalls).toEqual(["icon:rotate-ccw", "tooltip:Revert this change"]);
@@ -163,10 +151,7 @@ describe("showReviewChangesModal", () => {
 
         expect(revertPlugin).toHaveBeenCalledOnce();
         expect(getChanges).toHaveBeenCalledTimes(2);
-        expect(findElements(modal.contentEl, "lazy-review-changes-group").map((element) => element.text)).toEqual([
-            "Settings (1)",
-            "Profiles (2)",
-        ]);
+        expect(findElements(modal.contentEl, "lazy-review-changes-group").map((element) => element.text)).toEqual(["Settings (1)", "Profiles (2)"]);
 
         const confirmButton = allElements(modal.contentEl).find((element) => element.className.split(" ").includes("mod-cta"));
         confirmButton?.clickHandler?.();
@@ -220,5 +205,34 @@ describe("showReviewChangesModal", () => {
         expect(revertLastChange).toHaveBeenCalledOnce();
         expect(getChanges).toHaveBeenCalledTimes(2);
         expect(modal?.closeCalls).toBe(1);
+    });
+
+    describe("restore mode", () => {
+        const changes: PendingChange[] = [{ group: "plugins", label: "Sample plugin", from: "Lazy", to: "Enabled", revert: vi.fn() }];
+        const button = (modal: MockModal, text: string) => allElements(modal.contentEl).find((element) => element.text === text);
+
+        it("offers the unsaved draft without single reverts and resolves restore", async () => {
+            const result = showRestoreDraftModal({} as never, () => changes);
+            const modal = mockState.modals[0];
+
+            expect(modal.titleEl.text).toBe("Restore unsaved changes");
+            expect(findElements(modal.contentEl, "lazy-review-changes-note")[0]?.text).toBe("These changes were not saved when settings closed. Restore them to keep editing, or discard them.");
+            expect(mockState.extraButtonCalls).toEqual([]);
+            button(modal, "Restore (1)")?.clickHandler?.();
+
+            await expect(result).resolves.toBe("restore");
+        });
+
+        it("resolves discard from the Discard button", async () => {
+            const result = showRestoreDraftModal({} as never, () => changes);
+            button(mockState.modals[0], "Discard")?.clickHandler?.();
+            await expect(result).resolves.toBe("discard");
+        });
+
+        it("resolves dismiss when closed without a choice, so the draft can be offered again", async () => {
+            const result = showRestoreDraftModal({} as never, () => changes);
+            mockState.modals[0].close();
+            await expect(result).resolves.toBe("dismiss");
+        });
     });
 });

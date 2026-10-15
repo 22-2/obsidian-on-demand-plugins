@@ -10,8 +10,11 @@ const GROUP_HEADINGS: Record<PendingChangeGroup, string> = {
 };
 
 export type ReviewChangesOptions = {
-    /** "save" offers per-item reverts before saving; "discard" only previews what will be lost. */
-    mode: "save" | "discard";
+    /**
+     * "save" offers per-item reverts before saving; "discard" only previews what will be lost;
+     * "restore" offers a draft left unsaved when settings closed, with Discard as the other choice.
+     */
+    mode: "save" | "discard" | "restore";
     getChanges: () => PendingChange[];
     getConfirmLabel: () => string;
 };
@@ -19,20 +22,29 @@ export type ReviewChangesOptions = {
 const MODE_TEXT = {
     save: { title: "Review changes", note: "Plugin mode changes are applied when saved." },
     discard: { title: "Discard changes", note: "These changes will be lost and the saved settings restored." },
+    restore: { title: "Restore unsaved changes", note: "These changes were not saved when settings closed. Restore them to keep editing, or discard them." },
 };
+
+export type RestoreChoice = "restore" | "discard" | "dismiss";
 
 /**
  * Lists the staged draft before saving or discarding it so neither action
  * touches changes the user has not seen. Resolves `true` when the user confirms.
  */
 export function showReviewChangesModal(app: App, options: ReviewChangesOptions): Promise<boolean> {
-    return new ReviewChangesModal(app, options).openAndWait();
+    return new ReviewChangesModal(app, options).openAndWait().then((choice) => choice === "confirm");
+}
+
+/** Offers an unsaved draft back. Closing without a choice resolves "dismiss", so the draft can be offered again. */
+export async function showRestoreDraftModal(app: App, getChanges: () => PendingChange[]): Promise<RestoreChoice> {
+    const choice = await new ReviewChangesModal(app, { mode: "restore", getChanges, getConfirmLabel: () => `Restore (${getChanges().length})` }).openAndWait();
+    return choice === "confirm" ? "restore" : choice === "cancel" ? "discard" : "dismiss";
 }
 
 class ReviewChangesModal extends Modal {
     private readonly options: ReviewChangesOptions;
-    private confirmed = false;
-    private resolve!: (confirmed: boolean) => void;
+    private choice: "confirm" | "cancel" | "dismiss" = "dismiss";
+    private resolve!: (choice: "confirm" | "cancel" | "dismiss") => void;
 
     constructor(app: App, options: ReviewChangesOptions) {
         super(app);
@@ -47,11 +59,11 @@ class ReviewChangesModal extends Modal {
 
     onClose() {
         super.onClose();
-        this.resolve(this.confirmed);
+        this.resolve(this.choice);
     }
 
-    openAndWait(): Promise<boolean> {
-        const result = new Promise<boolean>((resolve) => (this.resolve = resolve));
+    openAndWait(): Promise<"confirm" | "cancel" | "dismiss"> {
+        const result = new Promise<"confirm" | "cancel" | "dismiss">((resolve) => (this.resolve = resolve));
         this.open();
         return result;
     }
@@ -81,10 +93,14 @@ class ReviewChangesModal extends Modal {
         const buttons = footer.createDiv({ cls: "modal-button-container" });
         const confirmClass = this.options.mode === "discard" ? "mod-warning" : "mod-cta";
         buttons.createEl("button", { text: this.options.getConfirmLabel(), cls: confirmClass }).onClickEvent(() => {
-            this.confirmed = true;
+            this.choice = "confirm";
             this.close();
         });
-        buttons.createEl("button", { text: "Cancel" }).onClickEvent(() => this.close());
+        // Restoring is a choice between two actions, so the second button names the other one.
+        buttons.createEl("button", { text: this.options.mode === "restore" ? "Discard" : "Cancel" }).onClickEvent(() => {
+            this.choice = "cancel";
+            this.close();
+        });
     }
 
     private renderChange(list: HTMLElement, change: PendingChange) {
@@ -111,7 +127,8 @@ class ReviewChangesModal extends Modal {
         }
         desc.createSpan({ cls: "lazy-review-changes-to", text: change.to });
         const revert = change.revert;
-        if (!revert) return;
+        // A restore is all or nothing; edits continue in the settings once it is back.
+        if (!revert || this.options.mode === "restore") return;
         new ExtraButtonComponent(item)
             .setIcon("rotate-ccw")
             .setTooltip("Revert this change")
