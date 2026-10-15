@@ -166,10 +166,20 @@ export class PendingChanges {
         return stash;
     }
 
-    /** Lists what a stashed draft changes, for offering it back. */
+    /**
+     * Lists what restoring a stashed draft would change in the live settings, for offering it back.
+     * Entries a newer live edit overrides are left out, since restoreDraft keeps the newer edit.
+     */
     describeStash(stash: DraftStash, describer: ChangeDescriber): PendingChange[] {
-        // A throwaway view over copies keeps the stash itself unchanged.
-        const view = { data: structuredClone(stash.draft), currentProfileId: stash.currentProfileId, persisted: stash.base };
+        const live = this.getSource()?.data;
+        // A throwaway view over copies keeps the stash and the live settings unchanged.
+        if (!live || !this.baselineData) {
+            const view = { data: structuredClone(stash.draft), currentProfileId: stash.currentProfileId, persisted: stash.base };
+            return new PendingChanges(() => view).describeChanges(describer);
+        }
+        const restored = structuredClone(live);
+        applyRestore(restored, stash, this.baselineData);
+        const view = { data: restored, currentProfileId: stash.currentProfileId, persisted: structuredClone(live) };
         return new PendingChanges(() => view).describeChanges(describer);
     }
 
@@ -182,9 +192,7 @@ export class PendingChanges {
         const data = this.getSource()?.data;
         const baseline = this.baselineData;
         if (!data || !baseline) return;
-        const liveDraft = structuredClone(data);
-        applySavedChanges(data, stash.base, stash.draft);
-        applySavedChanges(data, baseline, liveDraft);
+        applyRestore(data, stash, baseline);
     }
 
     markDirty() {
@@ -236,6 +244,13 @@ export class PendingChanges {
 
 function isSettingsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Applies a stash onto `data` in place, then reapplies the edits `data` already had so they win conflicts. */
+function applyRestore(data: LazySettings, stash: DraftStash, baseline: LazySettings) {
+    const liveDraft = structuredClone(data);
+    applySavedChanges(data, stash.base, stash.draft);
+    applySavedChanges(data, baseline, liveDraft);
 }
 
 /** Apply only the committed fields, retaining live drafts and the service's object references. */

@@ -269,7 +269,11 @@ test.describe("unsaved draft when settings close", () => {
 
         await page.getByText("Plugin management", { exact: true }).click();
         await expect(page.locator(".lazy-plugin-save-controls")).toContainText("15 plugins");
-        await page.locator(".setting-item").filter({ has: page.getByText("Unsaved draft prompt", { exact: true }) }).locator("select:visible").selectOption("discard");
+        await page
+            .locator(".setting-item")
+            .filter({ has: page.getByText("Unsaved draft prompt", { exact: true }) })
+            .locator("select:visible")
+            .selectOption("discard");
         await expect.poll(() => savedRestoreDraftBehavior(obsidian)).toBe("discard");
         await backToSettingsTop(obsidian);
         await page.getByText("Maintenance & batch", { exact: true }).click();
@@ -391,6 +395,7 @@ test.describe("unsaved draft when settings close", () => {
         expect(await modesOf(obsidian, initiallyDisabled)).toEqual(initiallyDisabled.map(() => "alwaysDisabled"));
         const reopenedPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Maintenance & batch" });
         await expect.poll(() => changedPluginIds(obsidian)).toEqual(initiallyDisabled);
+        await obsidian.findPage((candidate) => candidate.locator(".notice").filter({ hasText: "Restored 15 unsaved changes" }));
         await expect(reopenedPage.locator(".lazy-review-changes-modal")).toHaveCount(0);
         await expect(obsidian.page.locator(".lazy-review-changes-modal")).toHaveCount(0);
     });
@@ -412,6 +417,7 @@ test.describe("unsaved draft when settings close", () => {
         await closeSettings(obsidian);
         const reopenedPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Maintenance & batch" });
         await expect.poll(() => changedPluginIds(obsidian)).toEqual([]);
+        await obsidian.findPage((candidate) => candidate.locator(".notice").filter({ hasText: "Discarded 15 unsaved changes" }));
         await expect(reopenedPage.locator(".lazy-review-changes-modal")).toHaveCount(0);
         await expect(reopenedPage.locator(".lazy-plugin-save-controls")).toHaveCount(0);
         expect(await modesOf(obsidian, initiallyDisabled)).toEqual(initiallyDisabled.map(() => "alwaysDisabled"));

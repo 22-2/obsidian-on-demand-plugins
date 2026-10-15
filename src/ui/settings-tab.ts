@@ -129,6 +129,11 @@ export class SettingsTab extends PluginSettingTab {
             }
             const behavior = this.plugin.settings.restoreDraftBehavior ?? "ask";
             const choice = behavior === "ask" ? await showRestoreDraftModal(this.app, () => changes) : { action: behavior, dontAskAgain: false };
+            // An automatic choice is otherwise invisible, so say what happened and how to change it.
+            if (behavior !== "ask" && this.stash === stash) {
+                const count = `${changes.length} unsaved ${changes.length === 1 ? "change" : "changes"}`;
+                new Notice(`${behavior === "restore" ? "Restored" : "Discarded"} ${count}. Change this under Plugin management › Unsaved draft prompt.`);
+            }
             if (choice.action === "dismiss" || this.stash !== stash) return;
             if (choice.dontAskAgain) {
                 try {

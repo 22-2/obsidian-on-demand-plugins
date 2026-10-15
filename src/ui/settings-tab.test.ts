@@ -1,4 +1,5 @@
 import type { App } from "obsidian";
+import { Notice } from "src/__mocks__/obsidian";
 import { DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, PLUGIN_MODE } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 import { showRestoreDraftModal } from "src/ui/modals/review-changes-modal";
@@ -34,6 +35,7 @@ function setup() {
 describe("settings draft lifecycle", () => {
     beforeEach(() => {
         vi.mocked(showRestoreDraftModal).mockReset().mockResolvedValue({ action: "restore", dontAskAgain: false });
+        Notice.clearMessages();
     });
 
     it("keeps the draft live when returning from a sub-page", () => {
@@ -133,5 +135,68 @@ describe("settings draft lifecycle", () => {
         expect(service.data.showConsoleLog).toBe(true);
         expect(settings.plugins.foo.mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
         expect(tab.getChangedPluginIds()).toEqual([]);
+    });
+
+    it("lists only what a restore would change, leaving out fields a newer edit overrides", async () => {
+        const { tab, settings } = setup();
+        settings.defaultMode = PLUGIN_MODE.LAZY;
+        settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
+        tab.requestRestoreOnPageClose("maintenance");
+        tab.hide();
+        // Foo is edited again before the offer, so restoring keeps this newer mode.
+        settings.plugins.foo = { mode: PLUGIN_MODE.ALWAYS_ENABLED };
+
+        tab.offerRestoreOnPageOpen("maintenance");
+        await tab.restoring;
+
+        const getChanges = vi.mocked(showRestoreDraftModal).mock.calls[0][1];
+        expect(getChanges().map(({ label, from, to }) => ({ label, from, to }))).toEqual([{ label: "Default mode", from: "⛔ Always disabled", to: "🤲 Lazy on demand" }]);
+    });
+
+    it("drops a stash whose every entry a newer edit overrides, without asking", async () => {
+        const { tab, settings } = setup();
+        settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
+        tab.requestRestoreOnPageClose("maintenance");
+        tab.hide();
+        settings.plugins.foo = { mode: PLUGIN_MODE.ALWAYS_ENABLED };
+
+        tab.offerRestoreOnPageOpen("maintenance");
+        await tab.restoring;
+
+        expect(showRestoreDraftModal).not.toHaveBeenCalled();
+        expect(settings.plugins.foo.mode).toBe(PLUGIN_MODE.ALWAYS_ENABLED);
+    });
+
+    it.each([
+        ["restore", PLUGIN_MODE.LAZY, "Restored 1 unsaved change. Change this under Plugin management › Unsaved draft prompt."],
+        ["discard", PLUGIN_MODE.ALWAYS_DISABLED, "Discarded 1 unsaved change. Change this under Plugin management › Unsaved draft prompt."],
+    ] as const)("announces an automatic %s instead of acting silently", async (behavior, expectedMode, message) => {
+        const { tab, settings, service } = setup();
+        // Save the preference so it is not part of the draft.
+        settings.restoreDraftBehavior = behavior;
+        service.persisted = structuredClone(service.data);
+        settings.defaultMode = PLUGIN_MODE.LAZY;
+        tab.requestRestoreOnPageClose("maintenance");
+        tab.hide();
+
+        tab.offerRestoreOnPageOpen("maintenance");
+        await tab.restoring;
+
+        expect(showRestoreDraftModal).not.toHaveBeenCalled();
+        expect(settings.defaultMode).toBe(expectedMode);
+        expect(Notice.messages).toEqual([message]);
+    });
+
+    it("shows no notice when the user answers the prompt", async () => {
+        const { tab, settings } = setup();
+        settings.defaultMode = PLUGIN_MODE.LAZY;
+        tab.requestRestoreOnPageClose("maintenance");
+        tab.hide();
+
+        tab.offerRestoreOnPageOpen("maintenance");
+        await tab.restoring;
+
+        expect(showRestoreDraftModal).toHaveBeenCalledOnce();
+        expect(Notice.messages).toEqual([]);
     });
 });

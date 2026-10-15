@@ -1,18 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { expect, test } from "./fixtures";
-import {
-    FIXTURE_PLUGIN_COUNT,
-    cancelReviewModal,
-    capturePage,
-    expectCompactList,
-    fixturePluginId,
-    openPluginManagement,
-    openReviewModal,
-    readmeOutDir,
-    seedFixturePlugins,
-    toggleCompactList,
-} from "./screenshot-helpers";
+import { FIXTURE_PLUGIN_COUNT, cancelReviewModal, capturePage, expectCompactList, fixturePluginId, openPluginManagement, openReviewModal, readmeOutDir, seedFixturePlugins, toggleCompactList } from "./screenshot-helpers";
 import { pluginUnderTestId, useOnDemandPlugins, useOnDemandPluginsWithTargets } from "./test-utils";
 
 // README screenshots. Run with `pnpm ui:shots:readme`; README_SHOT_DIR overrides the output folder.
