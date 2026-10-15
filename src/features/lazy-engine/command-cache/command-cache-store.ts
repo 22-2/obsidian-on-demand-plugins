@@ -76,11 +76,12 @@ export class CommandCacheStore {
         this.ctx.getManifests().forEach((plugin) => {
             const ids = this.pluginCommandIndex.get(plugin.id);
             if (!ids) return;
-            const commands = Array.from(ids, (id) => this.commandCache.get(id)!).map((command) => ({
-                id: command.id,
-                name: command.name,
-                icon: command.icon,
-            }));
+            const commands = Array.from(ids, (id) => this.commandCache.get(id)!)
+                .map((command) => ({
+                    id: command.id,
+                    name: command.name,
+                    icon: command.icon,
+                }));
             cache[plugin.id] = commands;
             // Persisting one refreshed plugin must not validate other, still-stale snapshots.
             versions[plugin.id] = this.snapshotVersions.get(plugin.id) ?? "";
