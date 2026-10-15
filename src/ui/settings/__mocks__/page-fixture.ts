@@ -44,6 +44,8 @@ export function createPageFixture(feature?: unknown) {
         resetPending: vi.fn(),
         waitForImmediateSaves: vi.fn().mockResolvedValue(undefined),
         discardPendingChanges: vi.fn().mockResolvedValue(undefined),
+        offerRestoreOnPageOpen: vi.fn(),
+        stashDraftOnPageClose: vi.fn(),
         saveImmediateChanges: vi.fn(async (change: ImmediateSettingsChange) => {
             await change(data, service.currentProfileId);
         }),
