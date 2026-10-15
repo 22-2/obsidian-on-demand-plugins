@@ -1,10 +1,13 @@
 import { Notice } from "src/__mocks__/obsidian";
+import { showConfirmModal } from "src/core/confirm-modal";
 import { PLUGIN_MODE } from "src/core/types";
 import { createPageFixture } from "src/ui/settings/__mocks__/page-fixture";
 import { elements, ui } from "src/ui/settings/__mocks__/settings-ui";
 import type { UiElement } from "src/ui/settings/__mocks__/settings-ui";
 import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("src/core/confirm-modal", () => ({ showConfirmModal: vi.fn() }));
 
 vi.mock("obsidian", async () => ({
     ...(await import("src/__mocks__/obsidian")),
@@ -17,6 +20,7 @@ function setup() {
         // The fixture returns this object for every feature, including the drift check.
         confirmOverwrite: vi.fn().mockResolvedValue(true),
         executeSync: vi.fn().mockResolvedValue({ changed: 0, message: "Already in sync" }),
+        buildSyncPreview: vi.fn().mockResolvedValue({ label: "On-Demand → file", summary: "✅ Already in sync", hasChanges: false }),
         applyBatchModeReplace: vi.fn().mockReturnValue(0),
     };
     const fixture = createPageFixture(feature);
@@ -112,6 +116,30 @@ describe("MaintenancePage", () => {
         expect(feature.rebuildAndApplyCommandCache).toHaveBeenCalledTimes(1);
         expect(feature.executeSync).toHaveBeenCalledTimes(1);
         expect(sync.disabled).toBe(false);
+    });
+
+    it("shows what writing Obsidian's config changes and writes it only after confirmation", async () => {
+        const { feature, clickAndSettle } = setup();
+        feature.buildSyncPreview.mockResolvedValue({ label: "On-Demand → file", summary: "➕ Will enable: 1 (alpha)\n", hasChanges: true });
+        vi.mocked(showConfirmModal).mockResolvedValueOnce(false).mockResolvedValueOnce(null).mockResolvedValueOnce(true);
+
+        await clickAndSettle("Sync direction");
+        await clickAndSettle("Sync direction");
+        expect(feature.executeSync).not.toHaveBeenCalled();
+        expect(vi.mocked(showConfirmModal).mock.calls[0][1].message).toBe("On-Demand → file\n➕ Will enable: 1 (alpha)\n\ncommunity-plugins.json is rewritten now and takes effect on the next start. Continue?");
+
+        await clickAndSettle("Sync direction");
+        expect(feature.executeSync).toHaveBeenCalledWith("lazyToCore");
+    });
+
+    it("syncs without asking when nothing would change or when only staging a draft", async () => {
+        const { feature, setting, clickAndSettle } = setup();
+        await clickAndSettle("Sync direction");
+        await setting("Sync direction").dropdowns[0].change("coreToLazy");
+        await clickAndSettle("Sync direction");
+        expect(showConfirmModal).not.toHaveBeenCalled();
+        expect(feature.buildSyncPreview).toHaveBeenCalledTimes(1);
+        expect(feature.executeSync.mock.calls).toEqual([["lazyToCore"], ["coreToLazy"]]);
     });
 
     it("reports a failed sync instead of leaving the rejection unhandled", async () => {

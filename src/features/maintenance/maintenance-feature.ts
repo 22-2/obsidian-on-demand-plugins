@@ -12,6 +12,8 @@ export type SyncDirection = "coreToLazy" | "lazyToCore";
 interface SyncPreviewResult {
     label: string;
     summary: string;
+    /** False when the sync would change nothing. */
+    hasChanges: boolean;
 }
 
 export interface SyncResult {
@@ -55,6 +57,7 @@ export class MaintenanceFeature implements AppFeature {
                     toEnable.map((m) => m.name),
                     toDisable.map((m) => m.name),
                 ),
+                hasChanges: toEnable.length + toDisable.length > 0,
             };
         } else {
             const alwaysEnabled = this.getAlwaysEnabledIds();
@@ -64,6 +67,7 @@ export class MaintenanceFeature implements AppFeature {
             return {
                 label: "⚙️ On-Demand Plugins ➔ 📂 community-plugins.json",
                 summary: this.buildDiffSummary(`Always Enabled in On-Demand: ${alwaysEnabled.length} plugins`, toAdd, toRemove),
+                hasChanges: toAdd.length + toRemove.length > 0,
             };
         }
     }

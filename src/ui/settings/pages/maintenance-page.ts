@@ -1,6 +1,7 @@
 import log from "loglevel";
 import type { ButtonComponent } from "obsidian";
 import { Notice, Setting, SettingPage } from "obsidian";
+import { showConfirmModal } from "src/core/confirm-modal";
 import { PLUGIN_MODE } from "src/core/types";
 import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
@@ -70,6 +71,15 @@ export class MaintenancePage extends SettingPage {
             // on the plugin-data side.
             new Notice("Save or discard pending settings before syncing to Obsidian config.");
             return;
+        }
+        // Writing Obsidian's config takes effect at once and may overwrite edits made outside On-Demand,
+        // so show what changes first. The other direction only stages a draft that Review & save shows.
+        if (this.syncDirection === "lazyToCore") {
+            const preview = await feature.buildSyncPreview(this.syncDirection);
+            if (preview.hasChanges) {
+                const message = `${preview.label}\n${preview.summary.trimEnd()}\n\ncommunity-plugins.json is rewritten now and takes effect on the next start. Continue?`;
+                if ((await showConfirmModal(this.plugin.app, { message })) !== true) return;
+            }
         }
         const result = await feature.executeSync(this.syncDirection);
         new Notice(result.message);
