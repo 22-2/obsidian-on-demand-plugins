@@ -77,12 +77,17 @@ export class MaintenancePage extends SettingPage {
         if (this.syncDirection === "lazyToCore") {
             const preview = await feature.buildSyncPreview(this.syncDirection);
             if (preview.hasChanges) {
-                const message = `${preview.label}\n${preview.summary.trimEnd()}\n\ncommunity-plugins.json is rewritten now and takes effect on the next start. Continue?`;
+                const message = `${preview.label}\n${preview.summary.trimEnd()}\n\ncommunity-plugins.json is rewritten now and Obsidian restarts to apply it. Continue?`;
                 if ((await showConfirmModal(this.plugin.app, { message })) !== true) return;
             }
         }
         const result = await feature.executeSync(this.syncDirection);
         new Notice(result.message);
+        // Obsidian reads community-plugins.json only at startup, so restart as Apply does.
+        if (this.syncDirection === "lazyToCore" && result.changed > 0) {
+            this.plugin.app.commands.executeCommandById("app:reload");
+            return;
+        }
         if (result.changed > 0) {
             if (this.syncDirection === "coreToLazy") {
                 // coreToLazy stages plugin data in memory; retain the

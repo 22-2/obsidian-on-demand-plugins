@@ -22,6 +22,7 @@ export function createPageFixture(feature?: unknown) {
     const plugin = {
         data,
         core: { settingsService: service },
+        app: { commands: { executeCommandById: vi.fn() } },
         features: { get: vi.fn().mockReturnValue(feature) },
         manifests: [
             { id: "alpha", name: "Alpha" },

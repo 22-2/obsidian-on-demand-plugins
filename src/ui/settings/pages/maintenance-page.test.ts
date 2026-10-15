@@ -126,7 +126,7 @@ describe("MaintenancePage", () => {
         await clickAndSettle("Sync direction");
         await clickAndSettle("Sync direction");
         expect(feature.executeSync).not.toHaveBeenCalled();
-        expect(vi.mocked(showConfirmModal).mock.calls[0][1].message).toBe("On-Demand → file\n➕ Will enable: 1 (alpha)\n\ncommunity-plugins.json is rewritten now and takes effect on the next start. Continue?");
+        expect(vi.mocked(showConfirmModal).mock.calls[0][1].message).toBe("On-Demand → file\n➕ Will enable: 1 (alpha)\n\ncommunity-plugins.json is rewritten now and Obsidian restarts to apply it. Continue?");
 
         await clickAndSettle("Sync direction");
         expect(feature.executeSync).toHaveBeenCalledWith("lazyToCore");
@@ -192,13 +192,22 @@ describe("MaintenancePage", () => {
         expect(Notice.messages).toEqual(["Already in sync"]);
     });
 
-    it("exports saved configuration without staging another plugin draft", async () => {
-        const { feature, tabMock, clickAndSettle } = setup();
+    it("exports saved configuration without staging a draft and restarts Obsidian to apply it", async () => {
+        const { feature, pluginMock, tabMock, clickAndSettle } = setup();
         feature.executeSync.mockResolvedValueOnce({ changed: 1, message: "Config updated" });
         await clickAndSettle("Sync direction");
         expect(tabMock.markDirty).not.toHaveBeenCalled();
         expect(tabMock.pendingPluginIds.size).toBe(0);
-        expect(tabMock.renderPendingControls).toHaveBeenCalledTimes(2);
+        expect(pluginMock.app.commands.executeCommandById).toHaveBeenCalledWith("app:reload");
+    });
+
+    it("does not restart when the export changed nothing or only staged an import", async () => {
+        const { feature, pluginMock, setting, clickAndSettle } = setup();
+        await clickAndSettle("Sync direction");
+        await setting("Sync direction").dropdowns[0].change("coreToLazy");
+        feature.executeSync.mockResolvedValueOnce({ changed: 1, message: "Staged", pluginIds: ["alpha"] });
+        await clickAndSettle("Sync direction");
+        expect(pluginMock.app.commands.executeCommandById).not.toHaveBeenCalled();
     });
 
     it.each([true, false])("stages imported changes without overwriting an existing draft (IDs returned: %s)", async (withIds) => {

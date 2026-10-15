@@ -120,6 +120,9 @@ export class MaintenanceFeature implements AppFeature {
         const isSame = alwaysEnabled.length === currentOnDisk.length && alwaysEnabled.every((id) => currentOnDisk.includes(id));
 
         if (!isSame) {
+            // Match Obsidian's in-memory list, which it writes back to the file on its next config save.
+            this.ctx.obsidianPlugins.enabledPlugins.clear();
+            alwaysEnabled.forEach((id) => this.ctx.obsidianPlugins.enabledPlugins.add(id));
             await this.registry.writeCommunityPluginsFile(alwaysEnabled, this.ctx.getData().showConsoleLog);
             await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
             return {
