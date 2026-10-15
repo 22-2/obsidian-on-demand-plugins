@@ -1,13 +1,16 @@
-import type { DeviceSettings, LazySettings, PLUGIN_MODE, PluginSettings } from "src/core/types";
+import type { DeviceSettings, LazySettings, PLUGIN_MODE, PluginSettings, RestoreDraftBehavior } from "src/core/types";
 import { PluginModes } from "src/core/types";
 import { stableStringify } from "src/services/settings/settings-service";
 
 type DraftSource = {
     readonly data?: LazySettings;
     readonly currentProfileId: string;
+    /** Last loaded or saved settings; when present it is the baseline, so saves made elsewhere never go stale here. */
+    readonly persisted?: LazySettings;
 };
 
-export type PendingChangeGroup = "plugins" | "settings" | "profiles";
+/** "external" lists edits made outside On-Demand that saving overwrites; they are never part of the draft. */
+export type PendingChangeGroup = "plugins" | "settings" | "profiles" | "external";
 
 export type PendingChange = {
     group: PendingChangeGroup;
@@ -27,12 +30,24 @@ export type ChangeDescriber = {
 
 export type ImmediateSettingsChange = (data: LazySettings, profileId: string) => void | Promise<void>;
 
+/** An unsaved draft taken out of the live settings: the draft and the saved settings it was made against. */
+export type DraftStash = {
+    readonly draft: LazySettings;
+    readonly base: LazySettings;
+    readonly currentProfileId: string;
+};
+
 /** Top-level keys described explicitly; any other differing key is reported generically so nothing pending stays hidden. */
-const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog"]);
+const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog", "restoreDraftBehavior"]);
 const DESCRIBED_DEVICE_KEYS = new Set<string>(["plugins", "defaultMode", "pruneUninstalledEntries"]);
 const DEVICE_KEY_LABELS: Record<string, string> = {
     lazyOnViews: "View activation rules",
     lazyOnFiles: "File activation rules",
+};
+export const RESTORE_DRAFT_BEHAVIOR_LABELS: Record<RestoreDraftBehavior, string> = {
+    ask: "Ask every time",
+    restore: "Always restore",
+    discard: "Always discard",
 };
 
 const onOff = (value: boolean) => (value ? "On" : "Off");
@@ -45,14 +60,30 @@ const differs = (a: unknown, b: unknown) => stableStringify(a) !== stableStringi
  */
 export class PendingChanges {
     readonly pluginIds = new Set<string>();
-    private baselineData?: LazySettings;
-    private baselineFingerprint?: string;
+    private capturedBaseline?: LazySettings;
+    private fingerprintSource?: LazySettings;
+    private fingerprint?: string;
     private readonly getSource: () => DraftSource | undefined;
     private immediateSaveQueue: Promise<void> = Promise.resolve();
 
     constructor(getSource: () => DraftSource | undefined) {
         this.getSource = getSource;
         this.captureBaseline();
+    }
+
+    /** The saved settings the draft is compared against. */
+    private get baselineData(): LazySettings | undefined {
+        return this.getSource()?.persisted ?? this.capturedBaseline;
+    }
+
+    private get baselineFingerprint(): string | undefined {
+        const baseline = this.baselineData;
+        if (!baseline) return undefined;
+        if (baseline !== this.fingerprintSource) {
+            this.fingerprintSource = baseline;
+            this.fingerprint = stableStringify(baseline);
+        }
+        return this.fingerprint;
     }
 
     get hasChanges(): boolean {
@@ -115,6 +146,55 @@ export class PendingChanges {
         });
     }
 
+    /**
+     * Takes the draft out of the live settings, which return to the saved values,
+     * and returns it so it can be restored later. Retains an earlier stash, with
+     * newer live edits winning conflicts. Undefined when there is no live draft.
+     */
+    stashDraft(previous?: DraftStash): DraftStash | undefined {
+        const source = this.getSource();
+        const baseline = this.baselineData;
+        if (!source?.data || !baseline || !this.hasChanges) return undefined;
+        const liveDraft = structuredClone(source.data);
+        const draft = structuredClone(baseline);
+        if (previous) applySavedChanges(draft, previous.base, previous.draft);
+        applySavedChanges(draft, baseline, liveDraft);
+        const stash = { draft, base: structuredClone(baseline), currentProfileId: source.currentProfileId };
+        // Edit in place: the settings service keeps references to these objects.
+        applySavedChanges(source.data, liveDraft, stash.base);
+        this.pluginIds.clear();
+        return stash;
+    }
+
+    /**
+     * Lists what restoring a stashed draft would change in the live settings, for offering it back.
+     * Entries a newer live edit overrides are left out, since restoreDraft keeps the newer edit.
+     */
+    describeStash(stash: DraftStash, describer: ChangeDescriber): PendingChange[] {
+        const live = this.getSource()?.data;
+        // A throwaway view over copies keeps the stash and the live settings unchanged.
+        if (!live || !this.baselineData) {
+            const view = { data: structuredClone(stash.draft), currentProfileId: stash.currentProfileId, persisted: stash.base };
+            return new PendingChanges(() => view).describeChanges(describer);
+        }
+        const restored = structuredClone(live);
+        applyRestore(restored, stash, this.baselineData);
+        const view = { data: restored, currentProfileId: stash.currentProfileId, persisted: structuredClone(live) };
+        return new PendingChanges(() => view).describeChanges(describer);
+    }
+
+    /**
+     * Puts a stashed draft back by applying only what it changed relative to its saved
+     * settings, so unrelated saves made in the meantime are kept. Newer live draft
+     * edits win when the same field was edited again before the stash was restored.
+     */
+    restoreDraft(stash: DraftStash) {
+        const data = this.getSource()?.data;
+        const baseline = this.baselineData;
+        if (!data || !baseline) return;
+        applyRestore(data, stash, baseline);
+    }
+
     markDirty() {
         // Dirty state is derived from the baseline diff, so just ensure the baseline exists.
         // Callers invoke this after mutating settings; never recapture here or the edit would compare against itself.
@@ -134,8 +214,7 @@ export class PendingChanges {
             if (!differs(baseline, saved)) return;
             await save(saved);
             applySavedChanges(data, baseline, saved);
-            this.baselineData = saved;
-            this.baselineFingerprint = stableStringify(saved);
+            this.capturedBaseline = saved;
         });
         this.immediateSaveQueue = pendingSave.catch(() => undefined);
         return pendingSave;
@@ -152,20 +231,26 @@ export class PendingChanges {
     }
 
     private ensureBaseline() {
-        if (this.baselineData === undefined || this.baselineFingerprint === undefined) this.captureBaseline();
+        if (this.baselineData === undefined) this.captureBaseline();
     }
 
     private captureBaseline() {
         const data = this.getSource()?.data;
         if (!data) return;
         // Deep clone so later in-memory edits cannot mutate the comparison source.
-        this.baselineData = structuredClone(data);
-        this.baselineFingerprint = stableStringify(data);
+        this.capturedBaseline = structuredClone(data);
     }
 }
 
 function isSettingsRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Applies a stash onto `data` in place, then reapplies the edits `data` already had so they win conflicts. */
+function applyRestore(data: LazySettings, stash: DraftStash, baseline: LazySettings) {
+    const liveDraft = structuredClone(data);
+    applySavedChanges(data, stash.base, stash.draft);
+    applySavedChanges(data, baseline, liveDraft);
 }
 
 /** Apply only the committed fields, retaining live drafts and the service's object references. */
@@ -227,6 +312,15 @@ function describeRootSettings(data: LazySettings, baseline: LazySettings): Pendi
             from: onOff(baseline.showConsoleLog),
             to: onOff(data.showConsoleLog),
             revert: () => (data.showConsoleLog = baseline.showConsoleLog),
+        });
+    }
+    if (data.restoreDraftBehavior !== baseline.restoreDraftBehavior) {
+        changes.push({
+            group: "settings",
+            label: "Unsaved draft prompt",
+            from: RESTORE_DRAFT_BEHAVIOR_LABELS[baseline.restoreDraftBehavior],
+            to: RESTORE_DRAFT_BEHAVIOR_LABELS[data.restoreDraftBehavior],
+            revert: () => (data.restoreDraftBehavior = baseline.restoreDraftBehavior),
         });
     }
     const dataRecord = data as unknown as Record<string, unknown>;

@@ -9,6 +9,7 @@ export function createPageFixture(feature?: unknown) {
     const profile = (id: string, name: string) => ({ id, name, settings: structuredClone(DEFAULT_DEVICE_SETTINGS) });
     const data: LazySettings = {
         showConsoleLog: false,
+        restoreDraftBehavior: "ask",
         desktopProfileId: "home",
         mobileProfileId: "work",
         profiles: {
@@ -22,6 +23,7 @@ export function createPageFixture(feature?: unknown) {
     const plugin = {
         data,
         core: { settingsService: service },
+        app: { commands: { executeCommandById: vi.fn() } },
         features: { get: vi.fn().mockReturnValue(feature) },
         manifests: [
             { id: "alpha", name: "Alpha" },
@@ -43,6 +45,8 @@ export function createPageFixture(feature?: unknown) {
         resetPending: vi.fn(),
         waitForImmediateSaves: vi.fn().mockResolvedValue(undefined),
         discardPendingChanges: vi.fn().mockResolvedValue(undefined),
+        offerRestoreOnPageOpen: vi.fn(),
+        requestRestoreOnPageClose: vi.fn(),
         saveImmediateChanges: vi.fn(async (change: ImmediateSettingsChange) => {
             await change(data, service.currentProfileId);
         }),

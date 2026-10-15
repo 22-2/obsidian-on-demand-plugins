@@ -1,6 +1,8 @@
 import type { PluginContext } from "src/core/plugin-context";
 import type { ProgressDialog } from "src/core/progress";
 import { DEFAULT_DEVICE_SETTINGS } from "src/core/types";
+import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
+import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { waitForPluginInitialization } from "src/patches/plugin-initialization";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("src/core/storage");
 vi.mock("src/patches/plugin-initialization");
 
-function setup(count = 5) {
+function setup(count = 5, drift?: { confirmOverwrite: () => Promise<boolean> }) {
     const settings = structuredClone(DEFAULT_DEVICE_SETTINGS);
     const manifests = Array.from({ length: count }, (_, i) => ({ id: `plugin-${i}`, name: `Plugin ${i}`, version: "1.0.0" }));
     for (const { id } of manifests) settings.plugins[id] = { mode: "lazy", userConfigured: true };
@@ -42,7 +44,11 @@ function setup(count = 5) {
     } as unknown as PluginContext;
     const feature = new StartupPolicyFeature();
     const writeCommunityPluginsFile = vi.fn().mockResolvedValue(undefined);
-    feature.onload(ctx, { registry: { writeCommunityPluginsFile } } as never, { get: () => ({ commandCache: cache }) } as never, {} as never);
+    const features = {
+        get: (featureClass: unknown) => (featureClass === LazyEngineFeature ? { commandCache: cache } : featureClass === CommunityPluginsDriftFeature ? drift : undefined),
+    };
+    const registry = { writeCommunityPluginsFile, loadEnabledPluginsFromDisk: vi.fn().mockResolvedValue(undefined), enabledPluginsFromDisk: new Set<string>() };
+    feature.onload(ctx, { registry } as never, features as never, {} as never);
     let cancel = () => {};
     const progress = {
         setOnCancel: (handler: () => void) => {
@@ -53,7 +59,7 @@ function setup(count = 5) {
         setProgress: vi.fn<(current: number) => void>(),
         close: vi.fn(),
     };
-    return { feature, plugins, cache, settings, saveSettings, reload, progress, dialog: progress as unknown as ProgressDialog, cancel: () => cancel() };
+    return { feature, plugins, cache, settings, saveSettings, reload, progress, writeCommunityPluginsFile, registry, dialog: progress as unknown as ProgressDialog, cancel: () => cancel() };
 }
 
 describe("combined cache rebuild", () => {
@@ -152,5 +158,66 @@ describe("combined cache rebuild", () => {
         await expect(t.feature.rebuildWithProgress(t.dialog, true)).rejects.toThrow("Failed to rebuild plugin caches");
         expect(t.plugins.enablePlugin).toHaveBeenCalledTimes(2);
         expect(t.plugins.plugins["plugin-0"]).toEqual({ _loaded: true });
+    });
+});
+
+describe("external community-plugins.json edits", () => {
+    beforeEach(() => {
+        vi.resetAllMocks();
+    });
+
+    it("leaves the file, plugins and app untouched when the user keeps the external edits", async () => {
+        const confirmOverwrite = vi.fn().mockResolvedValue(false);
+        const t = setup(3, { confirmOverwrite });
+
+        await t.feature.applyWithProgress(t.dialog);
+        await t.feature.rebuildWithProgress(t.dialog, true);
+
+        expect(confirmOverwrite).toHaveBeenCalledTimes(2);
+        expect(t.plugins.enablePlugin).not.toHaveBeenCalled();
+        expect(t.writeCommunityPluginsFile).not.toHaveBeenCalled();
+        expect(t.reload).not.toHaveBeenCalled();
+        expect(t.progress.close).toHaveBeenCalledTimes(2);
+    });
+
+    it("writes the always-enabled plugins and itself after the user agrees", async () => {
+        const confirmOverwrite = vi.fn().mockResolvedValue(true);
+        const t = setup(3, { confirmOverwrite });
+        t.settings.plugins["plugin-1"] = { mode: "alwaysEnabled", userConfigured: true };
+
+        await t.feature.applyWithProgress(t.dialog);
+
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["on-demand-plugins", "plugin-1"], false);
+        expect(t.reload).toHaveBeenCalledWith("app:reload");
+    });
+
+    it("does not ask again when the caller already showed the external edits", async () => {
+        const confirmOverwrite = vi.fn().mockResolvedValue(false);
+        const t = setup(3, { confirmOverwrite });
+
+        await t.feature.applyWithProgress(t.dialog, undefined, { externalChangesConfirmed: true });
+
+        expect(confirmOverwrite).not.toHaveBeenCalled();
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalled();
+    });
+
+    it("still applies when the file cannot be checked", async () => {
+        const t = setup(3, { confirmOverwrite: vi.fn().mockRejectedValue(new Error("read failed")) });
+
+        await t.feature.applyWithProgress(t.dialog);
+
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalled();
+    });
+
+    it("keeps entries for plugins this device does not manage, such as desktop-only ones on mobile", async () => {
+        const t = setup(3, { confirmOverwrite: vi.fn().mockResolvedValue(true) });
+        t.settings.plugins["plugin-1"] = { mode: "alwaysEnabled", userConfigured: true };
+        // plugin-0 is managed here and lazy; the other two are not installed (or hidden) on this device.
+        t.registry.enabledPluginsFromDisk = new Set(["plugin-0", "desktop-only", "other-device-only", "on-demand-plugins"]);
+
+        await t.feature.applyWithProgress(t.dialog);
+
+        expect(t.registry.loadEnabledPluginsFromDisk).toHaveBeenCalled();
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "other-device-only", "plugin-1"], false);
     });
 });

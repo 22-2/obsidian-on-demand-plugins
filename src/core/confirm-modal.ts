@@ -35,7 +35,8 @@ class ConfirmModal extends Modal {
         this.titleEl.setText("Confirm");
 
         // Message
-        this.contentEl.createEl("p", { text: this.message });
+        // Line breaks in the message separate a summary from the question.
+        this.contentEl.createEl("p", { text: this.message, cls: "lazy-confirm-message" });
 
         // Button container
         const buttonContainer = this.contentEl.createDiv("modal-button-container");

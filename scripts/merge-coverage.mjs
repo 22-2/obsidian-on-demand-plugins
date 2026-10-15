@@ -6,7 +6,13 @@ import { mergeCoverageReports } from "obsidian-e2e-toolkit/coverage";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // Each E2E shard writes its coverage under coverage/e2e-shards/<artifact name>/ after download.
 const shardRoot = path.join(root, "coverage/e2e-shards");
-const shardDirs = (await readdir(shardRoot, { withFileTypes: true })).filter((entry) => entry.isDirectory());
+let shardDirs = [];
+try {
+    shardDirs = (await readdir(shardRoot, { withFileTypes: true })).filter((entry) => entry.isDirectory());
+} catch (error) {
+    if (error.code !== "ENOENT") throw error;
+    console.warn("No E2E shard coverage found; generating a unit-only coverage report.");
+}
 await mergeCoverageReports({
     inputFiles: [
         path.join(root, "coverage/unit/coverage-final.json"),

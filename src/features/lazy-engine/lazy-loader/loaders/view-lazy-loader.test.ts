@@ -4,6 +4,7 @@ import type { PluginContext } from "src/core/plugin-context";
 import { isLeafVisible, isPluginLoaded } from "src/core/utils";
 import { resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
+import { showLeafLoading } from "src/ui/load-feedback";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("src/core/utils", () => ({
@@ -12,6 +13,10 @@ vi.mock("src/core/utils", () => ({
 }));
 vi.mock("src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules", () => ({
     resolvePluginForViewType: vi.fn(),
+}));
+vi.mock("src/ui/load-feedback", () => ({
+    getPluginDisplayName: vi.fn((_ctx: unknown, pluginId: string) => pluginId),
+    showLeafLoading: vi.fn(),
 }));
 
 function createLeaf(id: string, viewType: string): WorkspaceLeaf {
@@ -49,6 +54,60 @@ describe("ViewLazyLoader", () => {
         vi.mocked(isLeafVisible).mockReturnValue(true);
         vi.mocked(isPluginLoaded).mockReturnValue(false);
         vi.mocked(resolvePluginForViewType).mockReturnValue("view-plugin");
+        vi.mocked(showLeafLoading).mockReturnValue(vi.fn());
+    });
+
+    it("shows a spinner on the leaf until its plugin finishes loading", async () => {
+        const leaf = createLeaf("leaf-1", "canvas");
+        const harness = createHarness();
+        const hide = vi.fn();
+        vi.mocked(showLeafLoading).mockReturnValue(hide);
+        harness.pluginLoader.ensurePluginLoaded.mockImplementation(async () => {
+            expect(hide).not.toHaveBeenCalled();
+            return true;
+        });
+
+        await harness.loader.initializeLazyViewForLeaf(leaf);
+
+        expect(showLeafLoading).toHaveBeenCalledWith(leaf, "view-plugin");
+        expect(hide).toHaveBeenCalledOnce();
+    });
+
+    it("removes the spinner when loading fails", async () => {
+        const leaf = createLeaf("leaf-1", "canvas");
+        const harness = createHarness();
+        const hide = vi.fn();
+        vi.mocked(showLeafLoading).mockReturnValue(hide);
+        harness.pluginLoader.ensurePluginLoaded.mockRejectedValue(new Error("boom"));
+
+        await expect(harness.loader.initializeLazyViewForLeaf(leaf)).rejects.toThrow("boom");
+
+        expect(hide).toHaveBeenCalledOnce();
+    });
+
+    it("does not show a spinner for an already loaded plugin", async () => {
+        const harness = createHarness();
+        vi.mocked(isPluginLoaded).mockReturnValue(true);
+
+        await harness.loader.initializeLazyViewForLeaf(createLeaf("leaf-1", "canvas"));
+
+        expect(showLeafLoading).not.toHaveBeenCalled();
+    });
+
+    it("shows a spinner on a leaf opened with an unregistered view type", async () => {
+        const leaf = createLeaf("leaf-1", "canvas");
+        const harness = createHarness();
+        const hide = vi.fn();
+        vi.mocked(showLeafLoading).mockReturnValue(hide);
+
+        await harness.loader.checkViewTypeForLazyLoading("canvas", leaf);
+        expect(showLeafLoading).toHaveBeenCalledWith(leaf, "view-plugin");
+        expect(hide).toHaveBeenCalledOnce();
+
+        // A leaf that already switched to another view has no placeholder to cover.
+        vi.mocked(showLeafLoading).mockClear();
+        await harness.loader.checkViewTypeForLazyLoading("other-view", leaf);
+        expect(showLeafLoading).not.toHaveBeenCalled();
     });
 
     it("waits for layout readiness and visibility before acquiring a lock", async () => {
@@ -146,5 +205,39 @@ describe("ViewLazyLoader", () => {
 
         expect(harness.workspace.on).toHaveBeenCalledWith("active-leaf-change", expect.any(Function));
         expect(harness.workspace.iterateAllLeaves).toHaveBeenCalledOnce();
+    });
+
+    it("loads visible lazy leaves on a workspace resize, such as a sidebar expanding", async () => {
+        const leaf = createLeaf("leaf-1", "nav-view");
+        const harness = createHarness(true, [leaf]);
+        harness.loader.registerActiveLeafReload();
+
+        harness.eventHandlers.get("resize")?.(null);
+
+        await vi.waitFor(() => expect(harness.pluginLoader.ensurePluginLoaded).toHaveBeenCalledWith("view-plugin"));
+        expect(harness.lockStrategy.lock.mock.calls).toContainEqual([{ leaf, viewType: "nav-view" }]);
+    });
+
+    it("skips hidden, unmatched and already loaded leaves when scanning visible leaves", () => {
+        const hidden = createLeaf("hidden", "nav-view");
+        const unmatched = createLeaf("unmatched", "markdown");
+        const loaded = createLeaf("loaded", "loaded-view");
+        const harness = createHarness(true, [hidden, unmatched, loaded]);
+        vi.mocked(isLeafVisible).mockImplementation((leaf) => leaf !== hidden);
+        vi.mocked(resolvePluginForViewType).mockImplementation((_ctx, viewType) => (viewType === "markdown" ? null : "view-plugin"));
+        vi.mocked(isPluginLoaded).mockReturnValue(true);
+
+        harness.loader.initializeVisibleLazyLeaves();
+
+        expect(harness.lockStrategy.lock).not.toHaveBeenCalled();
+        expect(resolvePluginForViewType).not.toHaveBeenCalledWith(harness.ctx, "nav-view");
+    });
+
+    it("does not scan visible leaves before the layout is ready", () => {
+        const harness = createHarness(false, [createLeaf("leaf-1", "nav-view")]);
+
+        harness.loader.initializeVisibleLazyLeaves();
+
+        expect(harness.workspace.iterateAllLeaves).not.toHaveBeenCalled();
     });
 });

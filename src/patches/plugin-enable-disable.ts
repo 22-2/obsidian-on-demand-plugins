@@ -33,9 +33,10 @@ export async function syncPluginMode(ctx: PluginContext, pluginId: string, fromM
  * Run the post-toggle sync steps after enable or disable, catching all errors
  * so Obsidian's core flow is never interrupted.
  */
-export async function runPostToggleSync(ctx: PluginContext, pluginId: string, fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE, label: "enablePlugin" | "disablePlugin"): Promise<void> {
+export async function runPostToggleSync(ctx: PluginContext, pluginId: string, fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE, label: "enablePlugin" | "disablePlugin", isUserToggle = true): Promise<void> {
     try {
-        await syncPluginMode(ctx, pluginId, fromMode, toMode);
+        if (isUserToggle) await syncPluginMode(ctx, pluginId, fromMode, toMode);
+        // Wrappers follow the live load state, so they are re-synced after every toggle.
         syncCommandWrappers(ctx, pluginId);
     } catch (error) {
         // Intentionally log every failure so repeated instability remains visible.
@@ -50,6 +51,11 @@ export async function runPostToggleSync(ctx: PluginContext, pluginId: string, fr
  *
  * Lets users toggle plugins in the standard Community Plugins settings
  * without losing their lazy-loading configuration.
+ *
+ * Only calls flagged as user toggles change the saved mode. Obsidian passes the flag from
+ * `enablePluginAndSave` / `disablePluginAndSave` (the settings toggle, its CLI and
+ * other plugins persisting a toggle), but not from restricted mode, `plugin:reload`,
+ * lazy loads or the in-memory toggles, none of which change community-plugins.json.
  */
 export function patchPluginEnableDisable(ctx: PluginContext): void {
     const obsidianPlugins = ctx.obsidianPlugins;
@@ -57,18 +63,18 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
     ctx.register(
         around(obsidianPlugins, {
             enablePlugin: (next: Plugins["enablePlugin"]) =>
-                async function (this: Plugins, pluginId: string) {
-                    const result = await next.call(this, pluginId);
+                async function (this: Plugins, pluginId: string, isUserEnabled?: boolean) {
+                    const result = await next.call(this, pluginId, isUserEnabled);
                     // Only sync ALWAYS_DISABLED → ALWAYS_ENABLED; preserve LAZY mode.
-                    await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.ALWAYS_ENABLED, "enablePlugin");
+                    await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.ALWAYS_ENABLED, "enablePlugin", isUserEnabled === true);
                     return result;
                 },
 
             disablePlugin: (next: Plugins["disablePlugin"]) =>
-                async function (this: Plugins, pluginId: string) {
-                    const result = await next.call(this, pluginId);
+                async function (this: Plugins, pluginId: string, isUserDisabled?: boolean) {
+                    const result = await next.call(this, pluginId, isUserDisabled);
                     // Only sync ALWAYS_ENABLED → ALWAYS_DISABLED; preserve LAZY mode.
-                    await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_ENABLED, PLUGIN_MODE.ALWAYS_DISABLED, "disablePlugin");
+                    await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_ENABLED, PLUGIN_MODE.ALWAYS_DISABLED, "disablePlugin", isUserDisabled === true);
                     return result;
                 },
         }),

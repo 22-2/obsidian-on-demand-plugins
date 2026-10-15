@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 import type OnDemandPlugin from "src/main";
-import { pluginUnderTestId, useOnDemandPluginsWithTargets, withReloadRecorded } from "./test-utils";
+import { pluginUnderTestId, useOnDemandPluginsWithFixture, withReloadRecorded } from "./test-utils";
 
 /**
  * Regression tests for plugins that register their views AFTER an await in
@@ -10,11 +10,11 @@ import { pluginUnderTestId, useOnDemandPluginsWithTargets, withReloadRecorded } 
  * session-wide Plugin.prototype.registerView patch instead.
  */
 
-// Folder name in myfiles/ is "graph-analysis"; the manifest id is "graph-analysis-ex".
+// Folder name in tests/fixtures/ is "graph-analysis"; the manifest id is "graph-analysis-ex".
 const graphAnalysisId = "graph-analysis-ex";
 const graphAnalysisViewType = "graph-analysis-ex";
 
-useOnDemandPluginsWithTargets("graph-analysis");
+useOnDemandPluginsWithFixture("graph-analysis");
 
 test("apply collects view types from a plugin that registers views after async onload", async ({ obsidian }) => {
     const pluginHandle = await obsidian.plugin(pluginUnderTestId);

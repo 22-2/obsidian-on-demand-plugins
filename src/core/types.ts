@@ -18,6 +18,11 @@ export function isPluginMode(value: unknown): value is PLUGIN_MODE {
 
 /** Device class that owns a default profile. */
 export type DeviceType = "desktop" | "mobile";
+export type RestoreDraftBehavior = "ask" | "restore" | "discard";
+
+export function isRestoreDraftBehavior(value: unknown): value is RestoreDraftBehavior {
+    return value === "ask" || value === "restore" || value === "discard";
+}
 
 export const PluginModes: Record<PLUGIN_MODE, string> = {
     [PLUGIN_MODE.ALWAYS_DISABLED]: "⛔ Always disabled",
@@ -74,6 +79,8 @@ export interface Profile {
 // Global settings for the plugin
 export interface LazySettings {
     showConsoleLog: boolean;
+    /** How to handle an unsaved draft when its settings page is reopened; shared by all profiles. */
+    restoreDraftBehavior: RestoreDraftBehavior;
     lastLazyPluginVersion?: string;
     // Reason: refusing unknown schema versions prevents older plugin builds from overwriting newer synced settings.
     settingsSchemaVersion?: number;
@@ -100,6 +107,7 @@ export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
+    restoreDraftBehavior: "ask",
     profiles: {
         [DEFAULT_PROFILE_ID]: {
             id: DEFAULT_PROFILE_ID,

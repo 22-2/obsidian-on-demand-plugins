@@ -11,6 +11,7 @@ import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
 import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 const logger = log.getLogger("OnDemandPlugin/PluginPage");
 const COMPACT_LIST_STORAGE_KEY = "compact-plugin-list";
@@ -29,6 +30,14 @@ function setStatusBadgeText(badge: HTMLElement, text: string) {
     badge.empty();
     badge.createSpan({ cls: "lazy-plugin-badge-text", text });
     setTooltip(badge, text);
+}
+
+function setEnabledBadgeState(badge: HTMLElement, app: App, pluginId: string, savedPluginIds?: ReadonlySet<string>) {
+    const loaded = isPluginLoaded(app, pluginId);
+    const status = enabledBadgeText(app, pluginId, savedPluginIds);
+    setStatusBadgeText(badge, status);
+    badge.toggleClass("is-loaded", loaded);
+    badge.toggleClass("is-memory-only", loaded && savedPluginIds !== undefined && !savedPluginIds.has(pluginId));
 }
 
 export class PluginPage extends SettingPage {
@@ -54,6 +63,7 @@ export class PluginPage extends SettingPage {
     }
     display() {
         this.disconnectInfiniteScroll();
+        this.tab.offerRestoreOnPageOpen("plugin-management");
         this.watchPluginLoadState();
         // Plugin installations can happen while the settings modal is open.
         // Refresh the registry whenever this page is entered so the count and
@@ -62,6 +72,9 @@ export class PluginPage extends SettingPage {
         void this.refreshCommunityPluginSnapshot();
         this.containerEl.empty();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
+        createSettingsNotice(this.containerEl, "lazy-plugin-changes-notice", (text) => {
+            text.setText("Changes apply only after you select save in the review dialog.");
+        });
         new Setting(this.containerEl).setName("Overview").setHeading();
         new Setting(this.containerEl)
             .setName(pluginStatisticsText(this.plugin))
@@ -123,6 +136,7 @@ export class PluginPage extends SettingPage {
         this.disconnectInfiniteScroll();
         this.unwatchPluginLoadState();
         this.communityPluginReadId++;
+        this.tab.requestRestoreOnPageClose("plugin-management");
         super.hide();
     }
     private renderInfiniteList() {
@@ -188,9 +202,8 @@ export class PluginPage extends SettingPage {
             // Show the live runtime state; the staged mode alone cannot tell
             // whether a lazy plugin is actually loaded right now.
             const enabledBadge = badges.createSpan({ cls: "lazy-plugin-enabled-badge" });
-            setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
+            setEnabledBadgeState(enabledBadge, this.app, manifest.id, this.savedCommunityPluginIds);
             enabledBadge.setAttr("data-plugin-id", manifest.id);
-            enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
             // The version sits beside the plugin name, as a sibling so the name text stays exact.
             setting.nameEl.after(createSpan({ cls: "lazy-plugin-version", text: `v${manifest.version}` }));
             // Author names vary widely in length, so they keep their own line on the badge row.
@@ -264,8 +277,7 @@ export class PluginPage extends SettingPage {
             logger.error(`Failed to ${enabled ? "enable" : "disable"} plugin ${manifest.id}`, error);
             new Notice(`Failed to ${enabled ? "enable" : "disable"} ${manifest.name}`);
         }
-        setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, manifest.id, this.savedCommunityPluginIds));
-        enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, manifest.id));
+        setEnabledBadgeState(enabledBadge, this.app, manifest.id, this.savedCommunityPluginIds);
     }
 
     private applyRowModeChange(pluginId: string, mode: PLUGIN_MODE, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
@@ -286,8 +298,7 @@ export class PluginPage extends SettingPage {
         // when it no longer matches the active filter; re-filtering waits
         // until the user changes the filter conditions.
         setModeBadgeText(modeBadge, pluginModeLabel(mode));
-        setStatusBadgeText(enabledBadge, enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
-        enabledBadge.toggleClass("is-loaded", isPluginLoaded(this.app, pluginId));
+        setEnabledBadgeState(enabledBadge, this.app, pluginId, this.savedCommunityPluginIds);
         this.refreshStats();
         this.tab.renderPendingControls(this.containerEl, () => this.display());
     }
@@ -329,9 +340,7 @@ export class PluginPage extends SettingPage {
         this.containerEl.querySelectorAll<HTMLElement>(".lazy-plugin-enabled-badge").forEach((badge) => {
             const pluginId = badge.dataset.pluginId;
             if (!pluginId) return;
-            const loaded = isPluginLoaded(this.app, pluginId);
-            setStatusBadgeText(badge, enabledBadgeText(this.app, pluginId, this.savedCommunityPluginIds));
-            badge.toggleClass("is-loaded", loaded);
+            setEnabledBadgeState(badge, this.app, pluginId, this.savedCommunityPluginIds);
         });
     }
     private disconnectInfiniteScroll() {

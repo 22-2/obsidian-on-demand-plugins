@@ -28,10 +28,8 @@ test("stale command cache is skipped at startup and rebuilt after layout ready",
     //    command ID the current plugin version does not register.
     await obsidian.page.evaluate(
         ({ pluginId, fakeId }) => {
-            const appWithId = app as unknown as { appId?: string };
-            const appId = appWithId.appId;
-            window.localStorage.setItem(`on-demand:commandCache:${appId}`, JSON.stringify({ [pluginId]: [{ id: fakeId, name: "Fake removed command" }] }));
-            window.localStorage.setItem(`on-demand:commandCacheVersions:${appId}`, JSON.stringify({ [pluginId]: "0.0.0-stale" }));
+            app.saveLocalStorage("on-demand:commandCache", { [pluginId]: [{ id: fakeId, name: "Fake removed command" }] });
+            app.saveLocalStorage("on-demand:commandCacheVersions", { [pluginId]: "0.0.0-stale" });
         },
         { pluginId: targetPluginId, fakeId: fakeCommandId },
     );

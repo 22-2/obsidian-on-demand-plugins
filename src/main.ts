@@ -3,11 +3,13 @@ import type { PluginManifest } from "obsidian";
 import { Plugin } from "obsidian";
 import { EventBus, FeatureEvents } from "src/core/event-bus";
 import { FeatureManager } from "src/core/feature-manager";
+import type { SettingsChange } from "src/core/plugin-context";
 import { createPluginContext } from "src/core/plugin-context";
 import type { DeviceSettings, LazySettings } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 import { toggleLoggerBy } from "src/core/utils";
 import { BackupFeature } from "src/features/backup/backup-feature";
+import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 import { ManualToggleFeature } from "src/features/manual-toggle/manual-toggle-feature";
@@ -28,6 +30,8 @@ export default class OnDemandPlugin extends Plugin {
     core!: CoreContainer;
     features!: FeatureManager;
     events!: EventBus;
+    /** Holds the settings draft; set once settings are loaded. */
+    settingsTab?: SettingsTab;
 
     async onload() {
         const ctx = createPluginContext(this);
@@ -37,6 +41,7 @@ export default class OnDemandPlugin extends Plugin {
         this.features = new FeatureManager(ctx, this.core, this.events);
         this.features.register(new BackupFeature());
         this.features.register(new MaintenanceFeature());
+        this.features.register(new CommunityPluginsDriftFeature());
         this.features.register(new ManualToggleFeature());
         this.features.register(new LazyEngineFeature());
         this.features.register(new StartupPolicyFeature());
@@ -69,24 +74,26 @@ export default class OnDemandPlugin extends Plugin {
             await this.saveSettings();
         }
 
-        this.addSettingTab(new SettingsTab(this.app, this));
+        this.settingsTab = new SettingsTab(this.app, this);
+        this.addSettingTab(this.settingsTab);
     }
 
     private registerEventHandlers() {
-        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean }) => {
+        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean; externalChangesConfirmed?: boolean }) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
-            await policyFeature?.rebuildWithProgress(null, options?.force ?? false);
+            await policyFeature?.rebuildWithProgress(null, options?.force ?? false, { externalChangesConfirmed: options?.externalChangesConfirmed });
         });
 
-        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[] }) => {
+        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[]; externalChangesConfirmed?: boolean }) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
             if (policyFeature) {
-                await policyFeature.applyWithProgress(null, options?.pluginIds);
+                await policyFeature.applyWithProgress(null, options?.pluginIds, { externalChangesConfirmed: options?.externalChangesConfirmed });
             }
         });
     }
 
     onunload() {
+        this.settingsTab?.dispose();
         void this.features?.unloadAll();
         this.core?.destroy();
     }
@@ -194,15 +201,27 @@ export default class OnDemandPlugin extends Plugin {
         return removed;
     }
 
+    /**
+     * Saves one change on top of the saved settings and applies it to the live ones,
+     * so an unsaved settings draft never reaches data.json without its review.
+     */
+    async saveSettingsChange(change: SettingsChange) {
+        if (this.settingsTab) {
+            await this.settingsTab.saveImmediateChanges(change);
+            return;
+        }
+        // Without the settings tab there is no draft, so the live settings are the saved ones.
+        await change(this.data, this.core.settingsService.currentProfileId);
+        await this.saveSettings();
+    }
+
     async updatePluginSettings(pluginId: string, mode: PLUGIN_MODE) {
         // Mode changes must not erase the plugin's advanced lazy rules; those
         // rules are independent of whether the plugin is currently enabled.
-        this.settings.plugins[pluginId] = {
-            ...(this.settings.plugins[pluginId] ?? {}),
-            mode,
-            userConfigured: true,
-        };
-        await this.saveSettings();
+        await this.saveSettingsChange((data, profileId) => {
+            const plugins = data.profiles[profileId].settings.plugins;
+            plugins[pluginId] = { ...(plugins[pluginId] ?? {}), mode, userConfigured: true };
+        });
         const lazyEngine = this.features.get(LazyEngineFeature);
         await lazyEngine!.applyPluginState(pluginId);
     }
@@ -214,19 +233,24 @@ export default class OnDemandPlugin extends Plugin {
         }
     }
 
-    async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
+    async rebuildAndApplyCommandCache(options?: { force?: boolean; externalChangesConfirmed?: boolean }) {
         const maintenance = this.features.get(MaintenanceFeature);
         if (maintenance) {
             await maintenance.rebuildAndApplyCommandCache(options);
         }
     }
 
-    async switchProfile(profileId: string) {
+    /** Resolves false when the user keeps the profile because applying it would overwrite external edits. */
+    async switchProfile(profileId: string): Promise<boolean> {
+        // Ask before switching: cancelling after the save would leave a saved profile that was never applied.
+        const drift = this.features.get(CommunityPluginsDriftFeature);
+        if (drift && !(await drift.confirmOverwrite())) return false;
         this.core.settingsService.switchProfile(profileId);
         this.settings = this.core.settingsService.settings;
         await this.saveSettings();
         const policyFeature = this.features.get(StartupPolicyFeature);
-        await policyFeature?.applyWithProgress(null);
+        await policyFeature?.applyWithProgress(null, undefined, { externalChangesConfirmed: true });
+        return true;
     }
 
     updateManifests() {

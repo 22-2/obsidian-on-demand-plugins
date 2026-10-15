@@ -4,6 +4,7 @@ import type { AppFeature } from "src/core/feature";
 import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
+import { computeDesiredCommunityPlugins } from "src/features/community-plugins-drift/community-plugins-drift";
 import type { CoreContainer } from "src/services/core-container";
 import type { PluginRegistry } from "src/services/registry/plugin-registry";
 
@@ -12,6 +13,8 @@ export type SyncDirection = "coreToLazy" | "lazyToCore";
 interface SyncPreviewResult {
     label: string;
     summary: string;
+    /** False when the sync would change nothing. */
+    hasChanges: boolean;
 }
 
 export interface SyncResult {
@@ -35,7 +38,7 @@ export class MaintenanceFeature implements AppFeature {
     onunload() {}
 
     /** Rebuild commands and views together; retain the method name for existing callers. */
-    async rebuildAndApplyCommandCache(options?: { force?: boolean }) {
+    async rebuildAndApplyCommandCache(options?: { force?: boolean; externalChangesConfirmed?: boolean }) {
         await this.events.emit(FeatureEvents.REBUILD_CACHE_REQUESTED, options);
     }
 
@@ -55,6 +58,7 @@ export class MaintenanceFeature implements AppFeature {
                     toEnable.map((m) => m.name),
                     toDisable.map((m) => m.name),
                 ),
+                hasChanges: toEnable.length + toDisable.length > 0,
             };
         } else {
             const alwaysEnabled = this.getAlwaysEnabledIds();
@@ -64,6 +68,7 @@ export class MaintenanceFeature implements AppFeature {
             return {
                 label: "⚙️ On-Demand Plugins ➔ 📂 community-plugins.json",
                 summary: this.buildDiffSummary(`Always Enabled in On-Demand: ${alwaysEnabled.length} plugins`, toAdd, toRemove),
+                hasChanges: toAdd.length + toRemove.length > 0,
             };
         }
     }
@@ -116,6 +121,9 @@ export class MaintenanceFeature implements AppFeature {
         const isSame = alwaysEnabled.length === currentOnDisk.length && alwaysEnabled.every((id) => currentOnDisk.includes(id));
 
         if (!isSame) {
+            // Match Obsidian's in-memory list, which it writes back to the file on its next config save.
+            this.ctx.obsidianPlugins.enabledPlugins.clear();
+            alwaysEnabled.forEach((id) => this.ctx.obsidianPlugins.enabledPlugins.add(id));
             await this.registry.writeCommunityPluginsFile(alwaysEnabled, this.ctx.getData().showConsoleLog);
             await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
             return {
@@ -147,17 +155,14 @@ export class MaintenanceFeature implements AppFeature {
         return changed;
     }
 
+    /** What exporting writes: always-enabled plugins and itself, keeping entries for plugins this device does not manage. */
     private getAlwaysEnabledIds(): string[] {
-        const ids = this.ctx
-            .getManifests()
-            .filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.ALWAYS_ENABLED)
-            .map((m) => m.id);
-
-        const selfId = this.ctx._plugin.manifest.id;
-        if (!ids.includes(selfId)) {
-            ids.push(selfId);
-        }
-        return ids;
+        return computeDesiredCommunityPlugins(
+            this.ctx.getManifests().map((m) => m.id),
+            (id) => this.ctx.getPluginMode(id),
+            this.ctx._plugin.manifest.id,
+            this.registry.enabledPluginsFromDisk,
+        );
     }
 
     private buildDiffSummary(header: string, toAdd: string[], toRemove: string[]): string {

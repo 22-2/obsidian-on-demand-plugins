@@ -62,14 +62,10 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
     padding-block: var(--size-4-2);
     border-bottom: 1px solid var(--background-modifier-border);
-}
-
-.lazy-review-changes-info {
-    /* Share the description's grid row with the revert button, independently of the name height. */
-    display: contents;
 }
 
 .lazy-review-changes-name {
@@ -79,14 +75,15 @@
 }
 
 .lazy-review-changes-desc {
-    grid-column: 1;
+    grid-column: 1 / -1;
     color: var(--text-muted);
     font-size: var(--font-ui-small);
     overflow-wrap: anywhere;
 }
 
-.lazy-review-changes-info:only-child .lazy-review-changes-desc {
-    grid-column: 1 / -1;
+/* Share the description's grid row with the revert button, independently of the name height. */
+.lazy-review-changes-item.has-revert .lazy-review-changes-desc {
+    grid-column: 1;
 }
 
 .lazy-review-changes-item > .extra-setting-button {
@@ -129,6 +126,20 @@
 .lazy-review-changes-note {
     color: var(--text-muted);
     font-size: var(--font-ui-small);
+}
+
+.lazy-restore-draft-remember {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-3);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    cursor: pointer;
+}
+
+.lazy-restore-draft-remember input {
+    margin: 0;
 }
 
 /* Bound the dialog so the footer stays on screen; only the body scrolls. */
@@ -216,7 +227,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
 }
 
 .lazy-plugin-list-body.is-compact .lazy-plugin-mode-badge,
@@ -335,8 +347,12 @@
 }
 
 .lazy-plugin-list-body.is-compact .lazy-plugin-mode-row .setting-item-description {
-    /* Lets the badges become flex items of the info row instead of a separate block below the name. */
-    display: contents;
+    /* Keeps the badges on the name's line instead of a separate block below it. */
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    min-width: 0;
+    margin-top: 0;
 }
 
 .lazy-plugin-list-body.is-compact .lazy-plugin-description,
@@ -412,6 +428,10 @@
     background: var(--color-green);
 }
 
+.lazy-plugin-enabled-badge.is-memory-only::before {
+    background: var(--text-warning);
+}
+
 .lazy-plugin-meta-badge {
     margin-top: var(--size-4-1);
     color: var(--text-faint);
@@ -424,7 +444,8 @@ body:not(.is-mobile) .lazy-plugin-mode-row .setting-item-description {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
 }
 
 body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-description {
@@ -451,7 +472,8 @@ body:not(.is-mobile) .lazy-plugin-mode-row .lazy-plugin-meta-badge {
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
-    column-gap: var(--size-4-2);
+    /* Gap shorthand: linters misread the column longhand as multi-column layout. */
+    gap: 0 var(--size-4-2);
 }
 
 .lazy-plugin-mode-row .setting-item-info > .setting-item-description {
@@ -657,7 +679,11 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     min-width: 180px;
 }
 
-/* Profile Manager Modal */
+.lazy-confirm-message {
+    white-space: pre-wrap;
+}
+
+/* Profile list */
 .lazy-profile-list {
     display: flex;
     flex-direction: column;
@@ -681,7 +707,7 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     gap: 8px;
 }
 
-.lazy-profile-page .lazy-profile-sync-notice {
+.lazy-settings-notice {
     background: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
     border-left: 3px solid var(--text-warning);
@@ -690,13 +716,13 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     padding: var(--size-4-3) var(--size-4-4);
 }
 
-.lazy-profile-page .lazy-profile-sync-notice p {
+.lazy-settings-notice p {
     /* Contrast keeps key sync instructions clear without emphasizing the whole paragraph. */
     color: var(--text-muted);
     margin: 0;
 }
 
-.lazy-profile-page .lazy-profile-sync-notice strong {
+.lazy-settings-notice strong {
     color: var(--text-normal);
 }
 
@@ -770,104 +796,36 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     }
 }
 
-.lazy-sync-preview {
-    background-color: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: var(--radius-m);
-    padding: var(--size-4-4) var(--size-4-6);
-    margin-bottom: var(--size-4-4);
+.lazy-plugin-view-loading-host {
+    /* Anchor the overlay to the leaf while the lazy plugin loads. */
+    position: relative;
 }
 
-.lazy-sync-preview-label {
-    font-weight: var(--font-bold);
-    color: var(--text-accent);
-    margin-bottom: var(--size-4-1);
-    font-size: var(--font-ui-small);
-}
-
-.lazy-sync-preview-summary {
-    font-size: var(--font-ui-small);
-    color: var(--text-muted);
-    white-space: pre-wrap;
-    line-height: var(--line-height-tight);
-}
-
-.lazy-tools-modal .lazy-replace-setting .setting-item-control {
-    width: 100%;
-}
-
-.lazy-tools-modal .setting-item-control .replace-button {
-    margin-right: auto;
-}
-
-/* Tabs UI */
-.lazy-tab-header {
+.lazy-plugin-view-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
     display: flex;
-    gap: 4px;
-    border-bottom: 1px solid var(--background-modifier-border);
-    margin-bottom: 20px;
-    padding-bottom: 1px;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.lazy-tab-header::-webkit-scrollbar {
-    display: none;
-}
-
-.lazy-tab-button {
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    border-radius: 0;
-    padding: 8px 16px;
-    font-weight: var(--font-medium);
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: none;
-    white-space: nowrap;
-}
-
-.lazy-tab-button:hover {
-    background-color: var(--background-modifier-hover);
-    color: var(--text-normal);
-}
-
-.lazy-tab-button.is-active {
-    color: var(--text-accent);
-    border-bottom-color: var(--text-accent);
-}
-
-.lazy-tab-button-icon {
-    display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    margin-right: 8px;
-    vertical-align: middle;
+    gap: var(--size-4-3);
+    background: var(--background-primary);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
 }
 
-.lazy-tab-button-icon svg {
-    width: 16px;
-    height: 16px;
+.lazy-plugin-spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--background-modifier-border);
+    border-top-color: var(--interactive-accent);
+    border-radius: 50%;
+    animation: lazy-plugin-spin 0.8s linear infinite;
 }
 
-.lazy-tab-button-text {
-    vertical-align: middle;
-}
-
-.lazy-tab-content {
-    animation: lazy-fade-in 0.3s ease;
-    padding-top: 8px;
-}
-
-@keyframes lazy-fade-in {
-    from {
-        opacity: 0;
-        transform: translateY(4px);
-    }
+@keyframes lazy-plugin-spin {
     to {
-        opacity: 1;
-        transform: translateY(0);
+        transform: rotate(360deg);
     }
 }

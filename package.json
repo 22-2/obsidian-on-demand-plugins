@@ -7,11 +7,12 @@
     "scripts": {
         "dev": "node esbuild.config.mjs",
         "typecheck": "tsc6 -noEmit -skipLibCheck",
-        "test:e2e": "playwright test --grep-invert @serial && playwright test --grep @serial --workers=1",
+        "test:e2e": "node scripts/run-e2e.mjs",
+        "test:e2e:runner": "node --test scripts/run-e2e.test.mjs",
         "test:e2e:coverage": "node scripts/e2e-coverage.mjs",
-        "readme:shots": "playwright test --config playwright.readme.config.ts --workers=1",
         "ui:shots:pc": "node scripts/ui-screenshots.mjs pc",
         "ui:shots:mobile": "node scripts/ui-screenshots.mjs mobile",
+        "ui:shots:readme": "node scripts/ui-screenshots.mjs readme",
         "test:e2e:headed": "playwright test --headed",
         "test:e2e:install-browsers": "playwright install --with-deps",
         "build": "pnpm run typecheck && pnpm run build:nocheck",
@@ -39,8 +40,7 @@
         "p-event": "^8.0.1",
         "p-queue": "^9.3.5",
         "p-timeout": "^7.0.2",
-        "p-wait-for": "^6.0.0",
-        "store2": "^2.14.4"
+        "p-wait-for": "^6.0.0"
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
@@ -61,7 +61,7 @@
         "jsonc-parser": "^3.3.1",
         "moment": "^2.31.0",
         "obsidian": "^1.14.4",
-        "obsidian-e2e-toolkit": "github:22-2/obsidian-e2e-toolkit#1848400d6d60b4a8e46a3c3c55a38fe4b8364438",
+        "obsidian-e2e-toolkit": "https://github.com/22-2/obsidian-e2e-toolkit/releases/download/1.7.1/obsidian-e2e-toolkit-1.7.1.tgz",
         "playwright": "^1.64.0",
         "prettier": "^3.9.10",
         "release-it": "^21.1.1",

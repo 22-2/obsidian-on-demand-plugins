@@ -46,8 +46,9 @@ test("disabling keepEnabled plugin syncs settings to disabled", async ({ obsidia
         }, targetPluginId),
     );
 
-    // 2. Disable via Obsidian UI (triggers the patch)
-    await obsidian.page.evaluate((id) => app.plugins.disablePlugin(id), targetPluginId);
+    // 2. Disable the way the Community plugins toggle and the CLI do (triggers the patch).
+    // A plain disablePlugin call is a runtime unload, which must leave the saved mode alone.
+    await obsidian.page.evaluate((id) => app.plugins.disablePluginAndSave(id), targetPluginId);
 
     // 3. Verify settings synced to "disabled"
     const result = await pluginHandle.evaluate(async (plugin, pluginId) => {

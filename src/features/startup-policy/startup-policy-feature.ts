@@ -11,6 +11,8 @@ import { ProgressDialog } from "src/core/progress";
 import { saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
 import { isLazyMode, isPluginLoaded } from "src/core/utils";
+import { computeDesiredCommunityPlugins } from "src/features/community-plugins-drift/community-plugins-drift";
+import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import type { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { waitForPluginInitialization } from "src/patches/plugin-initialization";
@@ -28,6 +30,8 @@ type StartupPolicyOptions = {
     force?: boolean;
     /** Maintenance rebuild: report failures instead of restarting. */
     rebuilding?: boolean;
+    /** The caller already showed the external community-plugins.json edits this run overwrites. */
+    externalChangesConfirmed?: boolean;
 };
 
 /**
@@ -41,6 +45,7 @@ export class StartupPolicyFeature implements AppFeature {
     private ctx!: PluginContext;
     private commandCacheService!: CommandCacheService;
     private registry!: PluginRegistry;
+    private features!: FeatureManager;
 
     onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
         this.ctx = ctx;
@@ -48,24 +53,30 @@ export class StartupPolicyFeature implements AppFeature {
         const lazyEngine = features.get(LazyEngineFeature);
         this.commandCacheService = lazyEngine!.commandCache;
         this.registry = core.registry;
+        this.features = features;
     }
 
     onunload() {}
 
     /** Apply startup policy reusing an externally created ProgressDialog. */
-    public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[]) {
-        await this.mutex.runExclusive(() => this.executeStartupPolicy({ pluginIds, externalProgress: progress }));
+    public async applyWithProgress(progress: ProgressDialog | null, pluginIds?: string[], options?: { externalChangesConfirmed?: boolean }) {
+        await this.mutex.runExclusive(() => this.executeStartupPolicy({ pluginIds, externalProgress: progress, externalChangesConfirmed: options?.externalChangesConfirmed }));
     }
 
-    public async rebuildWithProgress(progress: ProgressDialog | null, force = false) {
-        await this.mutex.runExclusive(() => this.executeStartupPolicy({ externalProgress: progress, force, rebuilding: true }));
+    public async rebuildWithProgress(progress: ProgressDialog | null, force = false, options?: { externalChangesConfirmed?: boolean }) {
+        await this.mutex.runExclusive(() => this.executeStartupPolicy({ externalProgress: progress, force, rebuilding: true, externalChangesConfirmed: options?.externalChangesConfirmed }));
     }
 
     // -------------------------------------------------------------------------
     // Core execution
     // -------------------------------------------------------------------------
 
-    private async executeStartupPolicy({ pluginIds, externalProgress, force = false, rebuilding = false }: StartupPolicyOptions) {
+    private async executeStartupPolicy({ pluginIds, externalProgress, force = false, rebuilding = false, externalChangesConfirmed = false }: StartupPolicyOptions) {
+        // Every run ends by rewriting community-plugins.json, so ask before losing edits made outside On-Demand.
+        if (!externalChangesConfirmed && !(await this.confirmExternalChanges())) {
+            externalProgress?.close();
+            return;
+        }
         const targetIds = pluginIds?.length ? new Set(pluginIds) : null;
         const allManifests = this.ctx.getManifests();
         const targetManifests = targetIds ? allManifests.filter((p) => targetIds.has(p.id)) : allManifests;
@@ -192,23 +203,21 @@ export class StartupPolicyFeature implements AppFeature {
             await this.ctx.saveSettings();
             saveLocalStorage(this.ctx.app, "lazyOnViews", lazyOnViews);
 
-            // Compute the desired enabled set (always-enabled + self)
-            const desiredEnabled = new Set<string>(
-                this.ctx
-                    .getManifests()
-                    .filter((p) => this.ctx.getPluginMode(p.id) === PLUGIN_MODE.ALWAYS_ENABLED)
-                    .map((p) => p.id),
+            // Desired enabled set: always-enabled plugins plus this plugin, keeping entries for plugins this device does not manage.
+            await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
+            const desiredEnabled = computeDesiredCommunityPlugins(
+                this.ctx.getManifests().map((p) => p.id),
+                (id) => this.ctx.getPluginMode(id),
+                ON_DEMAND_PLUGIN_ID,
+                this.registry.enabledPluginsFromDisk,
             );
-            desiredEnabled.add(ON_DEMAND_PLUGIN_ID);
 
             // Update in-memory enabled set
             this.ctx.obsidianPlugins.enabledPlugins.clear();
             desiredEnabled.forEach((id) => this.ctx.obsidianPlugins.enabledPlugins.add(id));
 
             // Persist community-plugins file
-            const toPersist = [...desiredEnabled].filter((id) => this.ctx.getPluginMode(id) === PLUGIN_MODE.ALWAYS_ENABLED || id === ON_DEMAND_PLUGIN_ID).sort((a, b) => a.localeCompare(b));
-
-            await this.registry.writeCommunityPluginsFile(toPersist, this.ctx.getData().showConsoleLog);
+            await this.registry.writeCommunityPluginsFile(desiredEnabled, this.ctx.getData().showConsoleLog);
 
             if (shouldReload) {
                 try {
@@ -219,6 +228,18 @@ export class StartupPolicyFeature implements AppFeature {
             }
         } finally {
             progress?.close();
+        }
+    }
+
+    private async confirmExternalChanges(): Promise<boolean> {
+        const drift = this.features.get(CommunityPluginsDriftFeature);
+        if (!drift) return true;
+        try {
+            return await drift.confirmOverwrite();
+        } catch (error) {
+            // A failed read must not block applying; the write recreates the file from the settings.
+            logger.warn("Failed to check community-plugins.json before applying", error);
+            return true;
         }
     }
 

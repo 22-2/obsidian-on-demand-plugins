@@ -37,6 +37,14 @@ Obsidian プラグインの起動を遅延させ、必要なときだけ読み�
 
 設定変更時、`.obsidian/community-plugins.json` が自動的に書き換えられます。変更のたびに最大 3 世代のバックアップが自動作成されますが、念のためご自身でもバックアップを取ることを推奨します。
 
+`community-plugins.json` が On-Demand Plugins 以外（Sync、Git、手動編集、Obsidian CLI、他のプラグインなど）で書き換えられた場合は、起動時に通知が表示され、変更を適用する前に上書きしてよいか確認されます。外部の変更を残したい場合は **Maintenance › Sync settings** で On-Demand の設定に取り込んでください。**Plugin data → Obsidian config** の方向で同期するときは、変更内容を表示して確認したうえで、反映のために Obsidian を再起動します。
+
+この端末に入っていないプラグインや、モバイルでのデスクトップ専用プラグインのエントリはそのまま残します。Sync で `community-plugins.json` を共有していても、ほかの端末のプラグインが無効になることはありません。
+
+## 保存していない変更について
+
+モードの変更は **Review & save…** を押すまで下書きのままです。On-Demand の設定ページ間を移動しても下書きは残ります。設定画面を閉じたり別の設定タブに移ったりすると下書きは一時的に退避され、On-Demand は保存済みの設定で動きます。**Plugin management** または **Maintenance & batch** に戻ると、退避した下書きを戻すか（**Restore**）捨てるか（**Discard**）を聞かれます。**Behaviour › Unsaved draft prompt**（全プロファイル共通）で、自動で戻す・捨てるようにもできます。退避した下書きは Obsidian を再起動するまで保持されます。
+
 ---
 
 ## 仕組み

@@ -1,6 +1,6 @@
 import type { LogLevelDesc } from "loglevel";
 import path from "node:path";
-import type { ObsidianAPI } from "obsidian-e2e-toolkit";
+import type { ObsidianAPI, ReloadOptions } from "obsidian-e2e-toolkit";
 import { fileURLToPath } from "url";
 import { test } from "./fixtures";
 
@@ -20,6 +20,10 @@ type TestVaultOptions = {
 
 export function resolveMyfilesPluginPath(pluginId: string): string {
     return path.resolve(repoRoot, "myfiles", pluginId);
+}
+
+export function resolveFixturePluginPath(fixtureName: string): string {
+    return path.resolve(repoRoot, "tests", "fixtures", fixtureName);
 }
 
 export function useVaultPlugins(pluginPaths: readonly string[], options: TestVaultOptions = {}) {
@@ -43,6 +47,11 @@ export function useOnDemandPluginsWithTargets(targetPluginIds: string | readonly
         enableBrowserConsoleLogging: true,
         ...options,
     });
+}
+
+export function useOnDemandPluginsWithFixture(fixtureName: string) {
+    // Reason: fixture plugins live in the repo, unlike the downloaded plugins in myfiles.
+    useVaultPlugins([repoRoot, resolveFixturePluginPath(fixtureName)], { enableBrowserConsoleLogging: true });
 }
 
 export function useOnDemandPluginOnly(options: TestVaultOptions = {}) {
@@ -72,6 +81,11 @@ export async function withReloadRecorded<T>(obsidian: ObsidianAPI, action: () =>
     }
 }
 
+/** Reload after a policy change, waiting only for the plugins this scenario expects at startup. */
+export async function reloadWithLazyPlugins(obsidian: ObsidianAPI, expectLoaded: readonly string[], options: Omit<ReloadOptions, "expectLoaded"> = {}): Promise<void> {
+    await obsidian.reload({ ...options, expectLoaded: [...expectLoaded] });
+}
+
 export async function triggerActiveLeafChange(obsidian: ObsidianAPI): Promise<void> {
     await obsidian.page.evaluate(() => {
         const workspace = app.workspace as unknown as {
@@ -86,22 +100,8 @@ export async function triggerActiveLeafChange(obsidian: ObsidianAPI): Promise<vo
 
 async function readOnDemandStorageRecord(obsidian: ObsidianAPI, prefix: string): Promise<Record<string, unknown> | null> {
     return obsidian.page.evaluate((storagePrefix) => {
-        const appWithId = app as unknown as {
-            app?: {
-                appId?: string;
-            };
-            appId?: string;
-            manifest?: {
-                id?: string;
-            };
-        };
-        const appId = appWithId.appId ?? appWithId.app?.appId ?? appWithId.manifest?.id ?? null;
-        if (!appId) {
-            return null;
-        }
-
-        const raw = window.localStorage.getItem(`on-demand:${storagePrefix}:${appId}`);
-        return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+        const value: unknown = app.loadLocalStorage(`on-demand:${storagePrefix}`);
+        return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
     }, prefix);
 }
 

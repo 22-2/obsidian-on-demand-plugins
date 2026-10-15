@@ -1,6 +1,6 @@
 import type { TFile } from "obsidian";
 import type { PluginContext } from "src/core/plugin-context";
-import { PLUGIN_MODE, type DeviceSettings, type FileActivationCriteria } from "src/core/types";
+import { PLUGIN_MODE, type DeviceSettings } from "src/core/types";
 import { resolvePluginForFile, resolvePluginForViewType } from "src/features/lazy-engine/lazy-loader/loaders/internal/activation-rules";
 import { describe, expect, it, vi } from "vitest";
 
