@@ -13,6 +13,8 @@ import { CommunityPluginsDriftFeature } from "src/features/community-plugins-dri
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 import { ManualToggleFeature } from "src/features/manual-toggle/manual-toggle-feature";
+import { createPluginTableHost } from "src/features/plugin-table/plugin-table-host";
+import { PluginTableView, VIEW_TYPE_PLUGIN_TABLE } from "src/features/plugin-table/plugin-table-view";
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { CoreContainer } from "src/services/core-container";
 import { SettingsTab } from "src/ui/settings-tab";
@@ -76,6 +78,22 @@ export default class OnDemandPlugin extends Plugin {
 
         this.settingsTab = new SettingsTab(this.app, this);
         this.addSettingTab(this.settingsTab);
+        this.registerPluginTable(this.settingsTab);
+    }
+
+    /** The table shares the settings tab's draft; only the view is registered here, so startup builds no table. */
+    private registerPluginTable(settingsTab: SettingsTab) {
+        const host = createPluginTableHost(this, settingsTab.drafts);
+        this.registerView(VIEW_TYPE_PLUGIN_TABLE, (leaf) => new PluginTableView(leaf, host));
+        this.addCommand({ id: "open-plugin-table", name: "Open plugin table", callback: () => void this.openPluginTable() });
+    }
+
+    /** Reveals the open plugin table, or opens one in a new tab. */
+    async openPluginTable() {
+        const { workspace } = this.app;
+        const leaf = workspace.getLeavesOfType(VIEW_TYPE_PLUGIN_TABLE)[0] ?? workspace.getLeaf("tab");
+        if (leaf.view.getViewType() !== VIEW_TYPE_PLUGIN_TABLE) await leaf.setViewState({ type: VIEW_TYPE_PLUGIN_TABLE, active: true });
+        await workspace.revealLeaf(leaf);
     }
 
     private registerEventHandlers() {

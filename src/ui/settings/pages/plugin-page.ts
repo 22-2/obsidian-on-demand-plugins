@@ -10,7 +10,7 @@ import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
-import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText, stagePluginMode } from "src/ui/settings/helpers";
 import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 const logger = log.getLogger("OnDemandPlugin/PluginPage");
@@ -80,6 +80,10 @@ export class PluginPage extends SettingPage {
             .setName(pluginStatisticsText(this.plugin))
             .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
             .setClass("lazy-plugin-statistics");
+        new Setting(this.containerEl)
+            .setName("Plugin table")
+            .setDesc("Edit modes in a sortable table. Unsaved changes carry over.")
+            .addButton((button) => button.setButtonText("Open table").onClick(() => void this.openPluginTable()));
         // Phones show the refresh control on the heading's right; desktop shows it beside the filters (see CSS).
         new Setting(this.containerEl)
             .setName("Plugins")
@@ -122,6 +126,14 @@ export class PluginPage extends SettingPage {
             });
         this.containerEl.createDiv({ cls: "lazy-plugin-infinite-host" });
         this.renderInfiniteList();
+    }
+    /**
+     * Opens the table before closing settings: the draft is set aside only when its last
+     * surface closes, so the open table keeps it live instead of prompting to restore it.
+     */
+    private async openPluginTable() {
+        await this.plugin.openPluginTable();
+        this.app.setting.close();
     }
     private refreshList() {
         this.plugin.updateManifests();
@@ -281,17 +293,7 @@ export class PluginPage extends SettingPage {
     }
 
     private applyRowModeChange(pluginId: string, mode: PLUGIN_MODE, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
-        // Selecting the effective mode changes nothing semantically, so skip creating
-        // an explicit entry just to flip userConfigured and keep the draft clean.
-        const current = this.plugin.settings.plugins[pluginId];
-        if (this.plugin.getPluginMode(pluginId) === mode && (current?.mode === undefined || current.mode === mode)) return;
-        // Changing the mode should preserve advanced lazy options so
-        // users can temporarily disable a plugin without reconfiguring it.
-        this.plugin.settings.plugins[pluginId] = {
-            ...(this.plugin.settings.plugins[pluginId] ?? {}),
-            mode,
-            userConfigured: true,
-        };
+        if (!stagePluginMode(this.plugin, pluginId, mode)) return;
         this.tab.pendingPluginIds.add(pluginId);
         this.tab.markDirty();
         // Update only the badges in place so the row stays where it is even

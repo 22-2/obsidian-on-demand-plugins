@@ -4,6 +4,7 @@ import { Modal, Notice, Setting } from "obsidian";
 import type { LazyOptions } from "src/core/types";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import type OnDemandPlugin from "src/main";
+import { currentLazyOptions, stageLazyOptions } from "src/ui/settings/helpers";
 
 const logger = log.getLogger("OnDemandPlugin/LazyOptionsModal");
 
@@ -20,28 +21,8 @@ export class LazyOptionsModal extends Modal {
         this.plugin = plugin;
         this.pluginId = pluginId;
         this.onSave = onSave;
-        const settings = this.plugin.settings.plugins[this.pluginId];
-        const legacyViewTypes = this.plugin.settings.lazyOnViews?.[pluginId] ?? [];
-
-        // Initialize options from existing settings or defaults
-        this.options = settings?.lazyOptions
-            ? structuredClone(settings.lazyOptions)
-            : {
-                  // Legacy view rules are represented by LAZY + lazyOptions/useView.
-                  useView: settings?.mode === "lazy" && legacyViewTypes.length > 0,
-                  viewTypes: legacyViewTypes,
-                  useFile: false,
-                  fileCriteria: this.plugin.settings.lazyOnFiles?.[pluginId] || {},
-              };
-
-        // Special case for Excalidraw if not configured
-        if (pluginId === "obsidian-excalidraw-plugin" && !settings?.lazyOptions) {
-            this.options.useFile = true;
-            this.options.fileCriteria = {
-                suffixes: [".excalidraw"],
-                frontmatterKeys: ["excalidraw-plugin"],
-            };
-        }
+        // Shared with the plugin table, which toggles the same options inline.
+        this.options = currentLazyOptions(this.plugin, pluginId);
 
         this.initialOptionsSnapshot = JSON.stringify(this.options);
     }
@@ -168,19 +149,7 @@ export class LazyOptionsModal extends Modal {
                     .setButtonText("Save")
                     .setCta()
                     .onClick(() => {
-                        const hasChanges = JSON.stringify(this.options) !== this.initialOptionsSnapshot;
-                        if (hasChanges) {
-                            // Plugin settings are sparse until a mode is explicitly
-                            // configured, but advanced options must still be saveable.
-                            const pluginSettings = (this.plugin.settings.plugins[this.pluginId] ??= {
-                                mode: this.plugin.getPluginMode(this.pluginId),
-                                userConfigured: false,
-                            });
-                            pluginSettings.lazyOptions = this.options;
-                            // For backward compatibility during transition, also update the global maps
-                            this.plugin.settings.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
-                            this.plugin.settings.lazyOnFiles[this.pluginId] = this.options.useFile ? this.options.fileCriteria : {};
-                        }
+                        const hasChanges = JSON.stringify(this.options) !== this.initialOptionsSnapshot && stageLazyOptions(this.plugin, this.pluginId, this.options);
                         // Notify caller (SettingsTab) so it can mark this plugin as pending
                         if (hasChanges) {
                             try {
