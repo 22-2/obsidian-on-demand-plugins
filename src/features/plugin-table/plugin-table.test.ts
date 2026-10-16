@@ -114,6 +114,13 @@ describe("plugin table rendering", () => {
         expect(alpha.querySelector(".lazy-plugin-table-update-icon")).not.toBeNull();
         // The author sits beside the name instead of in a column of its own.
         expect(alpha.querySelector(".lazy-plugin-table-author")?.textContent).toBe("Ann");
+        // Controls are named by the header and name text on screen, since Obsidian turns any aria-label into a tooltip.
+        const modeSelect = alpha.querySelector(".lazy-plugin-table-mode-cell select")!;
+        const labelText = (el: Element) => el.getAttribute("aria-labelledby")!.split(" ").map((id) => document.getElementById(id)?.textContent).join(" ");
+        expect(modeSelect.hasAttribute("aria-label")).toBe(false);
+        expect(labelText(modeSelect)).toBe("Mode Alpha");
+        expect(root.querySelectorAll(".lazy-plugin-table-filter-row [aria-label]")).toHaveLength(0);
+        expect(labelText(root.querySelector(".lazy-plugin-table-filter-row input")!)).toBe("Name");
         // Only the loaded state has a tooltip, for the in-memory detail its short label leaves out.
         expect(alpha.querySelector(".lazy-plugin-table-col-name")!.hasAttribute("aria-label")).toBe(false);
         expect(alpha.querySelector(".lazy-plugin-table-col-description")!.hasAttribute("aria-label")).toBe(false);
@@ -172,21 +179,21 @@ describe("plugin table rendering", () => {
 describe("plugin table filters and sorting", () => {
     it("filters by text, load state and mode", () => {
         const { root, names } = setup();
-        change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Name']")!, "a");
+        change(root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-name']")!, "a");
         expect(names()).toEqual(["Beta", "Alpha", "Gamma"]);
         // The name filter also finds a plugin by its author.
-        change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Name']")!, "BOB");
+        change(root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-name']")!, "BOB");
         expect(names()).toEqual(["Beta"]);
-        change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Name']")!, "");
-        change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Description']")!, "second");
+        change(root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-name']")!, "");
+        change(root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-description']")!, "second");
         expect(names()).toEqual(["Beta"]);
-        change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Description']")!, "");
+        change(root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-description']")!, "");
 
-        change(root.querySelector<HTMLSelectElement>("select[aria-label='Filter Loaded']")!, "false");
+        change(root.querySelector<HTMLSelectElement>("select[aria-labelledby$='-header-loaded']")!, "false");
         expect(names()).toEqual(["Alpha", "Gamma"]);
-        change(root.querySelector<HTMLSelectElement>("select[aria-label='Filter Mode']")!, PLUGIN_MODE.ALWAYS_DISABLED);
+        change(root.querySelector<HTMLSelectElement>("select[aria-labelledby$='-header-mode']")!, PLUGIN_MODE.ALWAYS_DISABLED);
         expect(names()).toEqual(["Gamma"]);
-        change(root.querySelector<HTMLSelectElement>("select[aria-label='Filter Mode']")!, "");
+        change(root.querySelector<HTMLSelectElement>("select[aria-labelledby$='-header-mode']")!, "");
         expect(names()).toEqual(["Alpha", "Gamma"]);
     });
 

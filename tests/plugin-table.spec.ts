@@ -17,7 +17,7 @@ async function openTable(obsidian: ObsidianAPI) {
     await plugin.evaluate((instance) => (instance as unknown as TablePlugin).openPluginTable());
     const view = obsidian.page.locator(".lazy-plugin-table-view");
     await expect(view).toBeVisible();
-    await view.getByRole("textbox", { name: "Filter Name" }).fill("BRAT");
+    await view.getByRole("textbox", { name: "Name", exact: true }).fill("BRAT");
     const row = view.locator("tbody tr").filter({ hasText: "BRAT" });
     await expect(row).toHaveCount(1);
     return { view, row };
@@ -33,7 +33,7 @@ test("plugin table stages a mode from its column and saves it through the shared
 
     const gear = row.locator(".lazy-plugin-table-mode-cell .clickable-icon");
     await expect(gear).toBeVisible();
-    await row.getByRole("combobox", { name: /^Mode for / }).selectOption("lazyOnLayoutReady");
+    await row.getByRole("combobox", { name: /^Mode / }).selectOption("lazyOnLayoutReady");
 
     // The lazy options apply only to Lazy on demand, so the gear hides but keeps its place.
     await expect(gear).toBeHidden();
@@ -59,7 +59,7 @@ test("plugin table stages a mode from its column and saves it through the shared
 test("closing the plugin table sets its draft aside and offers it back on reopen", async ({ obsidian }) => {
     await startFrom(obsidian, "lazy");
     const { row } = await openTable(obsidian);
-    await row.getByRole("combobox", { name: /^Mode for / }).selectOption("alwaysDisabled");
+    await row.getByRole("combobox", { name: /^Mode / }).selectOption("alwaysDisabled");
 
     await obsidian.page.evaluate(() => app.workspace.getLeavesOfType("on-demand-plugin-table").forEach((leaf) => leaf.detach()));
     // Until the user decides, On-Demand runs on the saved settings.
@@ -72,8 +72,8 @@ test("closing the plugin table sets its draft aside and offers it back on reopen
 
     await expect.poll(() => modeOf(obsidian)).toBe("alwaysDisabled");
     const view = obsidian.page.locator(".lazy-plugin-table-view");
-    await view.getByRole("textbox", { name: "Filter Name" }).fill("BRAT");
-    await expect(view.locator("tbody tr").filter({ hasText: "BRAT" }).getByRole("combobox", { name: /^Mode for / })).toHaveValue("alwaysDisabled");
+    await view.getByRole("textbox", { name: "Name", exact: true }).fill("BRAT");
+    await expect(view.locator("tbody tr").filter({ hasText: "BRAT" }).getByRole("combobox", { name: /^Mode / })).toHaveValue("alwaysDisabled");
     await expect(view.locator(".lazy-plugin-table-pending")).toContainText("1 unsaved change");
 });
 
@@ -114,8 +114,8 @@ test("opening the table from plugin management keeps the draft live", async ({ o
 
     const view = obsidian.page.locator(".lazy-plugin-table-view");
     await expect(view).toBeVisible();
-    await view.getByRole("textbox", { name: "Filter Name" }).fill("BRAT");
-    await expect(view.locator("tbody tr").filter({ hasText: "BRAT" }).getByRole("combobox", { name: /^Mode for / })).toHaveValue("alwaysDisabled");
+    await view.getByRole("textbox", { name: "Name", exact: true }).fill("BRAT");
+    await expect(view.locator("tbody tr").filter({ hasText: "BRAT" }).getByRole("combobox", { name: /^Mode / })).toHaveValue("alwaysDisabled");
     await expect(view.locator(".lazy-plugin-table-pending")).toContainText("1 unsaved change");
     // The table stayed open while settings closed, so the draft was never set aside.
     await expect(obsidian.page.locator(".lazy-review-changes-modal")).toHaveCount(0);

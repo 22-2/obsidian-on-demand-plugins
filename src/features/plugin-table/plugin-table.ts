@@ -139,6 +139,9 @@ function hasUpdate(row: PluginTableRow): boolean {
     return row.latestVersion !== undefined;
 }
 
+/** Makes element IDs unique when more than one table is open. */
+let tableCount = 0;
+
 export interface PluginTableOptions {
     initialState: PluginTableState;
     onStateChange: (state: PluginTableState) => void;
@@ -178,6 +181,11 @@ export class PluginTable {
     private stopResize?: () => void;
     /** Touch layouts get a menu button per row, since they have no right-click. */
     private readonly touchUi: boolean;
+    /**
+     * Controls are named with aria-labelledby, pointing at the header and name text already
+     * on screen: Obsidian shows any aria-label as a tooltip, which these controls do not need.
+     */
+    private readonly idPrefix = `lazy-plugin-table-${++tableCount}`;
 
     constructor(host: HTMLElement, tableHost: PluginTableHost, options: PluginTableOptions) {
         this.host = tableHost;
@@ -384,6 +392,14 @@ export class PluginTable {
         new ButtonComponent(this.pendingEl).setButtonText("Discard…").onClick(() => void drafts.discardChanges());
     }
 
+    private headerId(columnId: string): string {
+        return `${this.idPrefix}-header-${columnId}`;
+    }
+
+    private nameId(pluginId: string): string {
+        return `${this.idPrefix}-name-${pluginId}`;
+    }
+
     private getWidth(id: string): number | undefined {
         return this.columnWidths[id] ?? DEFAULT_WIDTHS[id];
     }
@@ -404,7 +420,7 @@ export class PluginTable {
         visibleColumns.forEach((column, index) => {
             const th = headerRow.createEl("th", { cls: `lazy-plugin-table-th lazy-plugin-table-col-${column.id}` });
             const label = th.createDiv({ cls: "lazy-plugin-table-th-label" });
-            label.createSpan({ text: headerText(column) });
+            label.createSpan({ text: headerText(column), attr: { id: this.headerId(column.id) } });
             const sorted = column.getIsSorted();
             if (sorted) label.createSpan({ text: sorted === "desc" ? " ▼" : " ▲", cls: "lazy-plugin-table-sort-indicator" });
             if (column.getCanSort()) {
@@ -442,7 +458,7 @@ export class PluginTable {
                     MODE_ORDER.map((mode) => [mode, PluginModes[mode]]),
                 );
             } else if (TEXT_FILTER_COLUMNS.has(column.id)) {
-                const input = th.createEl("input", { type: "text", cls: "lazy-plugin-table-filter-input", attr: { placeholder: "Filter...", "aria-label": `Filter ${headerText(column)}` } });
+                const input = th.createEl("input", { type: "text", cls: "lazy-plugin-table-filter-input", attr: { placeholder: "Filter...", "aria-labelledby": this.headerId(column.id) } });
                 input.value = filterText(column.getFilterValue());
                 input.addEventListener("input", () => column.setFilterValue(input.value === "" ? undefined : input.value));
                 input.addEventListener("contextmenu", (evt) => evt.stopPropagation());
@@ -460,7 +476,7 @@ export class PluginTable {
     }
 
     private createFilterSelect(th: HTMLElement, column: TableColumn, options: [string, string][]) {
-        const select = th.createEl("select", { cls: "dropdown lazy-plugin-table-filter-input", attr: { "aria-label": `Filter ${headerText(column)}` } });
+        const select = th.createEl("select", { cls: "dropdown lazy-plugin-table-filter-input", attr: { "aria-labelledby": this.headerId(column.id) } });
         select.createEl("option", { text: "All", value: "" });
         for (const [value, label] of options) select.createEl("option", { text: label, value });
         select.value = filterText(column.getFilterValue());
@@ -533,7 +549,7 @@ export class PluginTable {
      * is worth a column of its own, and the name filter matches the author too.
      */
     private renderNameCell(td: HTMLElement, data: PluginTableRow): void {
-        td.createSpan({ cls: "lazy-plugin-table-name", text: data.name });
+        td.createSpan({ cls: "lazy-plugin-table-name", text: data.name, attr: { id: this.nameId(data.id) } });
         const version = td.createSpan({ cls: "lazy-plugin-table-version" });
         if (data.latestVersion) {
             const icon = version.createSpan({ cls: "lazy-plugin-table-update-icon" });
@@ -568,7 +584,7 @@ export class PluginTable {
             .onChange((value) => {
                 if (isPluginMode(value)) this.applyMode([data.id], value);
             });
-        controls.dropdown.selectEl.setAttr("aria-label", `Mode for ${data.name}`);
+        controls.dropdown.selectEl.setAttr("aria-labelledby", `${this.headerId("mode")} ${this.nameId(data.id)}`);
         // The gear follows the dropdown, as the options belong to the mode chosen there.
         controls.gear = new ExtraButtonComponent(wrapper)
             .setIcon("settings")
