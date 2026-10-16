@@ -2,6 +2,7 @@ import type { App, DropdownComponent } from "obsidian";
 import { FileSystemAdapter, Notice, Platform, normalizePath } from "obsidian";
 import { openSystemPath } from "src/core/external-open";
 import { PLUGIN_MODE, PluginModes } from "src/core/types";
+import type { LazyOptions } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type OnDemandPlugin from "src/main";
 
@@ -98,6 +99,46 @@ export function stagePluginMode(plugin: OnDemandPlugin, pluginId: string, mode: 
     // users can temporarily disable a plugin without reconfiguring it.
     plugin.settings.plugins[pluginId] = { ...(current ?? {}), mode, userConfigured: true };
     return true;
+}
+
+/** The lazy options a plugin runs with now, including defaults for one that has none saved yet. */
+export function currentLazyOptions(plugin: OnDemandPlugin, pluginId: string): LazyOptions {
+    const settings = plugin.settings.plugins[pluginId];
+    if (settings?.lazyOptions) return structuredClone(settings.lazyOptions);
+    // Excalidraw files are recognised by their suffix and frontmatter, so it loads on file open by default.
+    if (pluginId === "obsidian-excalidraw-plugin") {
+        return { useView: false, viewTypes: [], useFile: true, fileCriteria: { suffixes: [".excalidraw"], frontmatterKeys: ["excalidraw-plugin"] } };
+    }
+    const legacyViewTypes = plugin.settings.lazyOnViews?.[pluginId] ?? [];
+    return {
+        // Legacy view rules are represented by LAZY + lazyOptions/useView.
+        useView: settings?.mode === "lazy" && legacyViewTypes.length > 0,
+        viewTypes: legacyViewTypes,
+        useFile: false,
+        fileCriteria: structuredClone(plugin.settings.lazyOnFiles?.[pluginId] ?? {}),
+    };
+}
+
+/** Stages lazy options in the live settings draft. Returns false when they are unchanged. */
+export function stageLazyOptions(plugin: OnDemandPlugin, pluginId: string, options: LazyOptions): boolean {
+    if (JSON.stringify(options) === JSON.stringify(currentLazyOptions(plugin, pluginId))) return false;
+    // Plugin settings are sparse until a mode is explicitly configured, but advanced options must still be saveable.
+    const pluginSettings = (plugin.settings.plugins[pluginId] ??= { mode: plugin.getPluginMode(pluginId), userConfigured: false });
+    pluginSettings.lazyOptions = structuredClone(options);
+    // For backward compatibility during transition, also update the global maps
+    setLegacyRule(plugin.settings.lazyOnViews, pluginId, options.useView ? options.viewTypes : []);
+    setLegacyRule(plugin.settings.lazyOnFiles, pluginId, options.useFile ? options.fileCriteria : {});
+    return true;
+}
+
+/**
+ * A missing entry and an empty one mean the same rule, so an empty value is written only over a
+ * non-empty one. Otherwise toggling an option would list an unchanged rule map in the review.
+ */
+function setLegacyRule<T extends object>(map: Record<string, T>, pluginId: string, value: T) {
+    const isEmpty = (rule: T | undefined) => rule === undefined || Object.keys(rule).length === 0;
+    if (isEmpty(value) && isEmpty(map[pluginId])) return;
+    map[pluginId] = value;
 }
 
 export function addModeOptions(dropdown: DropdownComponent): DropdownComponent {
