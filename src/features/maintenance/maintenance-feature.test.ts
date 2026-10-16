@@ -112,7 +112,7 @@ describe("MaintenanceFeature", () => {
             const result = await feature.executeSync("lazyToCore");
 
             expect(result.changed).toBe(1);
-            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(expect.arrayContaining(["plugin-2", "on-demand-plugins"]), false);
+            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(expect.arrayContaining(["plugin-2", "on-demand-plugins"]));
             // Obsidian's own config save writes this set back, so it must match the file.
             expect([...mockCtx.obsidianPlugins.enabledPlugins].sort()).toEqual(["on-demand-plugins", "plugin-2"]);
         });
@@ -123,7 +123,7 @@ describe("MaintenanceFeature", () => {
             const result = await feature.executeSync("lazyToCore");
 
             expect(result.changed).toBe(1);
-            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "plugin-2"], false);
+            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "plugin-2"]);
         });
 
         it("previews no removal for entries this device does not manage", async () => {

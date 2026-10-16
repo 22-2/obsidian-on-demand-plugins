@@ -187,7 +187,7 @@ describe("external community-plugins.json edits", () => {
 
         await t.feature.applyWithProgress(t.dialog);
 
-        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["on-demand-plugins", "plugin-1"], false);
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["on-demand-plugins", "plugin-1"]);
         expect(t.reload).toHaveBeenCalledWith("app:reload");
     });
 
@@ -218,6 +218,6 @@ describe("external community-plugins.json edits", () => {
         await t.feature.applyWithProgress(t.dialog);
 
         expect(t.registry.loadEnabledPluginsFromDisk).toHaveBeenCalled();
-        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "other-device-only", "plugin-1"], false);
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "other-device-only", "plugin-1"]);
     });
 });

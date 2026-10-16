@@ -85,9 +85,7 @@ export class LazyCommandRunner implements PluginLoader {
                 });
             });
         } catch (error) {
-            if (this.ctx.getData().showConsoleLog) {
-                logger.error(`Error executing lazy command ${commandId}:`, error);
-            }
+            logger.error(`Error executing lazy command ${commandId}:`, error);
         }
     }
 
@@ -118,9 +116,7 @@ export class LazyCommandRunner implements PluginLoader {
                 this.commandRegistry.syncCommandWrappersForPlugin(pluginId);
                 return true;
             } catch (error) {
-                if (this.ctx.getData().showConsoleLog) {
-                    logger.error(`Error loading plugin ${pluginId}:`, error);
-                }
+                logger.error(`Error loading plugin ${pluginId}:`, error);
                 return false;
             }
         });

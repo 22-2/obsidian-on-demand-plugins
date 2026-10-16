@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import log from "loglevel";
 import { Notice } from "obsidian";
 import pWaitFor from "p-wait-for";
 import type { CommandRegistry } from "src/core/interfaces";
@@ -91,13 +92,17 @@ describe("LazyCommandRunner", () => {
             expect(mockRegistry.syncCommandWrappersForPlugin).toHaveBeenCalledWith("test-plugin");
         });
 
-        it("should return false if enablePlugin or loading fails", async () => {
+        it("should return false and log the error if enablePlugin or loading fails", async () => {
+            const errorSpy = vi.spyOn(log.getLogger("OnDemandPlugin/LazyCommandRunner"), "error").mockImplementation(() => {});
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
-            mockCtx.obsidianPlugins.enablePlugin.mockRejectedValue(new Error("Fail"));
+            const failure = new Error("Fail");
+            mockCtx.obsidianPlugins.enablePlugin.mockRejectedValue(failure);
 
             const result = await runner.ensurePluginLoaded("test-plugin");
 
             expect(result).toBe(false);
+            expect(errorSpy).toHaveBeenCalledWith("Error loading plugin test-plugin:", failure);
+            errorSpy.mockRestore();
         });
 
         it("should return false if the plugin does not finish loading", async () => {
@@ -227,13 +232,16 @@ describe("LazyCommandRunner", () => {
             expect(messages).toEqual(["Loading Test Plugin…", "Test Plugin loaded"]);
         });
 
-        it("should log and swallow command readiness errors when console logging is enabled", async () => {
+        it("should log and swallow command readiness errors even when console logging is disabled", async () => {
+            const errorSpy = vi.spyOn(log.getLogger("OnDemandPlugin/LazyCommandRunner"), "error").mockImplementation(() => {});
             mockRegistry.getCachedCommand.mockReturnValue({ id: "cmd1", pluginId: "test-plugin" });
-            mockCtx.getData.mockReturnValue({ showConsoleLog: true });
             vi.spyOn(runner, "ensurePluginLoaded").mockResolvedValue(true);
-            vi.spyOn(runner, "waitForCommand").mockRejectedValue(new Error("readiness failed"));
+            const failure = new Error("readiness failed");
+            vi.spyOn(runner, "waitForCommand").mockRejectedValue(failure);
 
             await expect(runner.runLazyCommand("cmd1")).resolves.toBeUndefined();
+            expect(errorSpy).toHaveBeenCalledWith("Error executing lazy command cmd1:", failure);
+            errorSpy.mockRestore();
         });
     });
 

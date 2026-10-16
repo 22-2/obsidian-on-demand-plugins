@@ -95,15 +95,8 @@ describe("PluginRegistry", () => {
         it("should handle error gracefully", async () => {
             mockApp.vault.readConfigJson.mockRejectedValue(new Error("Disk Error"));
 
-            await registry.loadEnabledPluginsFromDisk(true);
+            await registry.loadEnabledPluginsFromDisk();
 
-            expect(registry.enabledPluginsFromDisk.size).toBe(0);
-        });
-
-        it("should handle read errors without logging when console logging is disabled", async () => {
-            mockApp.vault.readConfigJson.mockRejectedValue(new Error("Disk Error"));
-
-            await expect(registry.loadEnabledPluginsFromDisk()).resolves.toBeUndefined();
             expect(registry.enabledPluginsFromDisk.size).toBe(0);
         });
     });
@@ -134,7 +127,6 @@ describe("PluginRegistry", () => {
             mockApp.vault.writeConfigJson.mockRejectedValue(new Error("Disk Error"));
 
             await expect(registry.writeCommunityPluginsFile(["plugin-a"])).resolves.toBeUndefined();
-            await expect(registry.writeCommunityPluginsFile(["plugin-a"], true)).resolves.toBeUndefined();
         });
     });
 

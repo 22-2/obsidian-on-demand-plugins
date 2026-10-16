@@ -204,7 +204,7 @@ export class StartupPolicyFeature implements AppFeature {
             saveLocalStorage(this.ctx.app, "lazyOnViews", lazyOnViews);
 
             // Desired enabled set: always-enabled plugins plus this plugin, keeping entries for plugins this device does not manage.
-            await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
+            await this.registry.loadEnabledPluginsFromDisk();
             const desiredEnabled = computeDesiredCommunityPlugins(
                 this.ctx.getManifests().map((p) => p.id),
                 (id) => this.ctx.getPluginMode(id),
@@ -217,7 +217,7 @@ export class StartupPolicyFeature implements AppFeature {
             desiredEnabled.forEach((id) => this.ctx.obsidianPlugins.enabledPlugins.add(id));
 
             // Persist community-plugins file
-            await this.registry.writeCommunityPluginsFile(desiredEnabled, this.ctx.getData().showConsoleLog);
+            await this.registry.writeCommunityPluginsFile(desiredEnabled);
 
             if (shouldReload) {
                 try {

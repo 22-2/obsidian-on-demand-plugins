@@ -50,7 +50,7 @@ export class PluginRegistry {
         return this.app.vault.getConfigFile("community-plugins");
     }
 
-    async loadEnabledPluginsFromDisk(showConsoleLog?: boolean) {
+    async loadEnabledPluginsFromDisk() {
         this.enabledPluginsFromDisk.clear();
 
         try {
@@ -61,20 +61,16 @@ export class PluginRegistry {
                 });
             }
         } catch (error) {
-            if (showConsoleLog) {
-                logger.warn("Failed to read community-plugins.json using readConfigJson", error);
-            }
+            logger.warn("Failed to read community-plugins.json using readConfigJson", error);
         }
     }
 
-    async writeCommunityPluginsFile(enabledPlugins: string[], showConsoleLog?: boolean) {
+    async writeCommunityPluginsFile(enabledPlugins: string[]) {
         try {
             await this.app.vault.writeConfigJson("community-plugins", enabledPlugins);
             this.knownOnDisk = new Set(enabledPlugins);
         } catch (error) {
-            if (showConsoleLog) {
-                logger.error("Failed to write community-plugins.json using writeConfigJson", error);
-            }
+            logger.error("Failed to write community-plugins.json using writeConfigJson", error);
         }
     }
 

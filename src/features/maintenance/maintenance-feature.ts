@@ -43,7 +43,7 @@ export class MaintenanceFeature implements AppFeature {
     }
 
     async buildSyncPreview(direction: SyncDirection): Promise<SyncPreviewResult> {
-        await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
+        await this.registry.loadEnabledPluginsFromDisk();
         const onDisk = this.registry.enabledPluginsFromDisk;
         const manifests = this.ctx.getManifests();
 
@@ -74,7 +74,7 @@ export class MaintenanceFeature implements AppFeature {
     }
 
     async executeSync(direction: SyncDirection): Promise<SyncResult> {
-        await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
+        await this.registry.loadEnabledPluginsFromDisk();
 
         if (direction === "coreToLazy") {
             return this.syncCoreToLazy();
@@ -124,8 +124,8 @@ export class MaintenanceFeature implements AppFeature {
             // Match Obsidian's in-memory list, which it writes back to the file on its next config save.
             this.ctx.obsidianPlugins.enabledPlugins.clear();
             alwaysEnabled.forEach((id) => this.ctx.obsidianPlugins.enabledPlugins.add(id));
-            await this.registry.writeCommunityPluginsFile(alwaysEnabled, this.ctx.getData().showConsoleLog);
-            await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
+            await this.registry.writeCommunityPluginsFile(alwaysEnabled);
+            await this.registry.loadEnabledPluginsFromDisk();
             return {
                 changed: 1,
                 message: "Updated community-plugins.json based on Plugin data",
