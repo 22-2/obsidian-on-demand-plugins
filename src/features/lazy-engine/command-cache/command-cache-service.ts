@@ -10,7 +10,6 @@ import { waitForPluginInitialization } from "src/patches/plugin-initialization";
 
 const logger = log.getLogger("OnDemandPlugin/CommandCacheService");
 
-// Re-export for consumers
 export class CommandCacheService {
     private store: CommandCacheStore;
     private registeredWrappers = new Set<string>();

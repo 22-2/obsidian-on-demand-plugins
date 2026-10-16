@@ -17,5 +17,5 @@ export interface AppFeature {
     /**
      * Called when the feature is unloaded (e.g., plugin reload/disable).
      */
-    onunload(): void | Promise<void>;
+    onunload(): void;
 }
