@@ -128,7 +128,9 @@ describe("plugin table rendering", () => {
         await flush();
 
         expect(rowOf("Gamma").querySelector(".lazy-plugin-table-lamp.is-memory-only")).not.toBeNull();
-        expect(rowOf("Gamma").querySelector(".lazy-plugin-table-col-enabled")?.textContent).toBe("Loaded (in memory only)");
+        const cell = rowOf("Gamma").querySelector<HTMLElement>(".lazy-plugin-table-col-enabled")!;
+        expect(cell.textContent).toBe("Loaded");
+        expect(cell.title).toBe("Loaded (in memory only)");
     });
 
     it("ignores an unreadable community-plugins.json", async () => {
@@ -280,12 +282,11 @@ describe("plugin table mode editing", () => {
 
     it("shows the draft bar and hands review and discard to the draft", () => {
         const { root, drafts, table, pendingButton } = setup();
-        expect(root.querySelector(".lazy-plugin-table-pending-text")?.textContent).toBe("No unsaved changes");
-        expect(pendingButton("Review & save…").disabled).toBe(true);
+        // Like the settings bar, nothing shows while the draft is clean.
+        expect(root.querySelector(".lazy-plugin-table-pending")?.childElementCount).toBe(0);
 
         drafts.hasPendingChanges = true;
         table.refreshPendingBar();
-        expect(root.querySelector(".lazy-plugin-table-pending")?.classList.contains("has-pending-changes")).toBe(true);
         expect(root.querySelector(".lazy-plugin-table-pending-text")?.textContent).toContain("1 unsaved change");
         pendingButton("Review & save…").click();
         pendingButton("Discard…").click();

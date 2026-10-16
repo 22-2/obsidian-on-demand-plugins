@@ -84,8 +84,8 @@ const TEXT_FILTER_COLUMNS = new Set(["name", "id", "author", "description"]);
 const DEFAULT_WIDTHS: Record<string, number> = {
     name: 240,
     author: 140,
-    enabled: 130,
-    mode: 250,
+    enabled: 110,
+    mode: 220,
     actions: 52,
 };
 
@@ -363,22 +363,16 @@ export class PluginTable {
 
     private renderPendingBar(): void {
         const drafts = this.host.drafts;
-        const hasChanges = drafts.hasPendingChanges;
         this.pendingEl.empty();
-        this.pendingEl.toggleClass("has-pending-changes", hasChanges);
-        const text = this.pendingEl.createSpan({ cls: "lazy-plugin-table-pending-text" });
-        if (hasChanges) text.append(pendingSummary(drafts.describeChanges()));
-        else text.setText("No unsaved changes");
+        // Like the settings bar, the controls appear only while there is something to save.
+        if (!drafts.hasPendingChanges) return;
+        this.pendingEl.createSpan({ cls: "lazy-plugin-table-pending-text" }).append(pendingSummary(drafts.describeChanges()));
         // The handlers stay synchronous so Obsidian does not keep a spinner on the button for the whole review.
         new ButtonComponent(this.pendingEl)
             .setButtonText("Review & save…")
             .setCta()
-            .setDisabled(!hasChanges)
             .onClick(() => void drafts.reviewAndSave());
-        new ButtonComponent(this.pendingEl)
-            .setButtonText("Discard…")
-            .setDisabled(!hasChanges)
-            .onClick(() => void drafts.discardChanges());
+        new ButtonComponent(this.pendingEl).setButtonText("Discard…").onClick(() => void drafts.discardChanges());
     }
 
     private getWidth(id: string): number | undefined {
@@ -539,7 +533,8 @@ export class PluginTable {
         const lamp = td.createSpan({ cls: "lazy-plugin-table-lamp", attr: { "aria-hidden": "true" } });
         lamp.toggleClass("is-loaded", data.enabled);
         lamp.toggleClass("is-memory-only", data.memoryOnly);
-        td.createSpan({ text: data.status });
+        // A short label keeps the column narrow; the lamp colour and the tooltip carry the in-memory detail.
+        td.createSpan({ text: data.enabled ? "Loaded" : "Not loaded" });
         td.title = data.status;
     }
 
@@ -558,14 +553,14 @@ export class PluginTable {
         this.syncModeControls(data);
     }
 
-    /** The lazy options only take effect in Lazy on demand, so the gear stays in place but disabled otherwise. */
+    /** The lazy options only take effect in Lazy on demand, so the gear shows only there. */
     private syncModeControls(data: PluginTableRow): void {
         const controls = this.rowControls.get(data.id);
         if (!controls?.gear || !controls.dropdown) return;
         controls.dropdown.setValue(data.mode);
         const isLazy = data.mode === PLUGIN_MODE.LAZY;
-        controls.gear.setDisabled(!isLazy);
-        controls.gear.setTooltip(isLazy ? "Lazy settings" : "Lazy settings apply to Lazy on demand only");
+        controls.gear.setDisabled(!isLazy).setTooltip("Lazy settings");
+        // Hidden but still taking its place, so the dropdowns stay aligned across rows.
         controls.gear.extraSettingsEl.toggleClass("is-disabled", !isLazy);
     }
 

@@ -918,10 +918,6 @@ button.lazy-plugin-table-summary-item.is-active {
 }
 
 .lazy-plugin-table-pending-text {
-    color: var(--text-faint);
-}
-
-.lazy-plugin-table-pending.has-pending-changes .lazy-plugin-table-pending-text {
     color: var(--text-normal);
 }
 
@@ -985,13 +981,32 @@ button.lazy-plugin-table-summary-item.is-active {
 }
 
 .lazy-plugin-table-filter-row th {
-    padding: var(--size-4-1) var(--size-4-2);
+    padding: 0 var(--size-4-1) var(--size-4-1);
     background-color: var(--background-secondary);
 }
 
-.lazy-plugin-table-filter-input {
+/* Flat and short: a full form field per column made the header read as a second table. */
+.lazy-plugin-table .lazy-plugin-table-filter-input {
     width: 100%;
+    height: 24px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-s);
+    background-color: var(--background-modifier-form-field);
+    box-shadow: none;
     font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-table input.lazy-plugin-table-filter-input {
+    padding: 0 var(--size-4-2);
+}
+
+.lazy-plugin-table .lazy-plugin-table-filter-input:hover {
+    border-color: var(--background-modifier-border);
+}
+
+.lazy-plugin-table .lazy-plugin-table-filter-input:focus {
+    border-color: var(--interactive-accent);
+    box-shadow: none;
 }
 
 .lazy-plugin-table tbody tr:hover {
@@ -1067,16 +1082,32 @@ button.lazy-plugin-table-summary-item.is-active {
     min-width: 0;
 }
 
+/* Every row has one, so it reads as plain text until the row is pointed at or focused;
+   the chevron alone says it can be changed. */
 .lazy-plugin-table-mode-cell .dropdown {
     flex: 1 1 auto;
     min-width: 0;
+    height: 26px;
+    border: 1px solid transparent;
+    background-color: transparent;
+    box-shadow: none;
+    color: inherit;
     font-size: var(--font-ui-smaller);
 }
 
-/* Disabled, not hidden, so the dropdowns stay aligned across rows. */
+.lazy-plugin-table tbody tr:hover .lazy-plugin-table-mode-cell .dropdown,
+.lazy-plugin-table-mode-cell .dropdown:focus-visible {
+    border-color: var(--background-modifier-border);
+    background-color: var(--interactive-normal);
+}
+
+.lazy-plugin-table tbody tr.is-loaded .lazy-plugin-table-mode-cell .dropdown {
+    color: var(--text-normal);
+}
+
+/* Hidden, not removed, so the dropdowns stay aligned across rows. */
 .lazy-plugin-table-mode-cell .clickable-icon.is-disabled {
-    opacity: 0.35;
-    cursor: default;
+    visibility: hidden;
 }
 
 .lazy-plugin-table-td.lazy-plugin-table-col-actions {

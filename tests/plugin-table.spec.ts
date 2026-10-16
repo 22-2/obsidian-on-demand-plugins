@@ -50,7 +50,7 @@ test("plugin table stages a mode from its column and saves it through the shared
     await expect(review.getByText("🚀 Lazy on layout ready", { exact: true })).toBeVisible();
     await review.getByRole("button", { name: "Save & apply (1)", exact: true }).click();
 
-    await expect(pending).toContainText("No unsaved changes");
+    await expect(pending.getByRole("button")).toHaveCount(0);
     await expect.poll(() => reload.requested()).toBe(true);
     await reload.restore();
     expect(await modeOf(obsidian)).toBe("lazyOnLayoutReady");
