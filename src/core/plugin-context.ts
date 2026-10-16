@@ -14,32 +14,6 @@ import type OnDemandPlugin from "src/main";
 export type SettingsChange = (data: LazySettings, profileId: string) => void | Promise<void>;
 
 /**
- * Minimal view of Obsidian's `Commands` object used by services.
- */
-// export interface ObsidianCommands {
-//     commands: Record<string, unknown>;
-//     addCommand: (command: {
-//         id: string;
-//         name: string;
-//         icon?: string;
-//         callback: () => Promise<void>;
-//     }) => void;
-//     removeCommand?: (id: string) => void;
-// }
-
-/**
- * Minimal view of Obsidian's `Plugins` object used by services.
- */
-// export interface ObsidianPlugins {
-//     manifests: Record<string, PluginManifest>;
-//     enabledPlugins: Set<string>;
-//     plugins?: PluginsMap;
-//     enablePlugin: (id: string) => Promise<void>;
-//     disablePlugin: (id: string) => Promise<void>;
-//     loadingPluginId?: string;
-// }
-
-/**
  * The shared context that every service can depend on.
  *
  * This replaces the numerous `*Deps` interfaces that were

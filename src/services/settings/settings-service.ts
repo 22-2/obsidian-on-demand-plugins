@@ -172,11 +172,6 @@ export class SettingsService {
         return Object.keys(this.data.profiles)[0] || DEFAULT_PROFILE_ID;
     }
 
-    /**
-     * Older versions persisted command-cache fields in data.json; the live cache
-     * now lives in vault-scoped storage, so any copy here is stale bloat. Runs on
-     * every load so already-migrated installs get cleaned too.
-     */
     /** Pre-release builds stored this per profile; adopt the active profile's value once, then keep it shared. */
     private normalizeRestoreDraftBehavior(loaded: Partial<LazySettings>) {
         const fromProfile = (this.data.profiles[this.currentProfileId]?.settings as unknown as Partial<Record<string, unknown>> | undefined)?.restoreDraftBehavior;
@@ -185,6 +180,11 @@ export class SettingsService {
         for (const profile of Object.values(this.data.profiles)) delete (profile.settings as unknown as Partial<Record<string, unknown>>).restoreDraftBehavior;
     }
 
+    /**
+     * Older versions persisted command-cache fields in data.json; the live cache
+     * now lives in vault-scoped storage, so any copy here is stale bloat. Runs on
+     * every load so already-migrated installs get cleaned too.
+     */
     private dropDeadFields() {
         const data: LazySettings & LegacyDeadFields = this.data;
         delete data.commandCache;

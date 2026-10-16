@@ -31,9 +31,10 @@ export class FeatureManager {
         }
     }
 
-    async unloadAll() {
+    /** Synchronous because Obsidian's `Plugin.onunload` is; core teardown runs right after. */
+    unloadAll() {
         for (const feature of this.features) {
-            await feature.onunload();
+            feature.onunload();
         }
     }
 }
