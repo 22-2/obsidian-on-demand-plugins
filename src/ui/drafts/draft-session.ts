@@ -93,7 +93,11 @@ export class DraftSession {
 
     /** Remember the page to offer after a close; navigating while a surface stays open keeps edits live. */
     requestRestoreOnPageClose(page: RestorePage) {
-        if (this.pending.hasChanges) this.restoreOfferRequested.add(page);
+        if (!this.pending.hasChanges) return;
+        this.restoreOfferRequested.add(page);
+        // The settings list and the table show the same plugin draft, so either one offers it back.
+        if (page === "plugin-management") this.restoreOfferRequested.add("plugin-table");
+        if (page === "plugin-table") this.restoreOfferRequested.add("plugin-management");
     }
     /** Offer a stashed draft only after its page was previously left. */
     offerRestoreOnPageOpen(page: RestorePage) {
