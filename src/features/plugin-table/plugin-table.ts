@@ -544,13 +544,14 @@ export class PluginTable {
         const wrapper = td.createDiv({ cls: "lazy-plugin-table-mode-cell" });
         // Editing a mode is not a row click, so it never changes the selection.
         wrapper.addEventListener("click", (evt) => evt.stopPropagation());
-        controls.gear = new ExtraButtonComponent(wrapper).setIcon("settings").onClick(() => this.openLazyOptions(data.id));
         controls.dropdown = addModeOptions(new DropdownComponent(wrapper))
             .setValue(data.mode)
             .onChange((value) => {
                 if (isPluginMode(value)) this.applyMode([data.id], value);
             });
         controls.dropdown.selectEl.setAttr("aria-label", `Mode for ${data.name}`);
+        // The gear follows the dropdown, as the options belong to the mode chosen there.
+        controls.gear = new ExtraButtonComponent(wrapper).setIcon("settings").onClick(() => this.openLazyOptions(data.id));
         this.syncModeControls(data);
     }
 
