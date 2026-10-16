@@ -35,7 +35,7 @@ export default class OnDemandPlugin extends Plugin {
 
     async onload() {
         const ctx = createPluginContext(this);
-        this.core = new CoreContainer(ctx);
+        this.core = new CoreContainer(ctx, this);
         this.events = new EventBus();
 
         this.features = new FeatureManager(ctx, this.core, this.events);
@@ -216,14 +216,7 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     async updatePluginSettings(pluginId: string, mode: PLUGIN_MODE) {
-        // Mode changes must not erase the plugin's advanced lazy rules; those
-        // rules are independent of whether the plugin is currently enabled.
-        await this.saveSettingsChange((data, profileId) => {
-            const plugins = data.profiles[profileId].settings.plugins;
-            plugins[pluginId] = { ...(plugins[pluginId] ?? {}), mode, userConfigured: true };
-        });
-        const lazyEngine = this.features.get(LazyEngineFeature);
-        await lazyEngine!.applyPluginState(pluginId);
+        await this.features.get(LazyEngineFeature)!.setPluginMode(pluginId, mode);
     }
 
     async applyStartupPolicyAndRestart(pluginIds?: string[]) {

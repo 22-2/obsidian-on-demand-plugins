@@ -1,16 +1,17 @@
 import log from "loglevel";
 import type { EventBus } from "src/core/event-bus";
 import type { FeatureManager } from "src/core/feature-manager";
-import type { PluginContext } from "src/core/plugin-context";
+import type { PluginContext, SettingsChange } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
+import type { EnableDisableHooks } from "src/patches/plugin-enable-disable";
 import type { CoreContainer } from "src/services/core-container";
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The feature wires together services that each have their own tests. Replace them
 // with stubs so these tests cover only the feature's orchestration logic.
-const mocks = vi.hoisted(() => ({}) as { cache: CacheMock; runner: RunnerMock });
+const mocks = vi.hoisted(() => ({}) as { cache: CacheMock; runner: RunnerMock; enableDisableHooks?: EnableDisableHooks });
 
 vi.mock("src/features/lazy-engine/command-cache/command-cache-service", () => ({
     CommandCacheService: class {
@@ -40,6 +41,11 @@ vi.mock("src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock", () =>
     LeafLockManager: class {},
     LeafViewLockStrategy: class {},
 }));
+vi.mock("src/patches/plugin-enable-disable", () => ({
+    patchPluginEnableDisable: (_ctx: unknown, hooks: EnableDisableHooks) => {
+        mocks.enableDisableHooks = hooks;
+    },
+}));
 vi.mock("src/patches/plugin-load", () => ({ patchPluginLoad: () => () => {} }));
 vi.mock("src/patches/plugin-initialization", () => ({ patchPluginInitialization: () => () => {} }));
 vi.mock("src/patches/ribbon-reorder", () => ({ patchRibbonReorder: () => {} }));
@@ -67,6 +73,7 @@ function createCacheMock(calls: string[]) {
         ensureCommandsCached: vi.fn(async (id: string): Promise<void> => {
             calls.push(`ensureCommandsCached:${id}`);
         }),
+        syncCommandWrappersForPlugin: vi.fn(),
         getStaleCachedPluginIds: vi.fn((): string[] => []),
         refreshStaleCacheForPlugin: vi.fn(async (id: string): Promise<void> => {
             calls.push(`refreshStale:${id}`);
@@ -92,6 +99,7 @@ function createRunnerMock(calls: string[], instances: Record<string, { _loaded: 
 
 function setup(options: { modes?: Record<string, Mode>; loaded?: string[]; layoutReady?: boolean; runLayoutReadyCallback?: boolean } = {}) {
     const modes = options.modes ?? {};
+    const saved = { profiles: { p: { settings: { plugins: {} as Record<string, { mode: Mode; userConfigured?: boolean; lazyOnViews?: string[] }> } } } };
     const calls: string[] = [];
     const instances: Record<string, { _loaded: boolean }> = {};
     for (const id of options.loaded ?? []) instances[id] = { _loaded: true };
@@ -128,6 +136,11 @@ function setup(options: { modes?: Record<string, Mode>; loaded?: string[]; layou
         register: vi.fn(),
         getManifests: () => Object.keys(modes).map((id) => ({ id, name: id, version: "1.0.0" })),
         getPluginMode: (id: string) => modes[id] ?? PLUGIN_MODE.ALWAYS_DISABLED,
+        saveSettingsChange: vi.fn(async (change: SettingsChange) => {
+            calls.push("saveSettingsChange");
+            await change(saved as never, "p");
+            for (const [id, entry] of Object.entries(saved.profiles.p.settings.plugins)) modes[id] = entry.mode;
+        }),
     } as unknown as PluginContext;
 
     const feature = new LazyEngineFeature();
@@ -140,6 +153,7 @@ function setup(options: { modes?: Record<string, Mode>; loaded?: string[]; layou
         cache: mocks.cache,
         runner: mocks.runner,
         calls,
+        saved,
         isLoaded: (id: string) => Boolean(instances[id]?._loaded),
         fireLayoutReady: () => layoutReadyCallback?.(),
     };
@@ -363,6 +377,30 @@ describe("LazyEngineFeature layout-ready flow", () => {
 
         expect(t.runner.ensurePluginLoaded).toHaveBeenCalledTimes(ids.length);
         expect(maximum).toBe(3);
+    });
+});
+
+describe("LazyEngineFeature.setPluginMode", () => {
+    it("saves the mode without dropping the plugin's lazy rules, then applies it", async () => {
+        const t = setup({ modes: { a: PLUGIN_MODE.ALWAYS_DISABLED } });
+        t.saved.profiles.p.settings.plugins.a = { mode: PLUGIN_MODE.ALWAYS_DISABLED, lazyOnViews: ["markdown"] };
+        t.calls.length = 0;
+
+        await t.feature.setPluginMode("a", PLUGIN_MODE.ALWAYS_ENABLED);
+
+        expect(t.saved.profiles.p.settings.plugins.a).toEqual({ mode: PLUGIN_MODE.ALWAYS_ENABLED, userConfigured: true, lazyOnViews: ["markdown"] });
+        expect(t.calls).toEqual(["saveSettingsChange", "enable:a", "waitForPluginLoaded:a", "removeCachedCommandsForPlugin:a"]);
+    });
+
+    it("is what the enable/disable patch calls, alongside the command cache wrapper sync", async () => {
+        const t = setup({ modes: { a: PLUGIN_MODE.LAZY } });
+        const hooks = mocks.enableDisableHooks!;
+
+        hooks.syncCommandWrappers("a");
+        await hooks.setPluginMode("a", PLUGIN_MODE.ALWAYS_DISABLED);
+
+        expect(t.cache.syncCommandWrappersForPlugin).toHaveBeenCalledWith("a");
+        expect(t.saved.profiles.p.settings.plugins.a).toEqual({ mode: PLUGIN_MODE.ALWAYS_DISABLED, userConfigured: true });
     });
 });
 

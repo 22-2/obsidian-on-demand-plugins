@@ -11,7 +11,7 @@ describe("BackupFeature", () => {
         remove: ReturnType<typeof vi.fn>;
     };
     let mockCtx: {
-        _plugin: { manifest: { dir: string }; core: { settingsService: { isFirstLoad: boolean; data: { profiles: Record<string, unknown> } } } };
+        manifest: { dir: string };
         app: {
             vault: {
                 adapter: typeof mockAdapter;
@@ -33,18 +33,8 @@ describe("BackupFeature", () => {
         };
 
         mockCtx = {
-            _plugin: {
-                manifest: {
-                    dir: "mock/plugin/dir",
-                },
-                core: {
-                    settingsService: {
-                        isFirstLoad: false,
-                        data: {
-                            profiles: {},
-                        },
-                    },
-                },
+            manifest: {
+                dir: "mock/plugin/dir",
             },
             app: {
                 vault: {
