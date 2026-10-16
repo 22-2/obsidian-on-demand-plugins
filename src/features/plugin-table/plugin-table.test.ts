@@ -14,7 +14,8 @@ import { openPluginDirectory } from "src/ui/settings/helpers";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("obsidian", async () => ({ ...(await import("src/__mocks__/obsidian")), ...(await import("src/__mocks__/obsidian-ui")), setTooltip: () => {} }));
+// Obsidian's setTooltip also stores the text as the element's aria-label.
+vi.mock("obsidian", async () => ({ ...(await import("src/__mocks__/obsidian")), ...(await import("src/__mocks__/obsidian-ui")), setTooltip: (el: HTMLElement, text: string) => el.setAttribute("aria-label", text) }));
 vi.mock("src/ui/show-in-community-plugins", () => ({ showInCommunityPlugins: vi.fn() }));
 vi.mock("src/ui/settings/helpers", async (importOriginal) => ({ ...(await importOriginal<typeof import("src/ui/settings/helpers")>()), openPluginDirectory: vi.fn() }));
 
@@ -113,7 +114,8 @@ describe("plugin table rendering", () => {
         expect(alpha.querySelector(".lazy-plugin-table-update-icon")).not.toBeNull();
         // The author sits beside the name instead of in a column of its own.
         expect(alpha.querySelector(".lazy-plugin-table-author")?.textContent).toBe("Ann");
-        expect(alpha.querySelector<HTMLElement>(".lazy-plugin-table-col-name")!.title).toBe("Alpha by Ann");
+        expect(alpha.querySelector(".lazy-plugin-table-col-name")!.getAttribute("aria-label")).toBe("Alpha by Ann");
+        expect(alpha.querySelector(".lazy-plugin-table-col-description")!.getAttribute("aria-label")).toBe("First plugin");
         expect(root.querySelector("thead .lazy-plugin-table-col-author")).toBeNull();
         expect(rowOf("Beta").classList.contains("is-loaded")).toBe(true);
         expect(rowOf("Beta").querySelector(".lazy-plugin-table-lamp.is-loaded")).not.toBeNull();
@@ -133,7 +135,7 @@ describe("plugin table rendering", () => {
         expect(rowOf("Gamma").querySelector(".lazy-plugin-table-lamp.is-memory-only")).not.toBeNull();
         const cell = rowOf("Gamma").querySelector<HTMLElement>(".lazy-plugin-table-col-loaded")!;
         expect(cell.textContent).toBe("Yes");
-        expect(cell.title).toBe("Loaded (in memory only)");
+        expect(cell.getAttribute("aria-label")).toBe("Loaded (in memory only)");
     });
 
     it("ignores an unreadable community-plugins.json", async () => {
@@ -405,7 +407,9 @@ describe("plugin table edge cases", () => {
         const { rowOf } = setup({ extra: [{ id: "delta", name: "Delta", version: "4.0.0" } as PluginManifest] });
         const delta = rowOf("Delta");
         expect(delta.querySelector(".lazy-plugin-table-author")).toBeNull();
-        expect(delta.querySelector<HTMLElement>(".lazy-plugin-table-col-name")!.title).toBe("Delta");
+        expect(delta.querySelector(".lazy-plugin-table-col-name")!.getAttribute("aria-label")).toBe("Delta");
+        // An empty cell gets no tooltip.
+        expect(delta.querySelector(".lazy-plugin-table-col-description")!.hasAttribute("aria-label")).toBe(false);
         expect(delta.querySelector(".lazy-plugin-table-col-description")?.textContent).toBe("");
     });
 

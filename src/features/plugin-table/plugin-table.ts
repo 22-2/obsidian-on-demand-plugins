@@ -517,7 +517,8 @@ export class PluginTable {
                         // The remaining columns are the plain text fields.
                         const text = typeof value === "string" ? value : "";
                         td.setText(text);
-                        td.title = text;
+                        // The cell ellipsizes, so the tooltip carries the full text.
+                        if (text) setTooltip(td, text);
                     }
                 }
             }
@@ -535,7 +536,7 @@ export class PluginTable {
      */
     private renderNameCell(td: HTMLElement, data: PluginTableRow): void {
         td.createSpan({ cls: "lazy-plugin-table-name", text: data.name });
-        td.title = data.author ? `${data.name} by ${data.author}` : data.name;
+        setTooltip(td, data.author ? `${data.name} by ${data.author}` : data.name);
         const version = td.createSpan({ cls: "lazy-plugin-table-version" });
         if (data.latestVersion) {
             const icon = version.createSpan({ cls: "lazy-plugin-table-update-icon" });
@@ -558,7 +559,7 @@ export class PluginTable {
         lamp.toggleClass("is-memory-only", data.memoryOnly);
         // The lamp colour and the tooltip carry the in-memory detail.
         td.createSpan({ text: data.loaded ? "Yes" : "No" });
-        td.title = data.status;
+        setTooltip(td, data.status);
     }
 
     private renderModeCell(td: HTMLElement, data: PluginTableRow, controls: RowControls): void {
