@@ -34,4 +34,28 @@ describe("plugin table row selection", () => {
 
         expect(selection.ids(visible)).toEqual(["b"]);
     });
+
+    it("ignores rows that are not on screen", () => {
+        const selection = new RowSelection();
+        selection.select("z", visible, plain);
+        expect(selection.ids(visible)).toEqual([]);
+    });
+
+    it("adds a range to the selection with the toggle modifier", () => {
+        const selection = new RowSelection();
+        selection.select("a", visible, plain);
+        selection.select("c", visible, { toggle: true, range: false });
+        selection.select("d", visible, { toggle: true, range: true });
+        expect(selection.ids(visible)).toEqual(["a", "c", "d"]);
+    });
+
+    it("forgets the anchor once its row is hidden", () => {
+        const selection = new RowSelection();
+        selection.retain(visible);
+        selection.select("b", visible, plain);
+        selection.retain(["c"]);
+        // Without an anchor, a range click selects just the clicked row.
+        selection.select("d", visible, { toggle: false, range: true });
+        expect(selection.ids(visible)).toEqual(["d"]);
+    });
 });
