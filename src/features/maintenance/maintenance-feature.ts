@@ -39,7 +39,7 @@ export class MaintenanceFeature implements AppFeature {
 
     /** Rebuild commands and views together; retain the method name for existing callers. */
     async rebuildAndApplyCommandCache(options?: { force?: boolean; externalChangesConfirmed?: boolean }) {
-        await this.events.emit(FeatureEvents.REBUILD_CACHE_REQUESTED, options);
+        await this.events.emit(FeatureEvents.REBUILD_CACHE_REQUESTED, options ?? {});
     }
 
     async buildSyncPreview(direction: SyncDirection): Promise<SyncPreviewResult> {
