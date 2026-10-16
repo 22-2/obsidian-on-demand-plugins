@@ -428,8 +428,9 @@
     background: var(--color-green);
 }
 
+/* Lazy loading keeps plugins out of community-plugins.json, so this is the usual state, not a warning. */
 .lazy-plugin-enabled-badge.is-memory-only::before {
-    background: var(--text-warning);
+    background: var(--color-blue);
 }
 
 .lazy-plugin-meta-badge {
@@ -910,15 +911,25 @@ button.lazy-plugin-table-summary-item.is-active {
 
 .lazy-plugin-table-pending {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    min-width: 0;
     align-items: center;
     justify-content: flex-end;
     gap: var(--size-4-2);
     margin-left: auto;
 }
 
+/* On a narrow pane the summary gives way first, so the two buttons stay on one line. */
 .lazy-plugin-table-pending-text {
+    min-width: 0;
+    overflow: hidden;
     color: var(--text-normal);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lazy-plugin-table-pending button {
+    flex: 0 0 auto;
 }
 
 .lazy-plugin-table-wrapper {
@@ -1067,7 +1078,7 @@ button.lazy-plugin-table-summary-item.is-active {
 }
 
 .lazy-plugin-table-lamp.is-memory-only {
-    background: var(--text-warning);
+    background: var(--color-blue);
 }
 
 .lazy-plugin-table-td.lazy-plugin-table-col-mode {
@@ -1095,14 +1106,26 @@ button.lazy-plugin-table-summary-item.is-active {
     font-size: var(--font-ui-smaller);
 }
 
-.lazy-plugin-table tbody tr:hover .lazy-plugin-table-mode-cell .dropdown,
+.lazy-plugin-table-mode-cell .dropdown:hover,
+.lazy-plugin-table-mode-cell .dropdown:focus,
 .lazy-plugin-table-mode-cell .dropdown:focus-visible {
-    border-color: var(--background-modifier-border);
-    background-color: var(--interactive-normal);
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+/* The dropdown stays flat when focused, so the row marks where the keyboard is instead. */
+.lazy-plugin-table tbody tr:focus-within {
+    background-color: var(--background-modifier-hover);
 }
 
 .lazy-plugin-table tbody tr.is-loaded .lazy-plugin-table-mode-cell .dropdown {
     color: var(--text-normal);
+}
+
+.lazy-plugin-table-author {
+    margin-left: var(--size-4-2);
+    color: var(--text-faint);
 }
 
 /* Hidden, not removed, so the dropdowns stay aligned across rows. */

@@ -111,7 +111,10 @@ describe("plugin table rendering", () => {
         const alpha = rowOf("Alpha");
         expect(alpha.querySelector(".lazy-plugin-table-version")?.textContent).toBe("1.0.0");
         expect(alpha.querySelector(".lazy-plugin-table-update-icon")).not.toBeNull();
-        expect(alpha.querySelector(".lazy-plugin-table-col-author")?.textContent).toBe("Ann");
+        // The author sits beside the name instead of in a column of its own.
+        expect(alpha.querySelector(".lazy-plugin-table-author")?.textContent).toBe("Ann");
+        expect(alpha.querySelector<HTMLElement>(".lazy-plugin-table-col-name")!.title).toBe("Alpha by Ann");
+        expect(root.querySelector("thead .lazy-plugin-table-col-author")).toBeNull();
         expect(rowOf("Beta").classList.contains("is-loaded")).toBe(true);
         expect(rowOf("Beta").querySelector(".lazy-plugin-table-lamp.is-loaded")).not.toBeNull();
         expect(summary("enabled").querySelector("strong")?.textContent).toBe("1");
@@ -128,8 +131,8 @@ describe("plugin table rendering", () => {
         await flush();
 
         expect(rowOf("Gamma").querySelector(".lazy-plugin-table-lamp.is-memory-only")).not.toBeNull();
-        const cell = rowOf("Gamma").querySelector<HTMLElement>(".lazy-plugin-table-col-enabled")!;
-        expect(cell.textContent).toBe("Loaded");
+        const cell = rowOf("Gamma").querySelector<HTMLElement>(".lazy-plugin-table-col-loaded")!;
+        expect(cell.textContent).toBe("Yes");
         expect(cell.title).toBe("Loaded (in memory only)");
     });
 
@@ -139,7 +142,8 @@ describe("plugin table rendering", () => {
         table.refresh();
         await flush();
 
-        expect(rowOf("Beta").querySelector(".lazy-plugin-table-col-enabled")?.textContent).toBe("Loaded");
+        expect(rowOf("Beta").querySelector(".lazy-plugin-table-col-loaded")?.textContent).toBe("Yes");
+        expect(rowOf("Alpha").querySelector(".lazy-plugin-table-col-loaded")?.textContent).toBe("No");
     });
 
     it("adds a row menu button only on touch layouts", () => {
@@ -167,11 +171,15 @@ describe("plugin table filters and sorting", () => {
         const { root, names } = setup();
         change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Name']")!, "a");
         expect(names()).toEqual(["Beta", "Alpha", "Gamma"]);
+        // The name filter also finds a plugin by its author.
+        change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Name']")!, "BOB");
+        expect(names()).toEqual(["Beta"]);
+        change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Name']")!, "");
         change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Description']")!, "second");
         expect(names()).toEqual(["Beta"]);
         change(root.querySelector<HTMLInputElement>("input[aria-label='Filter Description']")!, "");
 
-        change(root.querySelector<HTMLSelectElement>("select[aria-label='Filter Enabled']")!, "false");
+        change(root.querySelector<HTMLSelectElement>("select[aria-label='Filter Loaded']")!, "false");
         expect(names()).toEqual(["Alpha", "Gamma"]);
         change(root.querySelector<HTMLSelectElement>("select[aria-label='Filter Mode']")!, PLUGIN_MODE.ALWAYS_DISABLED);
         expect(names()).toEqual(["Gamma"]);
@@ -216,31 +224,35 @@ describe("plugin table filters and sorting", () => {
         rightClick(header("name")).find("Sort ascending")!.click();
         expect(names()).toEqual(["Alpha", "Beta", "Gamma"]);
 
-        const columns = rightClick(header("author")).find("Columns")!.submenu!;
-        expect(columns.items.map((item) => item.title)).toEqual(["ID", "Author", "Enabled", "Mode", "Description"]);
-        columns.find("Author")!.click();
-        expect(root.querySelector("thead .lazy-plugin-table-col-author")).toBeNull();
-        expect(onStateChange.mock.lastCall?.[0].columnVisibility.author).toBe(false);
+        const columns = rightClick(header("description")).find("Columns")!.submenu!;
+        expect(columns.items.map((item) => item.title)).toEqual(["ID", "Loaded", "Mode", "Description"]);
+        columns.find("Description")!.click();
+        expect(root.querySelector("thead .lazy-plugin-table-col-description")).toBeNull();
+        expect(onStateChange.mock.lastCall?.[0].columnVisibility.description).toBe(false);
     });
 
     it("resizes a column by dragging its handle", () => {
         const { header, onStateChange, root } = setup();
-        const handle = header("author").querySelector<HTMLElement>(".lazy-plugin-table-resizer")!;
+        const handle = header("loaded").querySelector<HTMLElement>(".lazy-plugin-table-resizer")!;
         handle.setPointerCapture = () => {};
         handle.dispatchEvent(new PointerEvent("pointerdown", { clientX: 100, pointerId: 1 }));
         handle.dispatchEvent(new PointerEvent("pointermove", { clientX: 10 }));
         handle.dispatchEvent(new PointerEvent("pointerup"));
 
         // happy-dom has no layout, so the drag starts from a zero width and stops at the minimum.
-        expect(onStateChange).toHaveBeenLastCalledWith(expect.objectContaining({ columnWidths: { author: 60 } }));
-        const authorCol = root.querySelectorAll("col")[1] as HTMLElement;
-        expect(authorCol.style.width).toBe("60px");
+        expect(onStateChange).toHaveBeenLastCalledWith(expect.objectContaining({ columnWidths: { loaded: 60 } }));
+        const loadedCol = root.querySelectorAll("col")[1] as HTMLElement;
+        expect(loadedCol.style.width).toBe("60px");
+        // The table's minimum width follows, so it still scrolls sideways instead of squeezing a column.
+        expect(root.querySelector<HTMLElement>(".lazy-plugin-table")!.style.minWidth).toBe("840px");
     });
 
     it("restores saved widths and keeps sorting clicks off the resize handle", () => {
-        const state = { ...defaultTableState(false), columnWidths: { name: 300 } };
+        const state = { ...defaultTableState(false), columnWidths: { name: 300, mode: 210 } };
         const { header, root, names } = setup({ state });
         expect((root.querySelector("col") as HTMLElement).style.width).toBe("300px");
+        // Name, loaded and mode widths, plus the description's minimum.
+        expect(root.querySelector<HTMLElement>(".lazy-plugin-table")!.style.minWidth).toBe("840px");
         header("name").querySelector<HTMLElement>(".lazy-plugin-table-resizer")!.click();
         expect(names()).toEqual(["Beta", "Alpha", "Gamma"]);
     });
@@ -256,6 +268,7 @@ describe("plugin table mode editing", () => {
 
         expect(drafts.pendingPluginIds.has("alpha")).toBe(true);
         expect(drafts.markDirty).toHaveBeenCalledOnce();
+        // Lazy options only apply to Lazy on demand, so the gear hides but keeps its place.
         expect(gear(alpha).classList.contains("is-disabled")).toBe(true);
         // The row stays where it was until the filters or sorting change.
         expect(names()).toEqual(["Beta", "Alpha", "Gamma"]);
@@ -391,7 +404,8 @@ describe("plugin table edge cases", () => {
     it("shows blank cells for a manifest without an author or description", () => {
         const { rowOf } = setup({ extra: [{ id: "delta", name: "Delta", version: "4.0.0" } as PluginManifest] });
         const delta = rowOf("Delta");
-        expect(delta.querySelector(".lazy-plugin-table-col-author")?.textContent).toBe("");
+        expect(delta.querySelector(".lazy-plugin-table-author")).toBeNull();
+        expect(delta.querySelector<HTMLElement>(".lazy-plugin-table-col-name")!.title).toBe("Delta");
         expect(delta.querySelector(".lazy-plugin-table-col-description")?.textContent).toBe("");
     });
 

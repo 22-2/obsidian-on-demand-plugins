@@ -1,6 +1,6 @@
 import type { SortingState } from "@tanstack/table-core";
 
-export const PLUGIN_TABLE_COLUMN_IDS = ["name", "id", "author", "enabled", "mode", "description", "actions"] as const;
+export const PLUGIN_TABLE_COLUMN_IDS = ["name", "id", "loaded", "mode", "description", "actions"] as const;
 export type PluginTableColumnId = (typeof PLUGIN_TABLE_COLUMN_IDS)[number];
 
 /** Filters are intentionally excluded so each view opens with an unfiltered list. */
@@ -12,14 +12,11 @@ export interface PluginTableState {
 
 export const MIN_COLUMN_WIDTH = 60;
 
-/** Phones hide the long text columns at first so the name and mode fit without scrolling sideways. */
+/** Phones hide the description at first so the name and mode fit without scrolling sideways. */
 export function defaultTableState(isPhone: boolean): PluginTableState {
     const columnVisibility: Record<string, boolean> = { id: false };
-    if (isPhone) {
-        columnVisibility.author = false;
-        columnVisibility.description = false;
-    }
-    return { sorting: [{ id: "enabled", desc: true }], columnVisibility, columnWidths: {} };
+    if (isPhone) columnVisibility.description = false;
+    return { sorting: [{ id: "loaded", desc: true }], columnVisibility, columnWidths: {} };
 }
 
 function isColumnId(id: unknown): id is PluginTableColumnId {

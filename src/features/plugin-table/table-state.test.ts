@@ -2,8 +2,8 @@ import { defaultTableState, sanitizeTableState } from "src/features/plugin-table
 import { describe, expect, it } from "vitest";
 
 describe("plugin table state", () => {
-    it("hides the long text columns on phones only", () => {
-        expect(defaultTableState(true).columnVisibility).toEqual({ id: false, author: false, description: false });
+    it("hides the description on phones only", () => {
+        expect(defaultTableState(true).columnVisibility).toEqual({ id: false, description: false });
         expect(defaultTableState(false).columnVisibility).toEqual({ id: false });
     });
 
@@ -17,14 +17,14 @@ describe("plugin table state", () => {
         const state = sanitizeTableState(
             {
                 sorting: [{ id: "mode", desc: false }, { id: "removed", desc: true }, { id: "name" }],
-                columnVisibility: { author: false, name: false, actions: true, removed: true },
-                columnWidths: { mode: 300, author: 10, removed: 200 },
+                columnVisibility: { mode: false, name: false, actions: true, removed: true },
+                columnWidths: { mode: 300, loaded: 10, removed: 200 },
             },
             defaultTableState(false),
         );
 
         expect(state.sorting).toEqual([{ id: "mode", desc: false }]);
-        expect(state.columnVisibility).toEqual({ id: false, author: false });
+        expect(state.columnVisibility).toEqual({ id: false, mode: false });
         expect(state.columnWidths).toEqual({ mode: 300 });
     });
 });

@@ -32,11 +32,11 @@ test("plugin table stages a mode from its column and saves it through the shared
     const { view, row } = await openTable(obsidian);
 
     const gear = row.locator(".lazy-plugin-table-mode-cell .clickable-icon");
-    await expect(gear).not.toHaveClass(/is-disabled/);
+    await expect(gear).toBeVisible();
     await row.getByRole("combobox", { name: /^Mode for / }).selectOption("lazyOnLayoutReady");
 
-    // The lazy options apply only to Lazy on demand, so the gear stays in place but disabled.
-    await expect(gear).toHaveClass(/is-disabled/);
+    // The lazy options apply only to Lazy on demand, so the gear hides but keeps its place.
+    await expect(gear).toBeHidden();
     const pending = view.locator(".lazy-plugin-table-pending");
     await expect(pending).toContainText("1 unsaved change · 1 plugin");
     // The table never toggles plugins, so nothing is saved until the review.

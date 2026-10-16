@@ -37,7 +37,7 @@ export interface PluginTableRow {
     description: string;
     dir?: string;
     /** Live runtime state; the staged mode alone cannot tell whether a lazy plugin is loaded now. */
-    enabled: boolean;
+    loaded: boolean;
     /** Loaded although community-plugins.json does not list it, so it will not load after a restart. */
     memoryOnly: boolean;
     status: string;
@@ -65,37 +65,45 @@ const helper = createColumnHelper<Features, PluginTableRow>();
 /** Select filters hold the exact value as a string; choosing "All" removes the filter instead. */
 const equalsFilterFn: FilterFn<Features, PluginTableRow> = (row, columnId, filterValue) => String(row.getValue(columnId)) === String(filterValue);
 
+/** The author sits beside the name, so the name filter finds plugins by either. */
+const nameFilterFn: FilterFn<Features, PluginTableRow> = (row, _columnId, filterValue) => {
+    const query = String(filterValue).toLowerCase();
+    return row.original.name.toLowerCase().includes(query) || row.original.author.toLowerCase().includes(query);
+};
+
 /** Sort modes from the most to the least restrictive, matching the row menu, not alphabetically. */
 const modeSortFn: SortFn<Features, PluginTableRow> = (rowA, rowB) => MODE_ORDER.indexOf(rowA.original.mode) - MODE_ORDER.indexOf(rowB.original.mode);
 
 const columns = helper.columns([
-    helper.accessor("name", { header: "Name", filterFn: "includesString", sortFn: "alphanumeric", enableHiding: false }),
+    helper.accessor("name", { header: "Name", filterFn: nameFilterFn, sortFn: "alphanumeric", enableHiding: false }),
     helper.accessor("id", { header: "ID", filterFn: "includesString", sortFn: "alphanumeric" }),
-    helper.accessor("author", { header: "Author", filterFn: "includesString", sortFn: "alphanumeric" }),
-    helper.accessor("enabled", { header: "Enabled", filterFn: equalsFilterFn, sortFn: "basic" }),
+    helper.accessor("loaded", { header: "Loaded", filterFn: equalsFilterFn, sortFn: "basic" }),
     helper.accessor("mode", { header: "Mode", filterFn: equalsFilterFn, sortFn: modeSortFn }),
     helper.accessor("description", { header: "Description", filterFn: "includesString", sortFn: "alphanumeric" }),
     // Touch screens have no right-click, so phones and tablets get a visible menu button per row.
     helper.display({ id: "actions", header: "", enableHiding: false, enableSorting: false }),
 ]);
 
-const TEXT_FILTER_COLUMNS = new Set(["name", "id", "author", "description"]);
+const TEXT_FILTER_COLUMNS = new Set(["name", "id", "description"]);
 
 const DEFAULT_WIDTHS: Record<string, number> = {
-    name: 240,
-    author: 140,
-    enabled: 110,
-    mode: 220,
+    name: 300,
+    id: 180,
+    loaded: 90,
+    mode: 240,
     actions: 52,
 };
+
+/** Columns without a set width (the description) keep at least this much before the table scrolls sideways. */
+const UNSIZED_MIN_WIDTH = 240;
 
 const SUMMARY_FILTERS = ["all", "enabled", "disabled", "updates"] as const;
 type SummaryFilter = (typeof SUMMARY_FILTERS)[number];
 
 const SUMMARY_LABELS: Record<SummaryFilter, string> = {
     all: "All",
-    enabled: "Enabled",
-    disabled: "Disabled",
+    enabled: "Loaded",
+    disabled: "Not loaded",
     updates: "Updates",
 };
 
@@ -107,7 +115,7 @@ interface SummaryItem {
 /** Controls kept per rendered row so mode edits and load events update cells in place. */
 interface RowControls {
     tr: HTMLElement;
-    enabledCell?: HTMLElement;
+    loadedCell?: HTMLElement;
     gear?: ExtraButtonComponent;
     dropdown?: DropdownComponent;
 }
@@ -162,6 +170,7 @@ export class PluginTable {
     private containerEl: HTMLElement;
     private summaryItems: Record<SummaryFilter, SummaryItem>;
     private pendingEl: HTMLElement;
+    private tableEl: HTMLTableElement;
     private colgroupEl: HTMLTableColElement;
     private theadEl: HTMLTableSectionElement;
     private tbodyEl: HTMLTableSectionElement;
@@ -197,10 +206,10 @@ export class PluginTable {
         this.pendingEl = summary.createDiv({ cls: "lazy-plugin-table-pending" });
 
         const wrapper = this.containerEl.createDiv({ cls: "lazy-plugin-table-wrapper" });
-        const tableEl = wrapper.createEl("table", { cls: "lazy-plugin-table" });
-        this.colgroupEl = tableEl.createEl("colgroup");
-        this.theadEl = tableEl.createEl("thead");
-        this.tbodyEl = tableEl.createEl("tbody");
+        this.tableEl = wrapper.createEl("table", { cls: "lazy-plugin-table" });
+        this.colgroupEl = this.tableEl.createEl("colgroup");
+        this.theadEl = this.tableEl.createEl("thead");
+        this.tbodyEl = this.tableEl.createEl("tbody");
 
         this.saveState = debounce(() => this.options.onStateChange({ sorting: this.sorting, columnVisibility: this.columnVisibility, columnWidths: this.columnWidths }), 500, true);
 
@@ -258,7 +267,7 @@ export class PluginTable {
     refreshLoadState(): void {
         this.rowData = this.rowData.map((row) => ({ ...row, ...this.loadState(row.id) }));
         this.syncOptions();
-        for (const row of this.rowData) this.renderEnabledCell(row);
+        for (const row of this.rowData) this.renderLoadedCell(row);
         this.updateSummary();
     }
 
@@ -289,10 +298,10 @@ export class PluginTable {
         }));
     }
 
-    private loadState(pluginId: string): Pick<PluginTableRow, "enabled" | "memoryOnly" | "status"> {
-        const enabled = isPluginLoaded(this.host.app, pluginId);
+    private loadState(pluginId: string): Pick<PluginTableRow, "loaded" | "memoryOnly" | "status"> {
+        const loaded = isPluginLoaded(this.host.app, pluginId);
         const saved = this.savedCommunityPluginIds;
-        return { enabled, memoryOnly: enabled && saved !== undefined && !saved.has(pluginId), status: enabledBadgeText(this.host.app, pluginId, saved) };
+        return { loaded, memoryOnly: loaded && saved !== undefined && !saved.has(pluginId), status: enabledBadgeText(this.host.app, pluginId, saved) };
     }
 
     private async refreshCommunityPluginSnapshot() {
@@ -323,20 +332,20 @@ export class PluginTable {
     /** The summary item matching the current filters; the updates view takes precedence. */
     private getSummaryFilter(): SummaryFilter {
         if (this.showUpdatesOnly) return "updates";
-        const enabledFilter = this.columnFilters.find((filter) => filter.id === "enabled")?.value;
-        if (enabledFilter === "true") return "enabled";
-        if (enabledFilter === "false") return "disabled";
+        const loadedFilter = this.columnFilters.find((filter) => filter.id === "loaded")?.value;
+        if (loadedFilter === "true") return "enabled";
+        if (loadedFilter === "false") return "disabled";
         return "all";
     }
 
     /**
-     * Summary items act as exclusive filters. Enabled/Disabled reuse the enabled
+     * Summary items act as exclusive filters. Loaded/Not loaded reuse the loaded
      * column filter so the select in the filter row stays in sync.
      */
     private applySummaryFilter(filter: SummaryFilter): void {
         this.showUpdatesOnly = filter === "updates";
-        const otherFilters = this.columnFilters.filter((f) => f.id !== "enabled");
-        this.columnFilters = filter === "enabled" || filter === "disabled" ? [...otherFilters, { id: "enabled", value: String(filter === "enabled") }] : otherFilters;
+        const otherFilters = this.columnFilters.filter((f) => f.id !== "loaded");
+        this.columnFilters = filter === "enabled" || filter === "disabled" ? [...otherFilters, { id: "loaded", value: String(filter === "enabled") }] : otherFilters;
         this.syncOptions();
         this.renderHead();
         this.renderBody();
@@ -344,11 +353,11 @@ export class PluginTable {
     }
 
     private updateSummary(): void {
-        const enabled = this.rowData.filter((row) => row.enabled).length;
+        const loaded = this.rowData.filter((row) => row.loaded).length;
         const counts: Record<SummaryFilter, number> = {
             all: this.rowData.length,
-            enabled,
-            disabled: this.rowData.length - enabled,
+            enabled: loaded,
+            disabled: this.rowData.length - loaded,
             updates: this.rowData.filter(hasUpdate).length,
         };
         const active = this.getSummaryFilter();
@@ -389,6 +398,7 @@ export class PluginTable {
             const width = this.getWidth(column.id);
             if (width !== undefined) col.style.width = `${width}px`;
         }
+        this.updateMinWidth();
 
         const headerRow = this.theadEl.createEl("tr");
         visibleColumns.forEach((column, index) => {
@@ -420,10 +430,10 @@ export class PluginTable {
         const filterRow = this.theadEl.createEl("tr", { cls: "lazy-plugin-table-filter-row" });
         for (const column of visibleColumns) {
             const th = filterRow.createEl("th");
-            if (column.id === "enabled") {
+            if (column.id === "loaded") {
                 this.createFilterSelect(th, column, [
-                    ["true", "Enabled"],
-                    ["false", "Disabled"],
+                    ["true", "Yes"],
+                    ["false", "No"],
                 ]);
             } else if (column.id === "mode") {
                 this.createFilterSelect(
@@ -438,6 +448,15 @@ export class PluginTable {
                 input.addEventListener("contextmenu", (evt) => evt.stopPropagation());
             }
         }
+    }
+
+    /**
+     * With a fixed layout the table fits its container, so columns past the edge are squeezed
+     * instead of scrolled to. A minimum of the set widths makes it scroll sideways instead.
+     */
+    private updateMinWidth(): void {
+        const widths = this.table.getVisibleLeafColumns().map((column) => this.getWidth(column.id) ?? UNSIZED_MIN_WIDTH);
+        this.tableEl.style.minWidth = `${widths.reduce((sum, width) => sum + width, 0)}px`;
     }
 
     private createFilterSelect(th: HTMLElement, column: TableColumn, options: [string, string][]) {
@@ -458,7 +477,7 @@ export class PluginTable {
         for (const row of rows) {
             const data = row.original;
             const tr = this.tbodyEl.createEl("tr");
-            tr.toggleClass("is-loaded", data.enabled);
+            tr.toggleClass("is-loaded", data.loaded);
             tr.toggleClass("is-selected", this.selection.has(data.id));
             const controls: RowControls = { tr };
             this.rowControls.set(data.id, controls);
@@ -483,9 +502,9 @@ export class PluginTable {
                     case "name":
                         this.renderNameCell(td, data);
                         break;
-                    case "enabled":
-                        controls.enabledCell = td;
-                        this.renderEnabledCell(data);
+                    case "loaded":
+                        controls.loadedCell = td;
+                        this.renderLoadedCell(data);
                         break;
                     case "mode":
                         this.renderModeCell(td, data, controls);
@@ -510,10 +529,13 @@ export class PluginTable {
         for (const [id, { tr }] of this.rowControls) tr.toggleClass("is-selected", this.selection.has(id));
     }
 
-    /** Version is shown beside the name, as in Obsidian's settings, since it is not worth sorting or filtering by. */
+    /**
+     * Version and author are shown beside the name, as in Obsidian's settings: neither
+     * is worth a column of its own, and the name filter matches the author too.
+     */
     private renderNameCell(td: HTMLElement, data: PluginTableRow): void {
         td.createSpan({ cls: "lazy-plugin-table-name", text: data.name });
-        td.title = data.name;
+        td.title = data.author ? `${data.name} by ${data.author}` : data.name;
         const version = td.createSpan({ cls: "lazy-plugin-table-version" });
         if (data.latestVersion) {
             const icon = version.createSpan({ cls: "lazy-plugin-table-update-icon" });
@@ -521,20 +543,21 @@ export class PluginTable {
             setTooltip(icon, `Update available: v${data.latestVersion}`);
         }
         version.appendText(data.version);
+        if (data.author) td.createSpan({ cls: "lazy-plugin-table-author", text: data.author });
     }
 
-    /** A lamp and the state, like the settings list; plugins are switched only through their mode. */
-    private renderEnabledCell(data: PluginTableRow): void {
+    /** A lamp and Yes/No; plugins are switched only through their mode. */
+    private renderLoadedCell(data: PluginTableRow): void {
         const controls = this.rowControls.get(data.id);
-        const td = controls?.enabledCell;
+        const td = controls?.loadedCell;
         if (!controls || !td) return;
-        controls.tr.toggleClass("is-loaded", data.enabled);
+        controls.tr.toggleClass("is-loaded", data.loaded);
         td.empty();
         const lamp = td.createSpan({ cls: "lazy-plugin-table-lamp", attr: { "aria-hidden": "true" } });
-        lamp.toggleClass("is-loaded", data.enabled);
+        lamp.toggleClass("is-loaded", data.loaded);
         lamp.toggleClass("is-memory-only", data.memoryOnly);
-        // A short label keeps the column narrow; the lamp colour and the tooltip carry the in-memory detail.
-        td.createSpan({ text: data.enabled ? "Loaded" : "Not loaded" });
+        // The lamp colour and the tooltip carry the in-memory detail.
+        td.createSpan({ text: data.loaded ? "Yes" : "No" });
         td.title = data.status;
     }
 
@@ -549,7 +572,10 @@ export class PluginTable {
             });
         controls.dropdown.selectEl.setAttr("aria-label", `Mode for ${data.name}`);
         // The gear follows the dropdown, as the options belong to the mode chosen there.
-        controls.gear = new ExtraButtonComponent(wrapper).setIcon("settings").onClick(() => this.openLazyOptions(data.id));
+        controls.gear = new ExtraButtonComponent(wrapper)
+            .setIcon("settings")
+            .setTooltip("Lazy settings")
+            .onClick(() => this.openLazyOptions(data.id));
         this.syncModeControls(data);
     }
 
@@ -559,9 +585,15 @@ export class PluginTable {
         if (!controls?.gear || !controls.dropdown) return;
         controls.dropdown.setValue(data.mode);
         const isLazy = data.mode === PLUGIN_MODE.LAZY;
-        controls.gear.setDisabled(!isLazy).setTooltip("Lazy settings");
+        controls.gear.setDisabled(!isLazy);
         // Hidden but still taking its place, so the dropdowns stay aligned across rows.
         controls.gear.extraSettingsEl.toggleClass("is-disabled", !isLazy);
+    }
+
+    private markEdited(pluginId: string): void {
+        this.host.drafts.pendingPluginIds.add(pluginId);
+        this.host.drafts.markDirty(this);
+        this.renderPendingBar();
     }
 
     private renderActionsCell(td: HTMLElement, data: PluginTableRow): void {
@@ -576,11 +608,7 @@ export class PluginTable {
     }
 
     private openLazyOptions(pluginId: string): void {
-        this.host.openLazyOptions(pluginId, () => {
-            this.host.drafts.pendingPluginIds.add(pluginId);
-            this.host.drafts.markDirty(this);
-            this.renderPendingBar();
-        });
+        this.host.openLazyOptions(pluginId, () => this.markEdited(pluginId));
     }
 
     /**
@@ -639,7 +667,7 @@ export class PluginTable {
 
         if (single) {
             menu.addSeparator();
-            if (single.enabled) {
+            if (single.loaded) {
                 menu.addItem((item) =>
                     item
                         .setTitle("Open plugin settings")
@@ -741,6 +769,7 @@ export class PluginTable {
             const next = Math.round(Math.max(MIN_COLUMN_WIDTH, startWidth + (evt.clientX - start.clientX)));
             this.columnWidths[id] = next;
             colEl.style.width = `${next}px`;
+            this.updateMinWidth();
         };
         const onEnd = () => {
             handle.removeEventListener("pointermove", onMove);
