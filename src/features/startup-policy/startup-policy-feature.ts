@@ -32,6 +32,8 @@ type StartupPolicyOptions = {
     rebuilding?: boolean;
     /** The caller already showed the external community-plugins.json edits this run overwrites. */
     externalChangesConfirmed?: boolean;
+    /** Restart the app after a successful run. Defaults to true. */
+    reloadApp?: boolean;
 };
 
 /**
@@ -67,11 +69,16 @@ export class StartupPolicyFeature implements AppFeature {
         await this.mutex.runExclusive(() => this.executeStartupPolicy({ externalProgress: progress, force, rebuilding: true, externalChangesConfirmed: options?.externalChangesConfirmed }));
     }
 
+    /** Rebuild one plugin's command and view caches without restarting the app. */
+    public async rebuildPluginCaches(pluginId: string) {
+        await this.mutex.runExclusive(() => this.executeStartupPolicy({ pluginIds: [pluginId], force: true, rebuilding: true, reloadApp: false }));
+    }
+
     // -------------------------------------------------------------------------
     // Core execution
     // -------------------------------------------------------------------------
 
-    private async executeStartupPolicy({ pluginIds, externalProgress, force = false, rebuilding = false, externalChangesConfirmed = false }: StartupPolicyOptions) {
+    private async executeStartupPolicy({ pluginIds, externalProgress, force = false, rebuilding = false, externalChangesConfirmed = false, reloadApp = true }: StartupPolicyOptions) {
         // Every run ends by rewriting community-plugins.json, so ask before losing edits made outside On-Demand.
         if (!externalChangesConfirmed && !(await this.confirmExternalChanges())) {
             externalProgress?.close();
@@ -111,7 +118,7 @@ export class StartupPolicyFeature implements AppFeature {
             } finally {
                 // Applying settings must still restart: a plugin that keeps failing would otherwise
                 // block every apply. Failed caches stay stale and are retried later.
-                const shouldReload = failures !== null && !cancelled && (!rebuilding || failures.length === 0);
+                const shouldReload = reloadApp && failures !== null &&!cancelled && (!rebuilding || failures.length === 0);
                 await this.cleanupAndReload(shouldReload, progress);
             }
         }
