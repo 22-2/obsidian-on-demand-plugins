@@ -43,7 +43,7 @@ export class CommunityPluginsDriftFeature implements AppFeature {
 
     /** Re-reads the file and reports the entries the next write would undo. */
     async detect(): Promise<CommunityPluginsDrift | null> {
-        await this.registry.loadEnabledPluginsFromDisk(this.ctx.getData().showConsoleLog);
+        await this.registry.loadEnabledPluginsFromDisk();
         return detectCommunityPluginsDrift({
             onDisk: this.registry.enabledPluginsFromDisk,
             desired: new Set(this.getDesired()),

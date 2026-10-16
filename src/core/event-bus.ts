@@ -1,3 +1,7 @@
+import log from "loglevel";
+
+const logger = log.getLogger("OnDemandPlugin/EventBus");
+
 type EventHandler<T = unknown> = (payload: T) => void | Promise<void>;
 
 /**
@@ -39,7 +43,7 @@ export class EventBus {
                     promises.push(result);
                 }
             } catch (error) {
-                console.error(`[EventBus] Error in handler for event "${event}":`, error);
+                logger.error(`Error in handler for event "${event}":`, error);
             }
         }
         await Promise.all(promises);

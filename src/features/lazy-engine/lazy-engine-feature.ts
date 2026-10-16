@@ -1,3 +1,4 @@
+import log from "loglevel";
 import type { WorkspaceLeaf } from "obsidian";
 import PQueue from "p-queue";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
@@ -18,6 +19,8 @@ import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchPluginRegisterView } from "src/patches/view-registry";
 import { patchSetViewState } from "src/patches/view-state";
 import type { CoreContainer } from "src/services/core-container";
+
+const logger = log.getLogger("OnDemandPlugin/LazyEngineFeature");
 
 export class LazyEngineFeature implements AppFeature {
     public commandCache!: CommandCacheService;
@@ -91,7 +94,7 @@ export class LazyEngineFeature implements AppFeature {
         const toLoad = manifests.filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
 
         if (toLoad.length > 0) {
-            const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
+            const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => logger.error("Failed loading plugin onLayoutReady", manifest.id, err))));
 
             await Promise.all(tasks);
             this.commandCache.registerCachedCommands();
@@ -108,7 +111,7 @@ export class LazyEngineFeature implements AppFeature {
         const staleIds = this.commandCache.getStaleCachedPluginIds();
         if (staleIds.length === 0) return;
 
-        const tasks = staleIds.map((pluginId) => this.layoutReadyQueue.add(() => this.commandCache.refreshStaleCacheForPlugin(pluginId).catch((err) => console.error("Failed refreshing stale command cache", pluginId, err))));
+        const tasks = staleIds.map((pluginId) => this.layoutReadyQueue.add(() => this.commandCache.refreshStaleCacheForPlugin(pluginId).catch((err) => logger.error("Failed refreshing stale command cache", pluginId, err))));
         await Promise.all(tasks);
     }
 

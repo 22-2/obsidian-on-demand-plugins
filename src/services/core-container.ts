@@ -36,7 +36,7 @@ export class CoreContainer {
      */
     async initialize() {
         // Load enabled-plugins list from disk
-        await this.registry.loadEnabledPluginsFromDisk(this.settingsService.data.showConsoleLog);
+        await this.registry.loadEnabledPluginsFromDisk();
 
         // Handle initial load profile creation & backups
         await this.handleInstallationAndBackups();
