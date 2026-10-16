@@ -10,6 +10,10 @@ Obsidian plugin that delays plugin activation and only loads plugins when needed
 2. Choose a loading mode for each plugin.
 3. Click **Apply changes** (Obsidian will restart automatically).
 
+### Plugin table
+
+For many plugins at once, run **Open plugin table** from the command palette, or click **Open table** in **Plugin management**. The table can be searched, sorted, filtered by column and resized, and changes only loading modes: pick a mode in the **Mode** column, and use the gear to its right for the lazy options of **Lazy on demand** plugins. Right-click a row, or a selection of rows, for more actions; on phones and tablets each row has a menu button instead. The **Enabled** column shows whether a plugin is loaded right now; plugins are switched on and off only through their mode. The table and the settings share one draft, so **Review & save…** at the right of the table's bar saves the same changes.
+
 To refresh cached commands and view types together, open **Maintenance → Rebuild command and view caches** and click **Rebuild caches**. View types are refreshed for lazy plugins with **lazy on view** enabled. Each plugin is loaded once, with up to three plugins initializing concurrently; plugins loaded only for rebuilding are unloaded afterwards. Obsidian restarts when the rebuild completes.
 
 ---
@@ -42,7 +46,7 @@ Entries for plugins that are not installed on this device, or desktop-only plugi
 
 ### Unsaved changes
 
-Mode changes stay a draft until you click **Review & save…**. Moving between On-Demand's settings pages keeps the draft. If you close settings or switch to another settings tab, the draft is set aside and On-Demand keeps running on the saved settings. When you return to **Plugin management** or **Maintenance & batch**, it offers the draft back (**Restore** or **Discard**). **Behaviour › Unsaved draft prompt** (shared by all profiles) can restore or discard it automatically instead. A set-aside draft lasts until Obsidian restarts.
+Mode changes stay a draft until you click **Review & save…**. Moving between On-Demand's settings pages keeps the draft. If you close settings or switch to another settings tab, the draft is set aside and On-Demand keeps running on the saved settings. The plugin table shares the draft, so it is set aside only once both settings and the table are closed. When you return to **Plugin management**, **Maintenance & batch** or the plugin table, it offers the draft back (**Restore** or **Discard**). **Behaviour › Unsaved draft prompt** (shared by all profiles) can restore or discard it automatically instead. A set-aside draft lasts until Obsidian restarts.
 
 ### How it works
 
