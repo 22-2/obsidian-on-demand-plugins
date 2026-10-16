@@ -16,22 +16,15 @@ const logger = log.getLogger("OnDemandPlugin/LazyCommandRunner");
 export class LazyCommandRunner implements PluginLoader {
     // Manage locks per pluginId
     private pluginMutexes = new Map<string, Mutex>();
-    private commandExecutor!: CommandExecutor;
-    /** Injected after construction to break circular dependency. */
-    private commandRegistry!: CommandRegistry;
+    private readonly commandExecutor: CommandExecutor;
+    private readonly commandRegistry: CommandRegistry;
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
-    private ctx: PluginContext;
+    private readonly ctx: PluginContext;
 
-    constructor(ctx: PluginContext) {
+    constructor(ctx: PluginContext, commandRegistry: CommandRegistry) {
         this.ctx = ctx;
-    }
-
-    /**
-     * Setter injection — called by ServiceContainer after both services are created.
-     */
-    setCommandRegistry(registry: CommandRegistry) {
-        this.commandRegistry = registry;
-        this.commandExecutor = new CommandExecutor(this.ctx, registry);
+        this.commandRegistry = commandRegistry;
+        this.commandExecutor = new CommandExecutor(ctx, commandRegistry);
     }
 
     clear() {

@@ -52,8 +52,7 @@ describe("LazyCommandRunner", () => {
             isWrapperCommand: vi.fn(),
         };
 
-        runner = new LazyCommandRunner(mockCtx as unknown as PluginContext);
-        runner.setCommandRegistry(mockRegistry as unknown as CommandRegistry);
+        runner = new LazyCommandRunner(mockCtx as unknown as PluginContext, mockRegistry as unknown as CommandRegistry);
     });
 
     describe("ensurePluginLoaded", () => {
