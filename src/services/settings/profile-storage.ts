@@ -1,7 +1,6 @@
-import type { DataAdapter } from "obsidian";
+import type { DataAdapter, Plugin } from "obsidian";
 import { normalizePath } from "obsidian";
 import type { Profile } from "src/core/types";
-import type OnDemandPlugin from "src/main";
 
 export interface ProfileStorageLoadResult {
     available: boolean;
@@ -30,7 +29,7 @@ export class ProfileStorage {
     private readonly adapter?: DataAdapter;
     private readonly profilesDir?: string;
 
-    constructor(plugin: OnDemandPlugin) {
+    constructor(plugin: Pick<Plugin, "app" | "manifest">) {
         const candidate = plugin as unknown as {
             app?: { vault?: { adapter?: DataAdapter } };
             manifest?: { dir?: string };

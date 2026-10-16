@@ -160,7 +160,7 @@ export class MaintenanceFeature implements AppFeature {
         return computeDesiredCommunityPlugins(
             this.ctx.getManifests().map((m) => m.id),
             (id) => this.ctx.getPluginMode(id),
-            this.ctx._plugin.manifest.id,
+            this.ctx.manifest.id,
             this.registry.enabledPluginsFromDisk,
         );
     }

@@ -129,18 +129,18 @@ function setup(modes: Record<string, PluginMode>) {
         getData: () => ({ showConsoleLog: false }),
         getSettings: () => settings,
         register: (unload: () => void) => fake.register(unload),
-        _plugin: {
-            updatePluginSettings: async (id: string, mode: PluginMode) => {
-                settings.plugins[id] = { ...settings.plugins[id], mode, userConfigured: true };
-                await saveSettings();
-            },
-            features: { get: () => ({ commandCache: { syncCommandWrappersForPlugin: vi.fn() } }) },
-        },
     } as unknown as PluginContext;
+    const enableDisableHooks = {
+        setPluginMode: async (id: string, mode: PluginMode) => {
+            settings.plugins[id] = { ...settings.plugins[id], mode, userConfigured: true };
+            await saveSettings();
+        },
+        syncCommandWrappers: vi.fn(),
+    };
 
     const loadOnDemand = async () => {
         await registry.loadEnabledPluginsFromDisk();
-        patchPluginEnableDisable(ctx);
+        patchPluginEnableDisable(ctx, enableDisableHooks);
         const feature = new CommunityPluginsDriftFeature();
         feature.onload(ctx, { registry } as never, {} as never, {} as never);
         // onLayoutReady runs the startup check synchronously in this fake; let it settle.

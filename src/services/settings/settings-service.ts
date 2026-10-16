@@ -1,11 +1,10 @@
 import log from "loglevel";
-import type { DataAdapter } from "obsidian";
+import type { DataAdapter, Plugin } from "obsidian";
 import { Notice, Platform, normalizePath } from "obsidian";
 import { replaceFileContent } from "src/core/atomic-write";
 import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, DeviceType, LazySettings, Profile } from "src/core/types";
 import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, isPluginMode, isRestoreDraftBehavior } from "src/core/types";
-import type OnDemandPlugin from "src/main";
 import { ProfileStorage } from "src/services/settings/profile-storage";
 
 const logger = log.getLogger("OnDemandPlugin/SettingsService");
@@ -45,9 +44,12 @@ function parseSnapshot(text: string): SettingsSnapshot {
     return { kind: "valid", value, fingerprint: stableStringify(value) };
 }
 
+/** The parts of the Obsidian plugin instance that settings storage needs. */
+export type SettingsHost = Pick<Plugin, "app" | "manifest" | "loadData" | "saveData">;
+
 export class SettingsService {
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
-    private plugin: OnDemandPlugin;
+    private plugin: SettingsHost;
     private profileStorage: ProfileStorage;
     private persistedFingerprint?: string;
     private writesBlocked = false;
@@ -70,7 +72,7 @@ export class SettingsService {
      */
     persisted?: LazySettings;
 
-    constructor(plugin: OnDemandPlugin) {
+    constructor(plugin: SettingsHost) {
         this.plugin = plugin;
         this.profileStorage = new ProfileStorage(plugin);
     }

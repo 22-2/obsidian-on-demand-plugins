@@ -13,7 +13,7 @@ describe("MaintenanceFeature", () => {
         getSettings: () => typeof settingsState;
         getPluginMode: (id: string) => string | undefined;
         saveSettings: ReturnType<typeof vi.fn>;
-        _plugin: { manifest: { id: string } };
+        manifest: { id: string };
         obsidianPlugins: { enabledPlugins: Set<string> };
     };
     let mockRegistry: {
@@ -47,7 +47,7 @@ describe("MaintenanceFeature", () => {
             getSettings: () => settingsState,
             getPluginMode: (id) => mockCtx.getSettings().plugins[id]?.mode,
             saveSettings: vi.fn().mockResolvedValue(undefined),
-            _plugin: { manifest: { id: "on-demand-plugins" } },
+            manifest: { id: "on-demand-plugins" },
             obsidianPlugins: { enabledPlugins: new Set(["plugin-1", "on-demand-plugins"]) },
         };
 

@@ -13,6 +13,7 @@ import { FileLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/fil
 import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
+import { patchPluginEnableDisable } from "src/patches/plugin-enable-disable";
 import { patchPluginLoad } from "src/patches/plugin-load";
 import { patchPluginInitialization } from "src/patches/plugin-initialization";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
@@ -50,6 +51,10 @@ export class LazyEngineFeature implements AppFeature {
         this.fileLoader = new FileLazyLoader(ctx, this.lazyRunner, { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") });
 
         // 3. Patches and Subscriptions
+        patchPluginEnableDisable(ctx, {
+            setPluginMode: (pluginId, mode) => this.setPluginMode(pluginId, mode),
+            syncCommandWrappers: (pluginId) => this.commandCache.syncCommandWrappersForPlugin(pluginId),
+        });
         ctx.register(patchPluginLoad(ctx.obsidianPlugins, (pluginId) => ctx.app.workspace.trigger(PLUGIN_LOAD_STATE_CHANGED_EVENT, pluginId)));
         ctx.register(patchPluginInitialization());
         patchSetViewState({
@@ -113,6 +118,19 @@ export class LazyEngineFeature implements AppFeature {
 
         const tasks = staleIds.map((pluginId) => this.layoutReadyQueue.add(() => this.commandCache.refreshStaleCacheForPlugin(pluginId).catch((err) => logger.error("Failed refreshing stale command cache", pluginId, err))));
         await Promise.all(tasks);
+    }
+
+    /**
+     * Save a user-chosen mode for a plugin, then apply it.
+     */
+    async setPluginMode(pluginId: string, mode: PLUGIN_MODE) {
+        // Mode changes must not erase the plugin's advanced lazy rules; those
+        // rules are independent of whether the plugin is currently enabled.
+        await this.ctx.saveSettingsChange((data, profileId) => {
+            const plugins = data.profiles[profileId].settings.plugins;
+            plugins[pluginId] = { ...(plugins[pluginId] ?? {}), mode, userConfigured: true };
+        });
+        await this.applyPluginState(pluginId);
     }
 
     /**

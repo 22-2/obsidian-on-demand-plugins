@@ -3,29 +3,30 @@ import log from "loglevel";
 import { around } from "monkey-around";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
-import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 
 const logger = log.getLogger("OnDemandPlugin/PluginEnableDisablePatch");
 
-// ── Helpers ─────────────────────────────────────────
-
 /**
- * Sync command wrappers for a plugin via the lazy engine, if available.
+ * Operations the patch needs from the lazy engine. Passed in by the installer so
+ * the patch layer never reaches up into features or the plugin instance.
  */
-export function syncCommandWrappers(ctx: PluginContext, pluginId: string): void {
-    const lazyEngine = ctx._plugin.features.get(LazyEngineFeature);
-    if (!lazyEngine) throw new Error("LazyEngineFeature not found");
-    lazyEngine.commandCache.syncCommandWrappersForPlugin(pluginId);
+export interface EnableDisableHooks {
+    /** Save a user-chosen mode for a plugin and apply it. */
+    setPluginMode(pluginId: string, mode: PLUGIN_MODE): Promise<void>;
+    /** Re-sync the lazy command wrappers to the plugin's live load state. */
+    syncCommandWrappers(pluginId: string): void;
 }
+
+// ── Helpers ─────────────────────────────────────────
 
 /**
  * Update plugin mode only when it matches the expected `fromMode`.
  * Preserves LAZY mode on both enable and disable paths.
  */
-export async function syncPluginMode(ctx: PluginContext, pluginId: string, fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE): Promise<void> {
+export async function syncPluginMode(ctx: PluginContext, hooks: EnableDisableHooks, pluginId: string, fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE): Promise<void> {
     const mode = ctx.getPluginMode(pluginId);
     if (mode === fromMode) {
-        await ctx._plugin.updatePluginSettings(pluginId, toMode);
+        await hooks.setPluginMode(pluginId, toMode);
     }
 }
 
@@ -33,11 +34,11 @@ export async function syncPluginMode(ctx: PluginContext, pluginId: string, fromM
  * Run the post-toggle sync steps after enable or disable, catching all errors
  * so Obsidian's core flow is never interrupted.
  */
-export async function runPostToggleSync(ctx: PluginContext, pluginId: string, fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE, label: "enablePlugin" | "disablePlugin", isUserToggle = true): Promise<void> {
+export async function runPostToggleSync(ctx: PluginContext, hooks: EnableDisableHooks, pluginId: string, fromMode: PLUGIN_MODE, toMode: PLUGIN_MODE, label: "enablePlugin" | "disablePlugin", isUserToggle = true): Promise<void> {
     try {
-        if (isUserToggle) await syncPluginMode(ctx, pluginId, fromMode, toMode);
+        if (isUserToggle) await syncPluginMode(ctx, hooks, pluginId, fromMode, toMode);
         // Wrappers follow the live load state, so they are re-synced after every toggle.
-        syncCommandWrappers(ctx, pluginId);
+        hooks.syncCommandWrappers(pluginId);
     } catch (error) {
         // Intentionally log every failure so repeated instability remains visible.
         logger.warn(`${label} sync failed:`, error);
@@ -57,7 +58,7 @@ export async function runPostToggleSync(ctx: PluginContext, pluginId: string, fr
  * other plugins persisting a toggle), but not from restricted mode, `plugin:reload`,
  * lazy loads or the in-memory toggles, none of which change community-plugins.json.
  */
-export function patchPluginEnableDisable(ctx: PluginContext): void {
+export function patchPluginEnableDisable(ctx: PluginContext, hooks: EnableDisableHooks): void {
     const obsidianPlugins = ctx.obsidianPlugins;
 
     ctx.register(
@@ -66,7 +67,7 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
                 async function (this: Plugins, pluginId: string, isUserEnabled?: boolean) {
                     const result = await next.call(this, pluginId, isUserEnabled);
                     // Only sync ALWAYS_DISABLED → ALWAYS_ENABLED; preserve LAZY mode.
-                    await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.ALWAYS_ENABLED, "enablePlugin", isUserEnabled === true);
+                    await runPostToggleSync(ctx, hooks, pluginId, PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.ALWAYS_ENABLED, "enablePlugin", isUserEnabled === true);
                     return result;
                 },
 
@@ -74,7 +75,7 @@ export function patchPluginEnableDisable(ctx: PluginContext): void {
                 async function (this: Plugins, pluginId: string, isUserDisabled?: boolean) {
                     const result = await next.call(this, pluginId, isUserDisabled);
                     // Only sync ALWAYS_ENABLED → ALWAYS_DISABLED; preserve LAZY mode.
-                    await runPostToggleSync(ctx, pluginId, PLUGIN_MODE.ALWAYS_ENABLED, PLUGIN_MODE.ALWAYS_DISABLED, "disablePlugin", isUserDisabled === true);
+                    await runPostToggleSync(ctx, hooks, pluginId, PLUGIN_MODE.ALWAYS_ENABLED, PLUGIN_MODE.ALWAYS_DISABLED, "disablePlugin", isUserDisabled === true);
                     return result;
                 },
         }),
