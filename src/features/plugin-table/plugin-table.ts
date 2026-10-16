@@ -58,14 +58,12 @@ const features = tableFeatures({
 });
 
 type Features = typeof features;
+type TableColumn = ReturnType<Table<Features, PluginTableRow>["getAllLeafColumns"]>[number];
 
 const helper = createColumnHelper<Features, PluginTableRow>();
 
-/** Select filters hold the exact value as a string, with "" meaning no filter. */
-const equalsFilterFn: FilterFn<Features, PluginTableRow> = (row, columnId, filterValue) => {
-    if (filterValue === undefined || filterValue === "") return true;
-    return String(row.getValue(columnId)) === String(filterValue);
-};
+/** Select filters hold the exact value as a string; choosing "All" removes the filter instead. */
+const equalsFilterFn: FilterFn<Features, PluginTableRow> = (row, columnId, filterValue) => String(row.getValue(columnId)) === String(filterValue);
 
 /** Sort modes from the most to the least restrictive, matching the row menu, not alphabetically. */
 const modeSortFn: SortFn<Features, PluginTableRow> = (rowA, rowB) => MODE_ORDER.indexOf(rowA.original.mode) - MODE_ORDER.indexOf(rowB.original.mode);
@@ -114,8 +112,14 @@ interface RowControls {
     dropdown?: DropdownComponent;
 }
 
+/** Only multi-row actions show a count; a single row gets its own wording. */
 function pluralizePlugins(count: number): string {
-    return `${count} plugin${count === 1 ? "" : "s"}`;
+    return `${count} plugins`;
+}
+
+/** Every column here has a plain string header. */
+function headerText(column: TableColumn): string {
+    return typeof column.columnDef.header === "string" ? column.columnDef.header : "";
 }
 
 /** Filters here only ever hold strings; anything else means no filter. */
@@ -396,7 +400,7 @@ export class PluginTable {
         visibleColumns.forEach((column, index) => {
             const th = headerRow.createEl("th", { cls: `lazy-plugin-table-th lazy-plugin-table-col-${column.id}` });
             const label = th.createDiv({ cls: "lazy-plugin-table-th-label" });
-            label.createSpan({ text: String(column.columnDef.header ?? column.id) });
+            label.createSpan({ text: headerText(column) });
             const sorted = column.getIsSorted();
             if (sorted) label.createSpan({ text: sorted === "desc" ? " ▼" : " ▲", cls: "lazy-plugin-table-sort-indicator" });
             if (column.getCanSort()) {
@@ -407,7 +411,7 @@ export class PluginTable {
             }
             th.addEventListener("contextmenu", (evt) => {
                 evt.preventDefault();
-                this.showHeaderMenu(evt, column.id);
+                this.showHeaderMenu(evt, column);
             });
             if (column.id === "actions") return;
             const resizer = th.createDiv({ cls: "lazy-plugin-table-resizer" });
@@ -423,18 +427,18 @@ export class PluginTable {
         for (const column of visibleColumns) {
             const th = filterRow.createEl("th");
             if (column.id === "enabled") {
-                this.createFilterSelect(th, column.id, [
+                this.createFilterSelect(th, column, [
                     ["true", "Enabled"],
                     ["false", "Disabled"],
                 ]);
             } else if (column.id === "mode") {
                 this.createFilterSelect(
                     th,
-                    column.id,
+                    column,
                     MODE_ORDER.map((mode) => [mode, PluginModes[mode]]),
                 );
             } else if (TEXT_FILTER_COLUMNS.has(column.id)) {
-                const input = th.createEl("input", { type: "text", cls: "lazy-plugin-table-filter-input", attr: { placeholder: "Filter...", "aria-label": `Filter ${String(column.columnDef.header)}` } });
+                const input = th.createEl("input", { type: "text", cls: "lazy-plugin-table-filter-input", attr: { placeholder: "Filter...", "aria-label": `Filter ${headerText(column)}` } });
                 input.value = filterText(column.getFilterValue());
                 input.addEventListener("input", () => column.setFilterValue(input.value === "" ? undefined : input.value));
                 input.addEventListener("contextmenu", (evt) => evt.stopPropagation());
@@ -442,10 +446,8 @@ export class PluginTable {
         }
     }
 
-    private createFilterSelect(th: HTMLElement, columnId: string, options: [string, string][]) {
-        const column = this.table.getColumn(columnId);
-        if (!column) return;
-        const select = th.createEl("select", { cls: "dropdown lazy-plugin-table-filter-input", attr: { "aria-label": `Filter ${String(column.columnDef.header)}` } });
+    private createFilterSelect(th: HTMLElement, column: TableColumn, options: [string, string][]) {
+        const select = th.createEl("select", { cls: "dropdown lazy-plugin-table-filter-input", attr: { "aria-label": `Filter ${headerText(column)}` } });
         select.createEl("option", { text: "All", value: "" });
         for (const [value, label] of options) select.createEl("option", { text: label, value });
         select.value = filterText(column.getFilterValue());
@@ -478,7 +480,7 @@ export class PluginTable {
                 evt.preventDefault();
                 this.selection.selectForContextMenu(data.id);
                 this.syncSelection();
-                this.buildRowMenu()?.showAtMouseEvent(evt);
+                this.buildRowMenu().showAtMouseEvent(evt);
             });
 
             for (const cell of row.getVisibleCells()) {
@@ -500,8 +502,9 @@ export class PluginTable {
                     default: {
                         const value = cell.getValue();
                         // The remaining columns are the plain text fields.
-                        td.setText(typeof value === "string" ? value : "");
-                        td.title = td.textContent ?? "";
+                        const text = typeof value === "string" ? value : "";
+                        td.setText(text);
+                        td.title = text;
                     }
                 }
             }
@@ -573,7 +576,7 @@ export class PluginTable {
             this.selection.selectForContextMenu(data.id);
             this.syncSelection();
             const rect = button.extraSettingsEl.getBoundingClientRect();
-            this.buildRowMenu()?.showAtPosition({ x: rect.left, y: rect.bottom }, button.extraSettingsEl.doc);
+            this.buildRowMenu().showAtPosition({ x: rect.left, y: rect.bottom }, button.extraSettingsEl.doc);
         });
     }
 
@@ -603,16 +606,15 @@ export class PluginTable {
     }
 
     private getSelectedRows(): PluginTableRow[] {
-        const rowsById = new Map(this.rowData.map((row) => [row.id, row]));
-        return this.selection.ids(this.visibleIds).flatMap((id) => rowsById.get(id) ?? []);
+        const selected = new Set(this.selection.ids(this.visibleIds));
+        // The visible order, so batch actions and copies follow what is on screen.
+        return this.table.getRowModel().rows.flatMap((row) => (selected.has(row.id) ? [row.original] : []));
     }
 
-    /** Acts on the selection; a right-click outside it has already narrowed it to the clicked row. */
-    private buildRowMenu(): MenuType | undefined {
+    /** Acts on the selection; opening the menu has already put the row it was opened on into it. */
+    private buildRowMenu(): MenuType {
         const targets = this.getSelectedRows();
-        const [first] = targets;
-        if (!first) return undefined;
-        const single = targets.length === 1 ? first : null;
+        const single = targets.length === 1 ? targets[0] : null;
         const menu = new Menu();
 
         if (single) {
@@ -700,9 +702,7 @@ export class PluginTable {
         }
     }
 
-    private showHeaderMenu(evt: MouseEvent, columnId: string): void {
-        const column = this.table.getColumn(columnId);
-        if (!column) return;
+    private showHeaderMenu(evt: MouseEvent, column: TableColumn): void {
         const menu = new Menu();
         if (column.getCanSort()) {
             menu.addItem((item) =>
@@ -726,7 +726,7 @@ export class PluginTable {
                 if (!col.getCanHide()) continue;
                 submenu.addItem((subItem) =>
                     subItem
-                        .setTitle(String(col.columnDef.header ?? col.id))
+                        .setTitle(headerText(col))
                         .setChecked(col.getIsVisible())
                         .onClick(() => col.toggleVisibility(!col.getIsVisible())),
                 );
@@ -737,14 +737,15 @@ export class PluginTable {
 
     private beginResize(id: string, colIndex: number, handle: HTMLElement, start: PointerEvent): void {
         this.stopResize?.();
-        const colEl = this.colgroupEl.children[colIndex] as HTMLElement | undefined;
-        const startWidth = colEl?.getBoundingClientRect().width ?? this.getWidth(id) ?? 100;
+        // renderHead creates one col per visible column, so the index always has one.
+        const colEl = this.colgroupEl.children[colIndex] as HTMLElement;
+        const startWidth = colEl.getBoundingClientRect().width;
         // Capturing keeps the drag going when the pointer leaves the narrow handle.
         handle.setPointerCapture(start.pointerId);
         const onMove = (evt: PointerEvent) => {
             const next = Math.round(Math.max(MIN_COLUMN_WIDTH, startWidth + (evt.clientX - start.clientX)));
             this.columnWidths[id] = next;
-            if (colEl) colEl.style.width = `${next}px`;
+            colEl.style.width = `${next}px`;
         };
         const onEnd = () => {
             handle.removeEventListener("pointermove", onMove);
