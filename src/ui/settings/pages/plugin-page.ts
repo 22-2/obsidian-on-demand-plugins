@@ -10,7 +10,7 @@ import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
-import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText, stagePluginMode } from "src/ui/settings/helpers";
 import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 const logger = log.getLogger("OnDemandPlugin/PluginPage");
@@ -281,17 +281,7 @@ export class PluginPage extends SettingPage {
     }
 
     private applyRowModeChange(pluginId: string, mode: PLUGIN_MODE, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
-        // Selecting the effective mode changes nothing semantically, so skip creating
-        // an explicit entry just to flip userConfigured and keep the draft clean.
-        const current = this.plugin.settings.plugins[pluginId];
-        if (this.plugin.getPluginMode(pluginId) === mode && (current?.mode === undefined || current.mode === mode)) return;
-        // Changing the mode should preserve advanced lazy options so
-        // users can temporarily disable a plugin without reconfiguring it.
-        this.plugin.settings.plugins[pluginId] = {
-            ...(this.plugin.settings.plugins[pluginId] ?? {}),
-            mode,
-            userConfigured: true,
-        };
+        if (!stagePluginMode(this.plugin, pluginId, mode)) return;
         this.tab.pendingPluginIds.add(pluginId);
         this.tab.markDirty();
         // Update only the badges in place so the row stays where it is even

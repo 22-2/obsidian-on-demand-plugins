@@ -85,6 +85,21 @@ export async function openBackupDirectory(plugin: OnDemandPlugin) {
     }
 }
 
+/**
+ * Stages a mode change in the live settings draft. Returns false when nothing changed,
+ * so callers can skip marking the draft dirty.
+ */
+export function stagePluginMode(plugin: OnDemandPlugin, pluginId: string, mode: PLUGIN_MODE): boolean {
+    // Selecting the effective mode changes nothing semantically, so skip creating
+    // an explicit entry just to flip userConfigured and keep the draft clean.
+    const current = plugin.settings.plugins[pluginId];
+    if (plugin.getPluginMode(pluginId) === mode && (current?.mode === undefined || current.mode === mode)) return false;
+    // Changing the mode should preserve advanced lazy options so
+    // users can temporarily disable a plugin without reconfiguring it.
+    plugin.settings.plugins[pluginId] = { ...(current ?? {}), mode, userConfigured: true };
+    return true;
+}
+
 export function addModeOptions(dropdown: DropdownComponent): DropdownComponent {
     for (const [mode, label] of Object.entries(PluginModes)) dropdown.addOption(mode, label);
     return dropdown;
