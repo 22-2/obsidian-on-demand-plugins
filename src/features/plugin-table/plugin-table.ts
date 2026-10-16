@@ -65,6 +65,22 @@ const helper = createColumnHelper<Features, PluginTableRow>();
 /** Select filters hold the exact value as a string; choosing "All" removes the filter instead. */
 const equalsFilterFn: FilterFn<Features, PluginTableRow> = (row, columnId, filterValue) => String(row.getValue(columnId)) === String(filterValue);
 
+/**
+ * "true" and "false" are what the Loaded and Not loaded summary items set; "saved" and
+ * "memory" split the loaded plugins by whether community-plugins.json lists them.
+ */
+const loadedFilterFn: FilterFn<Features, PluginTableRow> = (row, _columnId, filterValue) => {
+    const { loaded, memoryOnly } = row.original;
+    switch (filterValue) {
+        case "saved":
+            return loaded && !memoryOnly;
+        case "memory":
+            return memoryOnly;
+        default:
+            return String(loaded) === String(filterValue);
+    }
+};
+
 /** The author sits beside the name, so the name filter finds plugins by either. */
 const nameFilterFn: FilterFn<Features, PluginTableRow> = (row, _columnId, filterValue) => {
     const query = String(filterValue).toLowerCase();
@@ -77,7 +93,7 @@ const modeSortFn: SortFn<Features, PluginTableRow> = (rowA, rowB) => MODE_ORDER.
 const columns = helper.columns([
     helper.accessor("name", { header: "Name", filterFn: nameFilterFn, sortFn: "alphanumeric", enableHiding: false }),
     helper.accessor("id", { header: "ID", filterFn: "includesString", sortFn: "alphanumeric" }),
-    helper.accessor("loaded", { header: "Loaded", filterFn: equalsFilterFn, sortFn: "basic" }),
+    helper.accessor("loaded", { header: "Loaded", filterFn: loadedFilterFn, sortFn: "basic" }),
     helper.accessor("mode", { header: "Mode", filterFn: equalsFilterFn, sortFn: modeSortFn }),
     helper.accessor("description", { header: "Description", filterFn: "includesString", sortFn: "alphanumeric" }),
     // Touch screens have no right-click, so phones and tablets get a visible menu button per row.
@@ -337,13 +353,16 @@ export class PluginTable {
         return this.showUpdatesOnly ? this.rowData.filter(hasUpdate) : this.rowData;
     }
 
-    /** The summary item matching the current filters; the updates view takes precedence. */
-    private getSummaryFilter(): SummaryFilter {
+    /**
+     * The summary item matching the current filters; the updates view takes precedence.
+     * Null when the loaded filter narrows further than any item, so none is highlighted.
+     */
+    private getSummaryFilter(): SummaryFilter | null {
         if (this.showUpdatesOnly) return "updates";
         const loadedFilter = this.columnFilters.find((filter) => filter.id === "loaded")?.value;
         if (loadedFilter === "true") return "enabled";
         if (loadedFilter === "false") return "disabled";
-        return "all";
+        return loadedFilter === undefined ? "all" : null;
     }
 
     /**
@@ -449,6 +468,9 @@ export class PluginTable {
             if (column.id === "loaded") {
                 this.createFilterSelect(th, column, [
                     ["true", "Yes"],
+                    // A select cannot be indented with CSS, so the two kinds of Yes are indented with spaces.
+                    ["saved", "   Saved"],
+                    ["memory", "   In memory only"],
                     ["false", "No"],
                 ]);
             } else if (column.id === "mode") {

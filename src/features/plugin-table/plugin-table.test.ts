@@ -197,6 +197,26 @@ describe("plugin table filters and sorting", () => {
         expect(names()).toEqual(["Alpha", "Gamma"]);
     });
 
+    it("splits loaded plugins into saved and in-memory only", async () => {
+        const { root, names, loaded, syncLoaded, table, summary } = setup();
+        loaded.add("gamma");
+        syncLoaded();
+        table.refresh();
+        await flush();
+        const loadedFilter = root.querySelector<HTMLSelectElement>("select[aria-labelledby$='-header-loaded']")!;
+        expect([...loadedFilter.options].map((option) => option.value)).toEqual(["", "true", "saved", "memory", "false"]);
+
+        change(loadedFilter, "saved");
+        expect(names()).toEqual(["Beta"]);
+        // Neither summary item matches a narrower filter, so none is highlighted.
+        expect(root.querySelectorAll(".lazy-plugin-table-summary-item.is-active")).toHaveLength(0);
+        change(loadedFilter, "memory");
+        expect(names()).toEqual(["Gamma"]);
+        change(loadedFilter, "true");
+        expect(names()).toEqual(["Beta", "Gamma"]);
+        expect(summary("enabled").classList.contains("is-active")).toBe(true);
+    });
+
     it("toggles the summary filters and leaves the updates view once nothing is left to update", () => {
         const { summary, names, table, app } = setup();
         summary("enabled").click();
