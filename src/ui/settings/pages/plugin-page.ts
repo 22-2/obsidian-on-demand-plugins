@@ -80,6 +80,10 @@ export class PluginPage extends SettingPage {
             .setName(pluginStatisticsText(this.plugin))
             .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
             .setClass("lazy-plugin-statistics");
+        new Setting(this.containerEl)
+            .setName("Plugin table")
+            .setDesc("Edit modes in a sortable table. Unsaved changes carry over.")
+            .addButton((button) => button.setButtonText("Open table").onClick(() => void this.openPluginTable()));
         // Phones show the refresh control on the heading's right; desktop shows it beside the filters (see CSS).
         new Setting(this.containerEl)
             .setName("Plugins")
@@ -122,6 +126,14 @@ export class PluginPage extends SettingPage {
             });
         this.containerEl.createDiv({ cls: "lazy-plugin-infinite-host" });
         this.renderInfiniteList();
+    }
+    /**
+     * Opens the table before closing settings: the draft is set aside only when its last
+     * surface closes, so the open table keeps it live instead of prompting to restore it.
+     */
+    private async openPluginTable() {
+        await this.plugin.openPluginTable();
+        this.app.setting.close();
     }
     private refreshList() {
         this.plugin.updateManifests();

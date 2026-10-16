@@ -99,3 +99,25 @@ test("plugin table switches to the touch layout on phones", async ({ obsidian })
     await actions.dispatchEvent("click");
     await expect(obsidian.page.locator(".menu-item").filter({ hasText: "Show in community plugins" })).toHaveCount(1);
 });
+
+test("opening the table from plugin management keeps the draft live", async ({ obsidian }) => {
+    await startFrom(obsidian, "lazy");
+    const settingsPage = await obsidian.openSettings(pluginUnderTestId, { subPage: "Plugin management" });
+    // Stage the edit the way the settings list does, so the draft exists before the table opens.
+    await obsidian.page.evaluate((id) => {
+        const plugin = app.plugins.plugins["on-demand-plugins"] as unknown as { settings: { plugins: Record<string, unknown> }; settingsTab: { markDirty: () => void } };
+        plugin.settings.plugins[id] = { mode: "alwaysDisabled", userConfigured: true };
+        plugin.settingsTab.markDirty();
+    }, targetPluginId);
+
+    await settingsPage.getByRole("button", { name: "Open table", exact: true }).click();
+
+    const view = obsidian.page.locator(".lazy-plugin-table-view");
+    await expect(view).toBeVisible();
+    await view.getByRole("textbox", { name: "Filter Name" }).fill("BRAT");
+    await expect(view.locator("tbody tr").filter({ hasText: "BRAT" }).getByRole("combobox", { name: /^Mode for / })).toHaveValue("alwaysDisabled");
+    await expect(view.locator(".lazy-plugin-table-pending")).toContainText("1 unsaved change");
+    // The table stayed open while settings closed, so the draft was never set aside.
+    await expect(obsidian.page.locator(".lazy-review-changes-modal")).toHaveCount(0);
+    expect(await modeOf(obsidian)).toBe("alwaysDisabled");
+});
