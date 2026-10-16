@@ -1008,7 +1008,41 @@ button.lazy-plugin-table-summary-item.is-active {
 }
 
 .lazy-plugin-table input.lazy-plugin-table-filter-input {
-    padding: 0 var(--size-4-2);
+    /* The right padding leaves room for the clear button. */
+    padding: 0 var(--size-4-6) 0 var(--size-4-2);
+}
+
+.lazy-plugin-table-filter-wrap {
+    position: relative;
+}
+
+.lazy-plugin-table-filter-clear {
+    position: absolute;
+    top: 50%;
+    right: var(--size-4-1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
+    border-radius: var(--radius-s);
+    color: var(--text-faint);
+    cursor: pointer;
+}
+
+.lazy-plugin-table-filter-clear:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.lazy-plugin-table-filter-clear.is-hidden {
+    display: none;
+}
+
+.lazy-plugin-table-filter-clear .svg-icon {
+    width: 14px;
+    height: 14px;
 }
 
 .lazy-plugin-table .lazy-plugin-table-filter-input:hover {

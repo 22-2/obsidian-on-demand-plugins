@@ -488,10 +488,24 @@ export class PluginTable {
                     MODE_ORDER.map((mode) => [mode, PluginModes[mode]]),
                 );
             } else if (TEXT_FILTER_COLUMNS.has(column.id)) {
-                const input = th.createEl("input", { type: "text", cls: "lazy-plugin-table-filter-input", attr: { placeholder: "Filter...", "aria-labelledby": this.headerId(column.id) } });
+                const wrap = th.createDiv({ cls: "lazy-plugin-table-filter-wrap" });
+                const input = wrap.createEl("input", { type: "text", cls: "lazy-plugin-table-filter-input", attr: { placeholder: "Filter...", "aria-labelledby": this.headerId(column.id) } });
+                const clear = wrap.createDiv({ cls: "lazy-plugin-table-filter-clear", attr: { role: "button", "aria-label": "Clear filter" } });
+                setIcon(clear, "x");
+                const syncClear = () => clear.toggleClass("is-hidden", input.value === "");
                 input.value = filterText(column.getFilterValue());
-                input.addEventListener("input", () => column.setFilterValue(input.value === "" ? undefined : input.value));
+                syncClear();
+                input.addEventListener("input", () => {
+                    column.setFilterValue(input.value === "" ? undefined : input.value);
+                    syncClear();
+                });
                 input.addEventListener("contextmenu", (evt) => evt.stopPropagation());
+                clear.addEventListener("click", () => {
+                    input.value = "";
+                    column.setFilterValue(undefined);
+                    syncClear();
+                    input.focus();
+                });
             }
         }
     }

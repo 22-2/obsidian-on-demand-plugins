@@ -120,7 +120,7 @@ describe("plugin table rendering", () => {
         const labelText = (el: Element) => el.getAttribute("aria-labelledby")!.split(" ").map((id) => document.getElementById(id)?.textContent).join(" ");
         expect(modeSelect.hasAttribute("aria-label")).toBe(false);
         expect(labelText(modeSelect)).toBe("Mode Alpha");
-        expect(root.querySelectorAll(".lazy-plugin-table-filter-row [aria-label]")).toHaveLength(0);
+        expect(root.querySelectorAll(".lazy-plugin-table-filter-row input[aria-label], .lazy-plugin-table-filter-row select[aria-label]")).toHaveLength(0);
         expect(labelText(root.querySelector(".lazy-plugin-table-filter-row input")!)).toBe("Name");
         // Only the loaded state has a tooltip, for the in-memory detail its short label leaves out.
         expect(alpha.querySelector(".lazy-plugin-table-col-name")!.hasAttribute("aria-label")).toBe(false);
