@@ -1,6 +1,7 @@
 import log from "loglevel";
 import type { DataAdapter } from "obsidian";
 import { Notice, Platform, normalizePath } from "obsidian";
+import { replaceFileContent } from "src/core/atomic-write";
 import { loadLocalStorage } from "src/core/storage";
 import type { DeviceSettings, DeviceType, LazySettings, Profile } from "src/core/types";
 import { DEFAULT_DEVICE_SETTINGS, DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, SETTINGS_SCHEMA_VERSION, isPluginMode, isRestoreDraftBehavior } from "src/core/types";
@@ -28,6 +29,20 @@ export function stableStringify(value: unknown): string {
             .join(",")}}`;
     }
     return JSON.stringify(value) ?? "null";
+}
+
+/** Thrown inside adapter.process to abort a save whose data.json no longer matches what was loaded. */
+class SettingsConflictError extends Error {}
+
+function parseSnapshot(text: string): SettingsSnapshot {
+    let value: unknown;
+    try {
+        value = JSON.parse(text);
+    } catch {
+        return { kind: "corrupt" };
+    }
+    if (!isRecord(value)) return { kind: "corrupt" };
+    return { kind: "valid", value, fingerprint: stableStringify(value) };
 }
 
 export class SettingsService {
@@ -194,34 +209,58 @@ export class SettingsService {
         }
     }
 
-    private async readPersistedSnapshot(): Promise<SettingsSnapshot> {
+    /** data.json read directly through the adapter; undefined when the plugin has no vault adapter (tests). */
+    private getDataFile(): { adapter: DataAdapter; path: string } | undefined {
         const candidate = this.plugin as unknown as {
             app?: { vault?: { adapter?: DataAdapter } };
             manifest?: { dir?: string };
-            loadData(): Promise<unknown>;
         };
         const adapter = candidate.app?.vault?.adapter;
         const dir = candidate.manifest?.dir;
+        return adapter && dir ? { adapter, path: normalizePath(`${dir}/data.json`) } : undefined;
+    }
 
-        if (adapter && dir) {
-            const dataPath = normalizePath(`${dir}/data.json`);
+    private async readPersistedSnapshot(): Promise<SettingsSnapshot> {
+        const dataFile = this.getDataFile();
+        if (dataFile) {
             try {
-                if (!(await adapter.exists(dataPath))) return { kind: "missing" };
-                const value: unknown = JSON.parse(await adapter.read(dataPath));
-                if (!isRecord(value)) return { kind: "corrupt" };
-                return { kind: "valid", value, fingerprint: stableStringify(value) };
+                if (!(await dataFile.adapter.exists(dataFile.path))) return { kind: "missing" };
+                return parseSnapshot(await dataFile.adapter.read(dataFile.path));
             } catch {
                 return { kind: "corrupt" };
             }
         }
 
         try {
-            const value: unknown = await candidate.loadData();
+            const value: unknown = await this.plugin.loadData();
             if (value === null || value === undefined) return { kind: "missing" };
             if (!isRecord(value)) return { kind: "corrupt" };
             return { kind: "valid", value, fingerprint: stableStringify(value) };
         } catch {
             return { kind: "corrupt" };
+        }
+    }
+
+    private async writePersisted(persisted: LazySettings) {
+        const dataFile = this.getDataFile();
+        if (!dataFile) {
+            await this.plugin.saveData(persisted);
+            return;
+        }
+
+        const expected = this.persistedFingerprint;
+        try {
+            // Reason: re-check the fingerprint inside process so a Sync write between the check above and this write is never overwritten.
+            await replaceFileContent(dataFile.adapter, dataFile.path, (current) => {
+                const latest: SettingsSnapshot = current === null ? { kind: "missing" } : parseSnapshot(current);
+                if (latest.kind === "corrupt" || latest.fingerprint !== expected) {
+                    throw new SettingsConflictError("data.json changed on disk before it could be saved");
+                }
+                return JSON.stringify(persisted, null, 2);
+            });
+        } catch (error) {
+            if (error instanceof SettingsConflictError) this.blockSettings("Settings changed on disk after this plugin loaded. Reload the plugin before saving to avoid overwriting newer data.");
+            throw error;
         }
     }
 
@@ -360,7 +399,7 @@ export class SettingsService {
         persisted.settingsSchemaVersion = SETTINGS_SCHEMA_VERSION;
         // Keep every profile in Obsidian's plugin data.json so Sync transfers the
         // complete configuration in one file; profiles/ remains the old migration copy for manual recovery.
-        await this.plugin.saveData(persisted);
+        await this.writePersisted(persisted);
         this.persistedFingerprint = stableStringify(persisted);
         this.persisted = persisted;
         this.isFirstLoad = false;

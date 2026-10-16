@@ -17,6 +17,7 @@ function createAdapter() {
         list: vi.fn().mockResolvedValue({ folders: [], files: [] }),
         read: vi.fn(),
         write: vi.fn().mockResolvedValue(undefined),
+        process: vi.fn(),
         remove: vi.fn().mockResolvedValue(undefined),
     };
 }
@@ -77,11 +78,8 @@ describe("ProfileStorage migration reader", () => {
         adapter.exists.mockImplementation(async (path: string) => path === "mock/plugin/dir/data.json" || path === "mock/plugin/dir/profiles");
         adapter.list.mockResolvedValue({ folders: [], files: ["mock/plugin/dir/profiles/Default.json"] });
         adapter.read.mockImplementation(async (path: string) => (path.endsWith("data.json") ? dataFile : JSON.stringify(profile)));
-        const { plugin, saveData } = createPlugin(adapter, oldData);
-        saveData.mockImplementation((value: unknown) => {
-            dataFile = JSON.stringify(value);
-            return Promise.resolve();
-        });
+        adapter.process.mockImplementation(async (_path: string, fn: (data: string) => string) => (dataFile = fn(dataFile)));
+        const { plugin } = createPlugin(adapter, oldData);
 
         await new SettingsService(plugin).load();
 

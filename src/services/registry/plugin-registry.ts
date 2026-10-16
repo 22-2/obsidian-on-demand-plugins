@@ -1,6 +1,7 @@
 import log from "loglevel";
 import type { App, PluginManifest } from "obsidian";
 import { Platform } from "obsidian";
+import { replaceFileContent } from "src/core/atomic-write";
 import { ON_DEMAND_PLUGIN_ID } from "src/core/constants";
 
 const logger = log.getLogger("OnDemandPlugin/PluginRegistry");
@@ -67,10 +68,12 @@ export class PluginRegistry {
 
     async writeCommunityPluginsFile(enabledPlugins: string[]) {
         try {
-            await this.app.vault.writeConfigJson("community-plugins", enabledPlugins);
+            // Reason: writeConfigJson swallows write errors; process keeps the read and write in one adapter queue slot and surfaces failures.
+            const content = JSON.stringify(enabledPlugins, null, 2);
+            await replaceFileContent(this.app.vault.adapter, this.getCommunityPluginsConfigFilePath(), () => content);
             this.knownOnDisk = new Set(enabledPlugins);
         } catch (error) {
-            logger.error("Failed to write community-plugins.json using writeConfigJson", error);
+            logger.error("Failed to write community-plugins.json", error);
         }
     }
 
