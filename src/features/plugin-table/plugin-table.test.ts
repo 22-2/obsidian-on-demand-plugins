@@ -114,8 +114,9 @@ describe("plugin table rendering", () => {
         expect(alpha.querySelector(".lazy-plugin-table-update-icon")).not.toBeNull();
         // The author sits beside the name instead of in a column of its own.
         expect(alpha.querySelector(".lazy-plugin-table-author")?.textContent).toBe("Ann");
-        expect(alpha.querySelector(".lazy-plugin-table-col-name")!.getAttribute("aria-label")).toBe("Alpha by Ann");
-        expect(alpha.querySelector(".lazy-plugin-table-col-description")!.getAttribute("aria-label")).toBe("First plugin");
+        // Only the loaded state has a tooltip, for the in-memory detail its short label leaves out.
+        expect(alpha.querySelector(".lazy-plugin-table-col-name")!.hasAttribute("aria-label")).toBe(false);
+        expect(alpha.querySelector(".lazy-plugin-table-col-description")!.hasAttribute("aria-label")).toBe(false);
         expect(root.querySelector("thead .lazy-plugin-table-col-author")).toBeNull();
         expect(rowOf("Beta").classList.contains("is-loaded")).toBe(true);
         expect(rowOf("Beta").querySelector(".lazy-plugin-table-lamp.is-loaded")).not.toBeNull();
@@ -407,9 +408,6 @@ describe("plugin table edge cases", () => {
         const { rowOf } = setup({ extra: [{ id: "delta", name: "Delta", version: "4.0.0" } as PluginManifest] });
         const delta = rowOf("Delta");
         expect(delta.querySelector(".lazy-plugin-table-author")).toBeNull();
-        expect(delta.querySelector(".lazy-plugin-table-col-name")!.getAttribute("aria-label")).toBe("Delta");
-        // An empty cell gets no tooltip.
-        expect(delta.querySelector(".lazy-plugin-table-col-description")!.hasAttribute("aria-label")).toBe(false);
         expect(delta.querySelector(".lazy-plugin-table-col-description")?.textContent).toBe("");
     });
 

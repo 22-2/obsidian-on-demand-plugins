@@ -517,8 +517,6 @@ export class PluginTable {
                         // The remaining columns are the plain text fields.
                         const text = typeof value === "string" ? value : "";
                         td.setText(text);
-                        // The cell ellipsizes, so the tooltip carries the full text.
-                        if (text) setTooltip(td, text);
                     }
                 }
             }
@@ -536,7 +534,6 @@ export class PluginTable {
      */
     private renderNameCell(td: HTMLElement, data: PluginTableRow): void {
         td.createSpan({ cls: "lazy-plugin-table-name", text: data.name });
-        setTooltip(td, data.author ? `${data.name} by ${data.author}` : data.name);
         const version = td.createSpan({ cls: "lazy-plugin-table-version" });
         if (data.latestVersion) {
             const icon = version.createSpan({ cls: "lazy-plugin-table-update-icon" });
