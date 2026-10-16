@@ -1,9 +1,8 @@
 /**
- * Interfaces extracted to break the circular dependency between
- * CommandCacheService and LazyCommandRunner.
+ * Interfaces shared between the command cache and the plugin-loading layer.
  *
- * Each service depends on the *interface* of the other, not the concrete class.
- * The ServiceContainer wires them together via setter injection.
+ * LazyCommandRunner receives the cache as a CommandRegistry in its constructor;
+ * CommandCacheService only gets a runLazyCommand callback, so there is no cycle.
  */
 
 export interface CachedCommand {
@@ -25,7 +24,7 @@ export interface CommandRegistry {
 }
 
 /**
- * What CommandCacheService needs from the plugin-loading layer.
+ * What the lazy loaders need from the plugin-loading layer.
  * Implemented by LazyCommandRunner.
  */
 export interface PluginLoader {

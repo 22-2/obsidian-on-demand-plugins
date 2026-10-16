@@ -2,7 +2,7 @@ import log from "loglevel";
 import type { PluginManifest } from "obsidian";
 import pTimeout from "p-timeout";
 import pWaitFor from "p-wait-for";
-import type { CachedCommand, PluginLoader } from "src/core/interfaces";
+import type { CachedCommand } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { isLazyMode, isPluginLoaded } from "src/core/utils";
 import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
@@ -17,11 +17,12 @@ export class CommandCacheService {
     private wrapperCommands = new Map<string, unknown>();
 
     private ctx: PluginContext;
-    private pluginLoader: PluginLoader;
+    /** Runs the real command behind a wrapper; the cache never loads plugins itself. */
+    private runLazyCommand: (commandId: string) => Promise<void>;
 
-    constructor(ctx: PluginContext, pluginLoader: PluginLoader) {
+    constructor(ctx: PluginContext, runLazyCommand: (commandId: string) => Promise<void>) {
         this.ctx = ctx;
-        this.pluginLoader = pluginLoader;
+        this.runLazyCommand = runLazyCommand;
         this.store = new CommandCacheStore(ctx);
     }
 
@@ -188,7 +189,7 @@ export class CommandCacheService {
                 name: cached.name,
                 icon: cached.icon,
                 callback: () => {
-                    void this.pluginLoader.runLazyCommand(commandId);
+                    void this.runLazyCommand(commandId);
                 },
             };
 

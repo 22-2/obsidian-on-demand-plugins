@@ -38,11 +38,11 @@ export class LazyEngineFeature implements AppFeature {
         this.events = events;
 
         // 1. Core Engine parts
-        this.lazyRunner = new LazyCommandRunner(ctx);
-        this.commandCache = new CommandCacheService(ctx, this.lazyRunner);
-
-        // Wire up setter injection
-        this.lazyRunner.setCommandRegistry(this.commandCache);
+        // The cache only needs a way to run a wrapped command, so it takes a callback
+        // and the runner can receive the finished cache in its constructor. Wrappers
+        // fire only after onload returns, by which time lazyRunner is assigned.
+        this.commandCache = new CommandCacheService(ctx, (commandId) => this.lazyRunner.runLazyCommand(commandId));
+        this.lazyRunner = new LazyCommandRunner(ctx, this.commandCache);
 
         // 2. Loaders setup
         const lockManager = new LeafLockManager();

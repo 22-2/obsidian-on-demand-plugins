@@ -1,4 +1,3 @@
-import type { PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as storageMs from "src/core/storage";
 import * as utilsMs from "src/core/utils";
@@ -31,10 +30,7 @@ type MockCtx = {
 describe("CommandCacheService", () => {
     let service: CommandCacheService;
     let mockCtx: MockCtx;
-    let mockPluginLoader: {
-        waitForPluginLoaded: ReturnType<typeof vi.fn>;
-        runLazyCommand: ReturnType<typeof vi.fn>;
-    };
+    let runLazyCommand: ReturnType<typeof vi.fn<(commandId: string) => Promise<void>>>;
 
     beforeEach(() => {
         vi.resetAllMocks();
@@ -60,12 +56,9 @@ describe("CommandCacheService", () => {
             },
         };
 
-        mockPluginLoader = {
-            waitForPluginLoaded: vi.fn().mockResolvedValue(true),
-            runLazyCommand: vi.fn().mockResolvedValue(undefined),
-        };
+        runLazyCommand = vi.fn<(commandId: string) => Promise<void>>().mockResolvedValue(undefined);
 
-        service = new CommandCacheService(mockCtx as unknown as PluginContext, mockPluginLoader as unknown as PluginLoader);
+        service = new CommandCacheService(mockCtx as unknown as PluginContext, runLazyCommand);
     });
 
     describe("getCommandsForPlugin", () => {
@@ -81,7 +74,6 @@ describe("CommandCacheService", () => {
             const result = await service.getCommandsForPlugin("test-plugin");
 
             expect(mockCtx.obsidianPlugins.enablePlugin).toHaveBeenCalledWith("test-plugin");
-            expect(mockPluginLoader.waitForPluginLoaded).not.toHaveBeenCalled();
 
             expect(result).toHaveLength(1);
             expect(result[0].id).toBe("test-cmd-1");
@@ -95,7 +87,6 @@ describe("CommandCacheService", () => {
             await service.getCommandsForPlugin("test-plugin");
 
             expect(mockCtx.obsidianPlugins.enablePlugin).not.toHaveBeenCalled();
-            expect(mockPluginLoader.waitForPluginLoaded).not.toHaveBeenCalled();
         });
     });
 
@@ -118,7 +109,7 @@ describe("CommandCacheService", () => {
             expect(service.isWrapperCommand("cmd1")).toBe(true);
 
             await addedCmd.callback();
-            expect(mockPluginLoader.runLazyCommand).toHaveBeenCalledWith("cmd1");
+            expect(runLazyCommand).toHaveBeenCalledWith("cmd1");
         });
 
         it("should not register wrapper if command is already registered by real plugin", async () => {

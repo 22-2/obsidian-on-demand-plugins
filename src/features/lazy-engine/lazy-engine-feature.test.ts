@@ -84,7 +84,6 @@ function createCacheMock(calls: string[]) {
 
 function createRunnerMock(calls: string[], instances: Record<string, { _loaded: boolean }>) {
     return {
-        setCommandRegistry: vi.fn(),
         ensurePluginLoaded: vi.fn(async (id: string): Promise<boolean> => {
             calls.push(`ensurePluginLoaded:${id}`);
             instances[id] = { _loaded: true };
