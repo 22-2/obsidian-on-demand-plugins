@@ -35,8 +35,18 @@ function createAdapter() {
         list: vi.fn().mockResolvedValue({ folders: [], files: [] }),
         read: vi.fn(),
         write: vi.fn().mockResolvedValue(undefined),
+        process: vi.fn(),
         remove: vi.fn().mockResolvedValue(undefined),
     };
+}
+
+/** Backs the adapter with one in-memory data.json, mirroring adapter.process (read, transform, write in one step). */
+function useDiskFile(adapter: ReturnType<typeof createAdapter>, initial: string) {
+    const disk = { data: initial };
+    adapter.exists.mockResolvedValue(true);
+    adapter.read.mockImplementation(async () => disk.data);
+    adapter.process.mockImplementation(async (_path: string, fn: (data: string) => string) => (disk.data = fn(disk.data)));
+    return disk;
 }
 
 function migratedDataWith(extra: Record<string, unknown> = {}) {
@@ -403,13 +413,9 @@ describe("SettingsService inline persistence", () => {
 
     it("serializes consecutive saves and stores profiles inline", async () => {
         const adapter = createAdapter();
-        let diskData = JSON.stringify(migratedDataWith());
-        adapter.exists.mockResolvedValue(true);
-        adapter.read.mockImplementation(async () => diskData);
+        const disk = useDiskFile(adapter, JSON.stringify(migratedDataWith()));
         const trigger = vi.fn();
-        const saveData = vi.fn(async (value: unknown) => {
-            diskData = JSON.stringify(value);
-        });
+        const saveData = vi.fn();
         const plugin = {
             app: { vault: { adapter }, workspace: { trigger } },
             manifest: { dir: "mock/plugin/dir" },
@@ -422,24 +428,58 @@ describe("SettingsService inline persistence", () => {
 
         await Promise.all([service.save(), service.save()]);
 
-        expect(saveData).toHaveBeenCalledTimes(2);
-        expect(saveData.mock.calls[0]?.[0]).toHaveProperty("profiles.Secondary");
-        expect(saveData.mock.calls[0]?.[0]).not.toHaveProperty("profileStorageVersion");
+        expect(adapter.process).toHaveBeenCalledTimes(2);
+        expect(saveData).not.toHaveBeenCalled();
+        expect(JSON.parse(disk.data)).toHaveProperty("profiles.Secondary");
+        expect(JSON.parse(disk.data)).not.toHaveProperty("profileStorageVersion");
         expect(trigger).toHaveBeenCalledTimes(2);
+    });
+
+    it("does not overwrite a data.json that changes between the check and the write", async () => {
+        const adapter = createAdapter();
+        const disk = useDiskFile(adapter, JSON.stringify(migratedDataWith()));
+        const plugin = {
+            app: { vault: { adapter }, workspace: { trigger: vi.fn() } },
+            manifest: { dir: "mock/plugin/dir" },
+            loadData: vi.fn(),
+            saveData: vi.fn(),
+        } as unknown as OnDemandPlugin;
+        const service = new SettingsService(plugin);
+        await service.load();
+        const synced = JSON.stringify(migratedDataWith({ showConsoleLog: true }));
+        // Simulate Sync writing data.json after the pre-save read but before the write.
+        adapter.process.mockImplementationOnce(async (_path: string, fn: (data: string) => string) => (disk.data = fn(synced)));
+
+        await expect(service.save()).rejects.toThrow("changed on disk after this plugin loaded");
+        expect(disk.data).not.toBe(synced);
+        await expect(service.save()).rejects.toThrow("cannot be saved");
+    });
+
+    it("creates data.json with adapter.write when it does not exist yet", async () => {
+        const adapter = createAdapter();
+        adapter.exists.mockResolvedValue(false);
+        const plugin = {
+            app: { vault: { adapter }, workspace: { trigger: vi.fn() } },
+            manifest: { dir: "mock/plugin/dir" },
+            loadData: vi.fn(),
+            saveData: vi.fn(),
+        } as unknown as OnDemandPlugin;
+        const service = new SettingsService(plugin);
+        await service.load();
+
+        await service.save();
+
+        expect(adapter.process).not.toHaveBeenCalled();
+        expect(adapter.write).toHaveBeenCalledWith("mock/plugin/dir/data.json", expect.stringContaining('"profiles"'));
     });
 
     it("persists an explicit snapshot without including or replacing the live plugin draft", async () => {
         const adapter = createAdapter();
-        let diskData = JSON.stringify(migratedDataWith());
-        adapter.exists.mockResolvedValue(true);
-        adapter.read.mockImplementation(async () => diskData);
-        const saveData = vi.fn(async (value: unknown) => {
-            diskData = JSON.stringify(value);
-        });
+        const disk = useDiskFile(adapter, JSON.stringify(migratedDataWith()));
         const plugin = {
             app: { vault: { adapter }, workspace: { trigger: vi.fn() } },
             manifest: { dir: "mock/plugin/dir" },
-            saveData,
+            saveData: vi.fn(),
         } as unknown as OnDemandPlugin;
         const service = new SettingsService(plugin);
         await service.load();
@@ -448,12 +488,12 @@ describe("SettingsService inline persistence", () => {
         service.settings.plugins.foo = { mode: PLUGIN_MODE.LAZY };
 
         await service.save(saved);
-        const persisted = JSON.parse(diskData) as LazySettings;
+        const persisted = JSON.parse(disk.data) as LazySettings;
         expect(persisted.profiles.Default.settings.plugins.foo).toBeUndefined();
         expect(persisted.showConsoleLog).toBe(true);
         expect(service.settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
         await service.save();
-        expect((JSON.parse(diskData) as LazySettings).profiles.Default.settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
+        expect((JSON.parse(disk.data) as LazySettings).profiles.Default.settings.plugins.foo.mode).toBe(PLUGIN_MODE.LAZY);
     });
 
     it("refuses to save before settings have loaded", async () => {

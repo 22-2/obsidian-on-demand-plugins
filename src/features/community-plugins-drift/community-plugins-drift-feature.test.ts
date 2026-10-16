@@ -31,7 +31,23 @@ class FakeObsidian {
         writeConfigJson: async (name: string, value: unknown) => {
             this.files.set(name, structuredClone(value));
         },
+        getConfigFile: (name: string) => `.obsidian/${name}.json`,
+        adapter: {
+            exists: async (path: string) => this.files.has(FakeObsidian.configName(path)),
+            write: async (path: string, data: string) => {
+                this.files.set(FakeObsidian.configName(path), JSON.parse(data));
+            },
+            process: async (path: string, fn: (data: string) => string) => {
+                const data = fn(JSON.stringify(this.files.get(FakeObsidian.configName(path))));
+                this.files.set(FakeObsidian.configName(path), JSON.parse(data));
+                return data;
+            },
+        },
     };
+
+    private static configName(path: string) {
+        return path.replace(/^\.obsidian\//, "").replace(/\.json$/, "");
+    }
 
     readonly workspace = { onLayoutReady: (callback: () => void) => callback() };
 
