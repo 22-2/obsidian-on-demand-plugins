@@ -1,3 +1,4 @@
+import log from "loglevel";
 import type { EventBus } from "src/core/event-bus";
 import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
@@ -250,10 +251,11 @@ describe("LazyEngineFeature.applyPluginState", () => {
 });
 
 describe("LazyEngineFeature layout-ready flow", () => {
-    let consoleError: MockInstance<typeof console.error>;
+    let consoleError: MockInstance<(...msg: unknown[]) => void>;
 
     beforeEach(() => {
-        consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+        // Reason: loglevel binds console methods when the logger is created, so spying on console misses its output.
+        consoleError = vi.spyOn(log.getLogger("OnDemandPlugin/LazyEngineFeature"), "error").mockImplementation(() => {});
     });
 
     afterEach(() => {
