@@ -79,15 +79,15 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     private registerEventHandlers() {
-        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean; externalChangesConfirmed?: boolean }) => {
+        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
-            await policyFeature?.rebuildWithProgress(null, options?.force ?? false, { externalChangesConfirmed: options?.externalChangesConfirmed });
+            await policyFeature?.rebuildWithProgress(null, options.force ?? false, { externalChangesConfirmed: options.externalChangesConfirmed });
         });
 
-        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[]; externalChangesConfirmed?: boolean }) => {
+        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
             if (policyFeature) {
-                await policyFeature.applyWithProgress(null, options?.pluginIds, { externalChangesConfirmed: options?.externalChangesConfirmed });
+                await policyFeature.applyWithProgress(null, options.pluginIds, { externalChangesConfirmed: options.externalChangesConfirmed });
             }
         });
     }
