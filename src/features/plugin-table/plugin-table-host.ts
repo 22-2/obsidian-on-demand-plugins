@@ -13,7 +13,9 @@ import { stagePluginMode } from "src/ui/settings/helpers";
 export interface PluginTableHost {
     readonly app: App;
     readonly drafts: DraftSession;
-    /** Reloads the installed manifests, since plugins can be installed while the table is open. */
+    /** On-Demand itself: listed, but its mode cannot change, since it is what applies the modes. */
+    readonly selfId: string;
+    /** Reloads the installed manifests, since plugins can be installed while the table is open. Includes On-Demand itself. */
     getManifests(): PluginManifest[];
     getMode(pluginId: string): PLUGIN_MODE;
     /** Stages a mode change in the draft; false when it changes nothing. */
@@ -26,9 +28,11 @@ export function createPluginTableHost(plugin: OnDemandPlugin, drafts: DraftSessi
     return {
         app: plugin.app,
         drafts,
+        selfId: plugin.manifest.id,
         getManifests: () => {
             plugin.updateManifests();
-            return plugin.manifests;
+            // The registry leaves On-Demand out because the lazy engine must never manage it; the table only lists it.
+            return [...plugin.manifests, plugin.manifest];
         },
         getMode: (pluginId) => plugin.getPluginMode(pluginId),
         stageMode: (pluginId, mode) => stagePluginMode(plugin, pluginId, mode),

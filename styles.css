@@ -1128,6 +1128,15 @@ button.lazy-plugin-table-summary-item.is-active {
     color: var(--text-faint);
 }
 
+/* On-Demand's own mode is fixed; it lines up with the text of the dropdowns above and below. */
+.lazy-plugin-table-mode-fixed {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    padding-left: calc(0.8em + 1px);
+    font-size: var(--font-ui-smaller);
+}
+
 /* Hidden, not removed, so the dropdowns stay aligned across rows. */
 .lazy-plugin-table-mode-cell .clickable-icon.is-disabled {
     visibility: hidden;

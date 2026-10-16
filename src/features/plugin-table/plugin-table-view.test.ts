@@ -43,6 +43,7 @@ function setup(stored?: unknown) {
     const host = {
         app: app as unknown as App,
         drafts: drafts as unknown as DraftSession,
+        selfId: "on-demand-plugins",
         getManifests,
         getMode: () => PLUGIN_MODE.LAZY,
         stageMode: () => false,

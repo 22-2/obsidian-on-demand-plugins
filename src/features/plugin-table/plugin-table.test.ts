@@ -54,6 +54,7 @@ function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unk
     const host: PluginTableHost = {
         app: app as unknown as App,
         drafts: drafts as unknown as DraftSession,
+        selfId: "on-demand-plugins",
         getManifests: () => [...MANIFESTS, ...(options.extra ?? [])],
         getMode: (id) => modes[id],
         stageMode: (id, mode) => {
@@ -427,6 +428,54 @@ describe("plugin table selection and row menu", () => {
         menu.find("Relative paths")!.click();
         await flush();
         expect(Notice.messages).toContain("Failed to copy to clipboard");
+    });
+});
+
+describe("On-Demand's own row", () => {
+    const self = { id: "on-demand-plugins", name: "On-Demand", version: "3.7.0", author: "22-2", description: "Loads plugins on demand", dir: "config/plugins/on-demand-plugins" } as PluginManifest;
+
+    it("is always loaded from community-plugins.json, with a fixed mode", async () => {
+        // An empty snapshot would mark every other loaded plugin as in memory only.
+        const { rowOf, app } = setup({ extra: [self], saved: [] });
+        await flush();
+        const row = rowOf("On-Demand");
+        expect(row.querySelector(".lazy-plugin-table-col-loaded")?.textContent).toBe("Yes");
+        expect(row.querySelector(".lazy-plugin-table-lamp.is-memory-only")).toBeNull();
+        expect(row.querySelector(".lazy-plugin-table-mode-cell select")).toBeNull();
+        expect(row.querySelector(".lazy-plugin-table-mode-fixed")?.textContent).toBe("✅ Always enabled");
+        expect(app.plugins.plugins["on-demand-plugins"]).toBeUndefined();
+    });
+
+    it("is found by the saved filter", async () => {
+        const { root, names } = setup({ extra: [self] });
+        await flush();
+        change(root.querySelector<HTMLSelectElement>("select[aria-labelledby$='-header-loaded']")!, "saved");
+        expect(names()).toEqual(["Beta", "On-Demand"]);
+    });
+
+    it("offers every action except changing its settings", () => {
+        Platform.isDesktopApp = true;
+        const { rowOf, app } = setup({ extra: [self] });
+        const menu = rightClick(rowOf("On-Demand"));
+        expect(menu.find("Lazy settings")).toBeUndefined();
+        expect(menu.find("Mode")).toBeUndefined();
+        menu.find("Open plugin settings")!.click();
+        expect(app.setting.openTabById).toHaveBeenCalledWith("on-demand-plugins");
+        expect(menu.find("Show in community plugins")).toBeDefined();
+        expect(menu.find("Show in system explorer")).toBeDefined();
+        expect(menu.find("Relative path")).toBeDefined();
+    });
+
+    it("is left out of a batch mode change", () => {
+        const { rowOf, drafts } = setup({ extra: [self] });
+        rowOf("Alpha").click();
+        rowOf("On-Demand").dispatchEvent(new MouseEvent("click", { ctrlKey: true }));
+        const menu = rightClick(rowOf("Alpha"));
+        expect(menu.find("Mode for 1 plugin")).toBeDefined();
+
+        menu.find("✅ Always enabled")!.click();
+
+        expect([...drafts.pendingPluginIds]).toEqual(["alpha"]);
     });
 });
 

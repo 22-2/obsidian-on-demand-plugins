@@ -15,6 +15,7 @@ function setup() {
     const manifests = [{ id: "alpha", name: "Alpha" }];
     const plugin = {
         app: {},
+        manifest: { id: "on-demand-plugins", name: "On-Demand" },
         manifests: [] as unknown[],
         settings: { plugins: {} as Record<string, unknown> },
         updateManifests: vi.fn(function (this: { manifests: unknown[] }) {
@@ -27,9 +28,13 @@ function setup() {
 }
 
 describe("plugin table host", () => {
-    it("reloads the manifests before listing them", () => {
+    it("reloads the manifests before listing them, and lists On-Demand itself", () => {
         const { host, plugin } = setup();
-        expect(host.getManifests()).toEqual([{ id: "alpha", name: "Alpha" }]);
+        expect(host.selfId).toBe("on-demand-plugins");
+        expect(host.getManifests()).toEqual([
+            { id: "alpha", name: "Alpha" },
+            { id: "on-demand-plugins", name: "On-Demand" },
+        ]);
         expect(plugin.updateManifests).toHaveBeenCalledOnce();
     });
 

@@ -121,3 +121,17 @@ test("opening the table from plugin management keeps the draft live", async ({ o
     await expect(obsidian.page.locator(".lazy-review-changes-modal")).toHaveCount(0);
     expect(await modeOf(obsidian)).toBe("alwaysDisabled");
 });
+
+test("plugin table lists On-Demand itself as always loaded, without a mode to change", async ({ obsidian }) => {
+    const plugin = await obsidian.plugin(pluginUnderTestId);
+    await plugin.evaluate((instance) => (instance as unknown as TablePlugin).openPluginTable());
+    const view = obsidian.page.locator(".lazy-plugin-table-view");
+    await view.getByRole("textbox", { name: "Name", exact: true }).fill("On-Demand");
+    const row = view.locator("tbody tr").filter({ hasText: "On-Demand" });
+    await expect(row).toHaveCount(1);
+    await expect(row.locator(".lazy-plugin-table-col-loaded")).toHaveText("Yes");
+    await expect(row.locator(".lazy-plugin-table-lamp.is-loaded")).toHaveCount(1);
+    await expect(row.locator(".lazy-plugin-table-lamp.is-memory-only")).toHaveCount(0);
+    await expect(row.locator(".lazy-plugin-table-mode-fixed")).toHaveText("✅ Always enabled");
+    await expect(row.getByRole("combobox")).toHaveCount(0);
+});

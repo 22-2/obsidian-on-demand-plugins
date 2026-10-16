@@ -42,6 +42,8 @@ export interface PluginTableRow {
     memoryOnly: boolean;
     status: string;
     mode: PLUGIN_MODE;
+    /** On-Demand itself: always loaded from community-plugins.json, and its mode is not editable here. */
+    locked: boolean;
 }
 
 const MODE_ORDER: PLUGIN_MODE[] = [PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.LAZY, PLUGIN_MODE.LAZY_ON_LAYOUT_READY, PLUGIN_MODE.ALWAYS_ENABLED];
@@ -136,9 +138,8 @@ interface RowControls {
     dropdown?: DropdownComponent;
 }
 
-/** Only multi-row actions show a count; a single row gets its own wording. */
 function pluralizePlugins(count: number): string {
-    return `${count} plugins`;
+    return `${count} plugin${count === 1 ? "" : "s"}`;
 }
 
 /** Every column here has a plain string header. */
@@ -309,20 +310,27 @@ export class PluginTable {
     private buildRows(): PluginTableRow[] {
         // obsidian-typings declares this as a Map, but Obsidian stores a plain object.
         const updates = this.host.app.plugins.updates as unknown as Record<string, PluginUpdateManifest | undefined>;
-        return this.host.getManifests().map((manifest: PluginManifest) => ({
-            id: manifest.id,
-            name: manifest.name,
-            version: manifest.version,
-            latestVersion: updates[manifest.id]?.version,
-            author: manifest.author?.trim() ?? "",
-            description: manifest.description,
-            dir: manifest.dir,
-            mode: this.host.getMode(manifest.id),
-            ...this.loadState(manifest.id),
-        }));
+        return this.host.getManifests().map((manifest: PluginManifest) => {
+            const locked = manifest.id === this.host.selfId;
+            return {
+                id: manifest.id,
+                name: manifest.name,
+                version: manifest.version,
+                latestVersion: updates[manifest.id]?.version,
+                author: manifest.author?.trim() ?? "",
+                description: manifest.description,
+                dir: manifest.dir,
+                // On-Demand has no entry of its own: it loads at startup to apply everyone else's mode.
+                mode: locked ? PLUGIN_MODE.ALWAYS_ENABLED : this.host.getMode(manifest.id),
+                locked,
+                ...this.loadState(manifest.id),
+            };
+        });
     }
 
     private loadState(pluginId: string): Pick<PluginTableRow, "loaded" | "memoryOnly" | "status"> {
+        // The table is On-Demand's own view, so On-Demand is running and listed whenever it is open.
+        if (pluginId === this.host.selfId) return { loaded: true, memoryOnly: false, status: "Loaded" };
         const loaded = isPluginLoaded(this.host.app, pluginId);
         const saved = this.savedCommunityPluginIds;
         return { loaded, memoryOnly: loaded && saved !== undefined && !saved.has(pluginId), status: enabledBadgeText(this.host.app, pluginId, saved) };
@@ -599,6 +607,10 @@ export class PluginTable {
 
     private renderModeCell(td: HTMLElement, data: PluginTableRow, controls: RowControls): void {
         const wrapper = td.createDiv({ cls: "lazy-plugin-table-mode-cell" });
+        if (data.locked) {
+            wrapper.createSpan({ cls: "lazy-plugin-table-mode-fixed", text: PluginModes[data.mode] });
+            return;
+        }
         // Editing a mode is not a row click, so it never changes the selection.
         wrapper.addEventListener("click", (evt) => evt.stopPropagation());
         controls.dropdown = addModeOptions(new DropdownComponent(wrapper))
@@ -652,7 +664,7 @@ export class PluginTable {
      * where it is even when it no longer matches the filter until the filters change.
      */
     private applyMode(ids: readonly string[], mode: PLUGIN_MODE): void {
-        const staged = ids.filter((id) => this.host.stageMode(id, mode));
+        const staged = ids.filter((id) => id !== this.host.selfId && this.host.stageMode(id, mode));
         if (staged.length > 0) {
             for (const id of staged) this.host.drafts.pendingPluginIds.add(id);
             this.host.drafts.markDirty(this);
@@ -674,9 +686,11 @@ export class PluginTable {
     private buildRowMenu(): MenuType {
         const targets = this.getSelectedRows();
         const single = targets.length === 1 ? targets[0] : null;
+        // On-Demand's own row keeps every action except changing its settings.
+        const editable = targets.filter((row) => !row.locked);
         const menu = new Menu();
 
-        if (single) {
+        if (single && !single.locked) {
             menu.addItem((item) =>
                 item
                     .setTitle("Lazy settings")
@@ -685,21 +699,23 @@ export class PluginTable {
                     .onClick(() => this.openLazyOptions(single.id)),
             );
         }
-        menu.addItem((item) => {
-            item.setTitle(single ? "Mode" : `Mode for ${pluralizePlugins(targets.length)}`).setIcon("list-checks");
-            const submenu = (item as unknown as { setSubmenu(): MenuType }).setSubmenu();
-            for (const mode of MODE_ORDER) {
-                submenu.addItem((subItem) =>
-                    subItem
-                        .setTitle(PluginModes[mode])
-                        .setChecked(targets.every((row) => row.mode === mode))
-                        .onClick(() => this.applyMode(
-                            targets.map((row) => row.id),
-                            mode,
-                        )),
-                );
-            }
-        });
+        if (editable.length > 0) {
+            menu.addItem((item) => {
+                item.setTitle(single ? "Mode" : `Mode for ${pluralizePlugins(editable.length)}`).setIcon("list-checks");
+                const submenu = (item as unknown as { setSubmenu(): MenuType }).setSubmenu();
+                for (const mode of MODE_ORDER) {
+                    submenu.addItem((subItem) =>
+                        subItem
+                            .setTitle(PluginModes[mode])
+                            .setChecked(editable.every((row) => row.mode === mode))
+                            .onClick(() => this.applyMode(
+                                editable.map((row) => row.id),
+                                mode,
+                            )),
+                    );
+                }
+            });
+        }
 
         if (single) {
             menu.addSeparator();
