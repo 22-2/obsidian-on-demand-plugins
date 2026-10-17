@@ -3,6 +3,7 @@ import type { App, PluginManifest } from "obsidian";
 import { installObsidianDom } from "src/__mocks__/obsidian-dom";
 import { Menu } from "src/__mocks__/obsidian-ui";
 import { FileSystemAdapter, Notice, Platform } from "src/__mocks__/obsidian";
+import { debounce } from "obsidian";
 import { PLUGIN_MODE } from "src/core/types";
 import type { PLUGIN_MODE as PluginMode } from "src/core/types";
 import { PluginTable } from "src/features/plugin-table/plugin-table";
@@ -15,7 +16,10 @@ import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Obsidian's setTooltip also stores the text as the element's aria-label.
-vi.mock("obsidian", async () => ({ ...(await import("src/__mocks__/obsidian")), ...(await import("src/__mocks__/obsidian-ui")), setTooltip: (el: HTMLElement, text: string) => el.setAttribute("aria-label", text) }));
+vi.mock("obsidian", async () => {
+    const base = await import("src/__mocks__/obsidian");
+    return { ...base, ...(await import("src/__mocks__/obsidian-ui")), debounce: vi.fn(base.debounce), setTooltip: (el: HTMLElement, text: string) => el.setAttribute("aria-label", text) };
+});
 vi.mock("src/ui/show-in-community-plugins", () => ({ showInCommunityPlugins: vi.fn() }));
 vi.mock("src/ui/settings/helpers", async (importOriginal) => ({ ...(await importOriginal<typeof import("src/ui/settings/helpers")>()), openPluginDirectory: vi.fn() }));
 
@@ -174,6 +178,31 @@ describe("plugin table rendering", () => {
         const { root, table } = setup();
         table.destroy();
         expect(root.querySelector(".lazy-plugin-table-container")).toBeNull();
+    });
+
+    it("saves a state change still waiting on the debounce when destroyed", () => {
+        // Hold the call until run(), like a debounce whose timer has not fired yet.
+        vi.mocked(debounce).mockImplementationOnce(((fn: () => void) => {
+            let pending = false;
+            const debounced = Object.assign(() => {
+                pending = true;
+                return debounced;
+            }, {
+                cancel: () => debounced,
+                run: () => {
+                    if (pending) fn();
+                    pending = false;
+                },
+            });
+            return debounced;
+        }));
+        const { header, table, onStateChange } = setup();
+        header("mode").click();
+        expect(onStateChange).not.toHaveBeenCalled();
+
+        table.destroy();
+
+        expect(onStateChange).toHaveBeenCalledWith(expect.objectContaining({ sorting: [{ id: "mode", desc: false }] }));
     });
 });
 

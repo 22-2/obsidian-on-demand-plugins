@@ -15,7 +15,7 @@ import {
 } from "@tanstack/table-core";
 import type { ColumnFiltersState, FilterFn, SortFn, SortingState, Table } from "@tanstack/table-core";
 import { storeReactivityBindings } from "@tanstack/table-core/store-reactivity-bindings";
-import type { Menu as MenuType, PluginManifest } from "obsidian";
+import type { Debouncer, MenuItem, Menu as MenuType, PluginManifest } from "obsidian";
 import { ButtonComponent, DropdownComponent, ExtraButtonComponent, FileSystemAdapter, Menu, Notice, Platform, debounce, setIcon, setTooltip } from "obsidian";
 import { PLUGIN_MODE, PluginModes, isPluginMode } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
@@ -152,6 +152,11 @@ function filterText(value: unknown): string {
     return typeof value === "string" ? value : "";
 }
 
+/** `MenuItem.setSubmenu` is not in Obsidian's public API, so this is the one place that relies on it. */
+function addSubmenu(item: MenuItem): MenuType {
+    return (item as unknown as { setSubmenu(): MenuType }).setSubmenu();
+}
+
 function hasUpdate(row: PluginTableRow): boolean {
     return row.latestVersion !== undefined;
 }
@@ -194,7 +199,7 @@ export class PluginTable {
     private colgroupEl: HTMLTableColElement;
     private theadEl: HTMLTableSectionElement;
     private tbodyEl: HTMLTableSectionElement;
-    private saveState: () => void;
+    private saveState: Debouncer<[], void>;
     private stopResize?: () => void;
     /** Touch layouts get a menu button per row, since they have no right-click. */
     private readonly touchUi: boolean;
@@ -303,6 +308,8 @@ export class PluginTable {
 
     destroy(): void {
         this.stopResize?.();
+        // A sort, column or width change made just before closing would otherwise be lost.
+        this.saveState.run();
         this.communityPluginReadId++;
         this.containerEl.remove();
     }
@@ -716,7 +723,7 @@ export class PluginTable {
         if (editable.length > 0) {
             menu.addItem((item) => {
                 item.setTitle(single ? "Mode" : `Mode for ${pluralizePlugins(editable.length)}`).setIcon("list-checks");
-                const submenu = (item as unknown as { setSubmenu(): MenuType }).setSubmenu();
+                const submenu = addSubmenu(item);
                 for (const mode of MODE_ORDER) {
                     submenu.addItem((subItem) =>
                         subItem
@@ -772,7 +779,7 @@ export class PluginTable {
         const basePath = adapter instanceof FileSystemAdapter ? adapter.getBasePath() : undefined;
         menu.addItem((item) => {
             item.setTitle("Copy").setIcon("copy");
-            const submenu = (item as unknown as { setSubmenu(): MenuType }).setSubmenu();
+            const submenu = addSubmenu(item);
             submenu.addItem((subItem) => subItem.setTitle(single ? "Plugin ID" : "Plugin IDs").onClick(() => void this.copyLines(targets.map((row) => row.id))));
             if (dirs.length === 0) return;
             submenu.addItem((subItem) => subItem.setTitle(single ? "Relative path" : "Relative paths").onClick(() => void this.copyLines(dirs)));
@@ -810,7 +817,7 @@ export class PluginTable {
         }
         menu.addItem((item) => {
             item.setTitle("Columns").setIcon("columns-3");
-            const submenu = (item as unknown as { setSubmenu(): MenuType }).setSubmenu();
+            const submenu = addSubmenu(item);
             for (const col of this.table.getAllLeafColumns()) {
                 if (!col.getCanHide()) continue;
                 submenu.addItem((subItem) =>
