@@ -209,64 +209,6 @@ describe("CommandCacheService", () => {
         });
     });
 
-    describe("forceReloadPluginCache", () => {
-        it("restores the previous wrappers when the snapshot fails", async () => {
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
-            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
-            await service.refreshCommandsForPlugin("test-plugin");
-            mockCtx.obsidianCommands.commands = {};
-            service.registerCachedCommandsForPlugin("test-plugin");
-            expect(service.isWrapperCommand("cmd1")).toBe(true);
-
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
-            mockCtx.obsidianPlugins.enablePlugin.mockRejectedValue(new Error("failed load"));
-            await expect(service.forceReloadPluginCache("test-plugin")).rejects.toThrow("failed load");
-
-            expect(service.isWrapperCommand("cmd1")).toBe(true);
-        });
-
-        it("drops obsolete wrappers when the loaded plugin no longer registers commands", async () => {
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
-
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
-            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
-
-            await service.refreshCommandsForPlugin("test-plugin");
-
-            mockCtx.obsidianCommands.commands = {};
-            service.registerCachedCommandsForPlugin("test-plugin");
-
-            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string };
-            mockCtx.obsidianCommands.commands.cmd1 = addedCmd;
-
-            await service.forceReloadPluginCache("test-plugin");
-
-            expect(mockCtx.obsidianCommands.removeCommand).toHaveBeenCalledWith("cmd1");
-            expect(mockCtx.obsidianCommands.addCommand).toHaveBeenCalledTimes(1);
-            expect(service.getCachedCommand("cmd1")).toBeUndefined();
-            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
-        });
-
-        it("should refresh and persist without registering wrappers when none were active", async () => {
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
-
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
-            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
-
-            await service.refreshCommandsForPlugin("test-plugin");
-
-            vi.clearAllMocks();
-
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1 updated" } };
-            await service.forceReloadPluginCache("test-plugin");
-
-            expect(mockCtx.obsidianCommands.removeCommand).not.toHaveBeenCalled();
-            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
-            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
-        });
-    });
-
     describe("stale command cache (plugin version changed)", () => {
         // Simulates a cache built while test-plugin was 0.9.0; the manifest now reports 1.0.0.
         const seedStorage = (cachedVersion: string) => {

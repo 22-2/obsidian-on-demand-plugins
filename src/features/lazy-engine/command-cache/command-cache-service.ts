@@ -82,21 +82,6 @@ export class CommandCacheService {
         if (await this.refreshCommandsForPlugin(pluginId)) this.store.persist();
     }
 
-    async forceReloadPluginCache(pluginId: string): Promise<void> {
-        const cachedIds = this.store.getIds(pluginId);
-        const hadWrappers = cachedIds ? Array.from(cachedIds).some((commandId) => this.isWrapperCommand(commandId)) : false;
-
-        try {
-            await this.snapshotCommandsForPlugin(pluginId);
-            this.persistCache();
-        } finally {
-            // The snapshot removes wrappers first; restore them from the previous cache on failure.
-            if (hadWrappers) {
-                this.registerCachedCommandsForPlugin(pluginId);
-            }
-        }
-    }
-
     /** Capture without serializing the entire cache; bulk rebuilds persist once at the end. */
     async snapshotCommandsForPlugin(pluginId: string): Promise<void> {
         this.removeCachedCommandsForPlugin(pluginId);

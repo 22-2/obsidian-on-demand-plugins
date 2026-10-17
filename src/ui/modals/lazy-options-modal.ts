@@ -2,7 +2,7 @@ import log from "loglevel";
 import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type { LazyOptions } from "src/core/types";
-import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
+import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import type OnDemandPlugin from "src/main";
 import { currentLazyOptions, stageLazyOptions } from "src/ui/settings/helpers";
 
@@ -38,7 +38,7 @@ export class LazyOptionsModal extends Modal {
 
         new Setting(contentEl)
             .setName("Cache")
-            .setDesc("Force reload command cache for this plugin only.")
+            .setDesc("Force rebuild the command and view caches for this plugin only. A running plugin is briefly reloaded to capture its views.")
             .addButton((btn) =>
                 btn
                     .setButtonText("Reload this plugin cache")
@@ -47,14 +47,14 @@ export class LazyOptionsModal extends Modal {
                         void (async () => {
                             btn.setDisabled(true);
                             try {
-                                const lazyEngine = this.plugin.features.get(LazyEngineFeature);
-                                if (!lazyEngine) {
-                                    new Notice("Lazy engine is not available");
+                                const startupPolicy = this.plugin.features.get(StartupPolicyFeature);
+                                if (!startupPolicy) {
+                                    new Notice("Startup policy is not available");
                                     return;
                                 }
 
-                                await lazyEngine.commandCache.forceReloadPluginCache(this.pluginId);
-                                new Notice(`Reloaded command cache for ${this.pluginId}`);
+                                await startupPolicy.rebuildPluginCaches(this.pluginId);
+                                new Notice(`Reloaded command and view caches for ${this.pluginId}`);
                             } catch (error: unknown) {
                                 const message = error instanceof Error ? error.message : String(error);
                                 new Notice(`Failed to reload cache for ${this.pluginId}`);
