@@ -5,11 +5,11 @@ import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
-import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText, stagePluginMode } from "src/ui/settings/helpers";
 import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
@@ -47,14 +47,14 @@ export class PluginPage extends SettingPage {
     // Kept in vault-scoped local storage, not in the staged settings draft, so it saves at once.
     private compact = false;
     private app: App;
-    private plugin: OnDemandPlugin;
+    private plugin: SettingsUiHost;
     private tab: SettingsTab;
     private infiniteScrollObserver?: IntersectionObserver;
     private loadedCount = 0;
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
     private loadStateRef?: EventRef;
-    constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
+    constructor(app: App, plugin: SettingsUiHost, tab: SettingsTab) {
         super();
         this.app = app;
         this.plugin = plugin;
@@ -197,7 +197,7 @@ export class PluginPage extends SettingPage {
         );
         this.infiniteScrollObserver.observe(sentinel);
     }
-    private appendPluginRows(listEl: HTMLElement, plugins: OnDemandPlugin["manifests"], start: number, end: number) {
+    private appendPluginRows(listEl: HTMLElement, plugins: SettingsUiHost["manifests"], start: number, end: number) {
         plugins.slice(start, end).forEach((manifest) => {
             if (!manifest) return;
             const setting = new Setting(listEl).setName(manifest.name);
