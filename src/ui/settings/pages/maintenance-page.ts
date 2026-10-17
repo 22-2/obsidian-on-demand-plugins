@@ -3,18 +3,16 @@ import type { ButtonComponent } from "obsidian";
 import { Notice, Setting, SettingPage } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
 import { PLUGIN_MODE } from "src/core/types";
-import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import type { SyncDirection } from "src/features/maintenance/maintenance-feature";
-import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
-import type OnDemandPlugin from "src/main";
 import type { SettingsTab } from "src/ui/settings-tab";
+import type { MaintenanceOperations, SettingsUiHost } from "src/ui/settings-ui-host";
 import { addModeOptions } from "src/ui/settings/helpers";
 import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 const logger = log.getLogger("OnDemandPlugin/MaintenancePage");
 
 export class MaintenancePage extends SettingPage {
-    private plugin: OnDemandPlugin;
+    private plugin: SettingsUiHost;
     private tab: SettingsTab;
     private from: PLUGIN_MODE = PLUGIN_MODE.ALWAYS_DISABLED;
     private to: PLUGIN_MODE = PLUGIN_MODE.LAZY;
@@ -28,13 +26,13 @@ export class MaintenancePage extends SettingPage {
     // so these flags stop a double click from starting a second run.
     private rebuildBusy = false;
     private syncBusy = false;
-    constructor(plugin: OnDemandPlugin, tab: SettingsTab) {
+    constructor(plugin: SettingsUiHost, tab: SettingsTab) {
         super();
         this.plugin = plugin;
         this.tab = tab;
     }
     /** Resolves once the rebuild finished, failed or was declined; failures are reported, not thrown. */
-    rebuildCaches(button: ButtonComponent, feature: MaintenanceFeature): Promise<void> {
+    rebuildCaches(button: ButtonComponent, feature: MaintenanceOperations): Promise<void> {
         if (this.rebuildBusy) return this.rebuilding;
         this.rebuildBusy = true;
         this.rebuilding = this.runRebuild(button, feature)
@@ -48,7 +46,7 @@ export class MaintenancePage extends SettingPage {
         return this.rebuilding;
     }
     /** Resolves once the sync finished or was refused; failures are reported, not thrown. */
-    syncNow(button: ButtonComponent, feature: MaintenanceFeature): Promise<void> {
+    syncNow(button: ButtonComponent, feature: MaintenanceOperations): Promise<void> {
         if (this.syncBusy) return this.syncing;
         this.syncBusy = true;
         button.setDisabled(true);
@@ -67,7 +65,7 @@ export class MaintenancePage extends SettingPage {
         this.tab.requestRestoreOnPageClose("maintenance");
         super.hide();
     }
-    private async runSync(feature: MaintenanceFeature) {
+    private async runSync(feature: MaintenanceOperations) {
         await this.tab.waitForImmediateSaves();
         if (this.syncDirection === "lazyToCore" && this.tab.hasPendingChanges) {
             // This direction writes Obsidian's config immediately, so
@@ -102,7 +100,7 @@ export class MaintenancePage extends SettingPage {
             this.display();
         }
     }
-    private async runRebuild(button: ButtonComponent, feature: MaintenanceFeature) {
+    private async runRebuild(button: ButtonComponent, feature: MaintenanceOperations) {
         await this.tab.waitForImmediateSaves();
         // Rebuilding also persists settings and applies startup policies.
         if (this.tab.hasPendingChanges) {
@@ -110,8 +108,7 @@ export class MaintenancePage extends SettingPage {
             return;
         }
         // Ask here rather than inside the rebuild so declining is not reported as a success.
-        const drift = this.plugin.features.get(CommunityPluginsDriftFeature);
-        if (drift && !(await drift.confirmOverwrite())) return;
+        if (!(await this.plugin.confirmExternalOverwrite())) return;
         button.setDisabled(true);
         try {
             await feature.rebuildAndApplyCommandCache({ force: true, externalChangesConfirmed: true });
@@ -125,7 +122,7 @@ export class MaintenancePage extends SettingPage {
         this.containerEl.empty();
         this.containerEl.addClass("lazy-maintenance-page");
         this.tab.renderPendingControls(this.containerEl, () => this.display());
-        const f = this.plugin.features.get(MaintenanceFeature);
+        const f = this.plugin.maintenance;
         new Setting(this.containerEl).setName("Cache maintenance").setHeading();
         new Setting(this.containerEl)
             .setName("Rebuild command and view caches")

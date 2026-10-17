@@ -17,13 +17,14 @@ vi.mock("obsidian", async () => ({
 function setup() {
     const feature = {
         rebuildAndApplyCommandCache: vi.fn().mockResolvedValue(undefined),
-        // The fixture returns this object for every feature, including the drift check.
-        confirmOverwrite: vi.fn().mockResolvedValue(true),
         executeSync: vi.fn().mockResolvedValue({ changed: 0, message: "Already in sync" }),
         buildSyncPreview: vi.fn().mockResolvedValue({ label: "On-Demand → file", summary: "✅ Already in sync", hasChanges: false }),
         applyBatchModeReplace: vi.fn().mockReturnValue(0),
+        confirmOverwrite: vi.fn().mockResolvedValue(true),
     };
     const fixture = createPageFixture(feature);
+    // Kept beside the maintenance mocks so its order against the rebuild can be checked.
+    fixture.pluginMock.confirmExternalOverwrite = feature.confirmOverwrite;
     const page = new MaintenancePage(fixture.plugin, fixture.tab);
     page.display();
     const setting = (name: string) => ui.setting(name, page.containerEl as unknown as UiElement);
@@ -172,7 +173,7 @@ describe("MaintenancePage", () => {
 
     it("ignores maintenance operations when the feature is unavailable", async () => {
         const { feature, pluginMock, page, setting, clickAndSettle } = setup();
-        pluginMock.features.get.mockReturnValue(undefined);
+        pluginMock.maintenance = undefined;
         page.display();
         await clickAndSettle("Rebuild command and view caches");
         await clickAndSettle("Sync direction");

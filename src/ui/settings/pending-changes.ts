@@ -2,7 +2,7 @@ import type { DeviceSettings, LazySettings, PLUGIN_MODE, PluginSettings, Restore
 import { PluginModes } from "src/core/types";
 import { stableStringify } from "src/services/settings/settings-service";
 
-type DraftSource = {
+export type DraftSource = {
     readonly data?: LazySettings;
     readonly currentProfileId: string;
     /** Last loaded or saved settings; when present it is the baseline, so saves made elsewhere never go stale here. */

@@ -1,12 +1,10 @@
 import type { App } from "obsidian";
 import { Notice } from "obsidian";
-import { FeatureEvents } from "src/core/event-bus";
 import { PLUGIN_MODE } from "src/core/types";
 import type { RestoreDraftBehavior } from "src/core/types";
 import type { CommunityPluginsDrift } from "src/features/community-plugins-drift/community-plugins-drift";
-import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
-import type OnDemandPlugin from "src/main";
 import { showRestoreDraftModal, showReviewChangesModal } from "src/ui/modals/review-changes-modal";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import type { ChangeDescriber, DraftStash, ImmediateSettingsChange, PendingChange, PendingChangeGroup } from "src/ui/settings/pending-changes";
 import { PendingChanges } from "src/ui/settings/pending-changes";
 
@@ -30,7 +28,7 @@ export type DraftListener = (kind: DraftChangeKind, source: unknown) => void;
  */
 export class DraftSession {
     private readonly app: App;
-    private readonly plugin: OnDemandPlugin;
+    private readonly plugin: SettingsUiHost;
     private readonly pending: PendingChanges;
     private readonly listeners = new Set<DraftListener>();
     private readonly openSurfaces = new Set<DraftSurface>();
@@ -42,10 +40,10 @@ export class DraftSession {
     /** The last restore offer, for callers that need to wait for it. */
     restoring: Promise<void> = Promise.resolve();
 
-    constructor(app: App, plugin: OnDemandPlugin) {
+    constructor(app: App, plugin: SettingsUiHost) {
         this.app = app;
         this.plugin = plugin;
-        this.pending = new PendingChanges(() => this.plugin.core?.settingsService);
+        this.pending = new PendingChanges(() => this.plugin.getDraftSource());
     }
 
     get pendingPluginIds() {
@@ -165,7 +163,7 @@ export class DraftSession {
     }
 
     async saveImmediateChanges(change: ImmediateSettingsChange): Promise<void> {
-        await this.pending.saveImmediately(change, (data) => this.plugin.core.settingsService.save(data));
+        await this.pending.saveImmediately(change, (data) => this.plugin.saveSettings(data));
     }
     async waitForImmediateSaves(): Promise<void> {
         await this.pending.waitForImmediateSaves();
@@ -176,13 +174,6 @@ export class DraftSession {
             pluginName: (pluginId) => this.plugin.manifests.find((manifest) => manifest.id === pluginId)?.name ?? pluginId,
             fallbackMode: (pluginId, settings) => (this.plugin.isPluginEnabledOnDisk(pluginId) ? PLUGIN_MODE.ALWAYS_ENABLED : settings.defaultMode),
         };
-    }
-    private async detectExternalChanges(): Promise<CommunityPluginsDrift | null> {
-        try {
-            return (await this.plugin.features.get(CommunityPluginsDriftFeature)?.detect()) ?? null;
-        } catch {
-            return null;
-        }
     }
     private describeExternalChanges(drift: CommunityPluginsDrift): PendingChange[] {
         const nameOf = (pluginId: string) => this.plugin.manifests.find((manifest) => manifest.id === pluginId)?.name ?? pluginId;
@@ -212,7 +203,7 @@ export class DraftSession {
         }
     }
     private async runReview() {
-        const drift = await this.detectExternalChanges();
+        const drift = await this.plugin.detectExternalChanges();
         const confirmed = await showReviewChangesModal(this.app, {
             mode: "save",
             // Only an apply rewrites community-plugins.json, so external edits matter only while plugin changes remain.
@@ -237,7 +228,7 @@ export class DraftSession {
         const pluginIds = this.getChangedPluginIds();
         await this.plugin.saveSettings();
         if (pluginIds.length > 0) {
-            await this.plugin.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds, externalChangesConfirmed: options?.externalChangesConfirmed });
+            await this.plugin.applyPolicies(pluginIds, { externalChangesConfirmed: options?.externalChangesConfirmed });
         }
         this.resetPending();
         new Notice(pluginIds.length > 0 ? "Settings saved and applied" : "Settings saved");

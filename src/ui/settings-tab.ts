@@ -1,10 +1,9 @@
-import type { App, SettingDefinitionItem } from "obsidian";
+import type { App, Plugin, SettingDefinitionItem } from "obsidian";
 import { PluginSettingTab, Setting } from "obsidian";
 import { DEFAULT_DEVICE_SETTINGS, PluginModes } from "src/core/types";
 import type { RestoreDraftBehavior } from "src/core/types";
-import { BackupFeature } from "src/features/backup/backup-feature";
-import type OnDemandPlugin from "src/main";
 import { DraftSession, pendingSummary } from "src/ui/drafts/draft-session";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import { pluginManagementSummary } from "src/ui/settings/helpers";
 import { MaintenancePage } from "src/ui/settings/pages/maintenance-page";
 import { PluginPage } from "src/ui/settings/pages/plugin-page";
@@ -13,10 +12,11 @@ import type { ImmediateSettingsChange, PendingChange } from "src/ui/settings/pen
 import { RESTORE_DRAFT_BEHAVIOR_LABELS } from "src/ui/settings/pending-changes";
 
 export class SettingsTab extends PluginSettingTab {
-    public plugin: OnDemandPlugin;
+    public plugin: Plugin & SettingsUiHost;
     /** The draft shared with the plugin table; this tab is one of its surfaces. */
     readonly drafts: DraftSession;
-    constructor(app: App, plugin: OnDemandPlugin) {
+    /** Obsidian registers a settings tab against its plugin, so the host is the plugin itself. */
+    constructor(app: App, plugin: Plugin & SettingsUiHost) {
         super(app, plugin);
         this.plugin = plugin;
         this.drafts = new DraftSession(app, plugin);
@@ -132,7 +132,7 @@ export class SettingsTab extends PluginSettingTab {
                                                     const installed = new Set(this.plugin.manifests.map((manifest) => manifest.id));
                                                     const maps = [settings.plugins, settings.lazyOnViews, settings.lazyOnFiles];
                                                     if (!maps.some((map) => Object.keys(map).some((id) => !installed.has(id)))) return;
-                                                    await this.plugin.features.get(BackupFeature)?.createBackup();
+                                                    await this.plugin.createBackup();
                                                     for (const map of maps) {
                                                         for (const id of Object.keys(map)) if (!installed.has(id)) delete map[id];
                                                     }

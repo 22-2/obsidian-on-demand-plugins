@@ -9,6 +9,7 @@ import type { DeviceSettings, LazySettings } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 import { toggleLoggerBy } from "src/core/utils";
 import { BackupFeature } from "src/features/backup/backup-feature";
+import type { CommunityPluginsDrift } from "src/features/community-plugins-drift/community-plugins-drift";
 import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
@@ -18,10 +19,12 @@ import { PluginTableView, VIEW_TYPE_PLUGIN_TABLE } from "src/features/plugin-tab
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { CoreContainer } from "src/services/core-container";
 import { SettingsTab } from "src/ui/settings-tab";
+import type { MaintenanceOperations, SettingsUiHost } from "src/ui/settings-ui-host";
+import type { DraftSource } from "src/ui/settings/pending-changes";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
 
-export default class OnDemandPlugin extends Plugin {
+export default class OnDemandPlugin extends Plugin implements SettingsUiHost {
     // Assigned during onload via loadSettings().
     data!: LazySettings;
     // Assigned during onload via loadSettings().
@@ -126,8 +129,17 @@ export default class OnDemandPlugin extends Plugin {
         this.device = this.core.settingsService.data.profiles[profileId]?.name ?? "Unknown";
     }
 
-    async saveSettings() {
-        await this.core.settingsService.save();
+    async saveSettings(snapshot?: LazySettings) {
+        await this.core.settingsService.save(snapshot);
+    }
+
+    get currentProfileId(): string {
+        return this.core.settingsService.currentProfileId;
+    }
+
+    getDraftSource(): DraftSource | undefined {
+        // Undefined until the core exists; the draft then compares against its own snapshot.
+        return this.core?.settingsService;
     }
 
     // ─── Plugin configuration ──────────────────────────────────
@@ -242,6 +254,38 @@ export default class OnDemandPlugin extends Plugin {
         if (policyFeature) {
             await policyFeature.applyWithProgress(null, pluginIds);
         }
+    }
+
+    async applyPolicies(pluginIds: string[], options?: { externalChangesConfirmed?: boolean }) {
+        await this.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds, externalChangesConfirmed: options?.externalChangesConfirmed });
+    }
+
+    async confirmExternalOverwrite(): Promise<boolean> {
+        const drift = this.features.get(CommunityPluginsDriftFeature);
+        return !drift || (await drift.confirmOverwrite());
+    }
+
+    async detectExternalChanges(): Promise<CommunityPluginsDrift | null> {
+        try {
+            return (await this.features.get(CommunityPluginsDriftFeature)?.detect()) ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    async rebuildPluginCaches(pluginId: string): Promise<boolean> {
+        const startupPolicy = this.features.get(StartupPolicyFeature);
+        if (!startupPolicy) return false;
+        await startupPolicy.rebuildPluginCaches(pluginId);
+        return true;
+    }
+
+    async createBackup() {
+        await this.features.get(BackupFeature)?.createBackup();
+    }
+
+    get maintenance(): MaintenanceOperations | undefined {
+        return this.features.get(MaintenanceFeature);
     }
 
     async rebuildAndApplyCommandCache(options?: { force?: boolean; externalChangesConfirmed?: boolean }) {

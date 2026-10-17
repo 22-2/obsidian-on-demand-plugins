@@ -1,8 +1,8 @@
 import type { App, PluginManifest } from "obsidian";
 import type { PLUGIN_MODE } from "src/core/types";
-import type OnDemandPlugin from "src/main";
 import type { DraftSession } from "src/ui/drafts/draft-session";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import { stagePluginMode } from "src/ui/settings/helpers";
 
 /**
@@ -24,7 +24,7 @@ export interface PluginTableHost {
     openLazyOptions(pluginId: string, onSave: () => void): void;
 }
 
-export function createPluginTableHost(plugin: OnDemandPlugin, drafts: DraftSession): PluginTableHost {
+export function createPluginTableHost(plugin: SettingsUiHost, drafts: DraftSession): PluginTableHost {
     return {
         app: plugin.app,
         drafts,

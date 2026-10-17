@@ -2,21 +2,20 @@ import log from "loglevel";
 import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type { LazyOptions } from "src/core/types";
-import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
-import type OnDemandPlugin from "src/main";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import { currentLazyOptions, stageLazyOptions } from "src/ui/settings/helpers";
 
 const logger = log.getLogger("OnDemandPlugin/LazyOptionsModal");
 
 export class LazyOptionsModal extends Modal {
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
-    private plugin: OnDemandPlugin;
+    private plugin: SettingsUiHost;
     private pluginId: string;
     private onSave?: () => void;
     private options: LazyOptions;
     private initialOptionsSnapshot: string;
 
-    constructor(app: App, plugin: OnDemandPlugin, pluginId: string, onSave?: () => void) {
+    constructor(app: App, plugin: SettingsUiHost, pluginId: string, onSave?: () => void) {
         super(app);
         this.plugin = plugin;
         this.pluginId = pluginId;
@@ -47,13 +46,10 @@ export class LazyOptionsModal extends Modal {
                         void (async () => {
                             btn.setDisabled(true);
                             try {
-                                const startupPolicy = this.plugin.features.get(StartupPolicyFeature);
-                                if (!startupPolicy) {
+                                if (!(await this.plugin.rebuildPluginCaches(this.pluginId))) {
                                     new Notice("Startup policy is not available");
                                     return;
                                 }
-
-                                await startupPolicy.rebuildPluginCaches(this.pluginId);
                                 new Notice(`Reloaded command and view caches for ${this.pluginId}`);
                             } catch (error: unknown) {
                                 const message = error instanceof Error ? error.message : String(error);

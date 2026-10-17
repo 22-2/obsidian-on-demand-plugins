@@ -2,13 +2,12 @@
 import type { App } from "obsidian";
 import { Notice } from "src/__mocks__/obsidian";
 import { installObsidianDom } from "src/__mocks__/obsidian-dom";
-import { FeatureEvents } from "src/core/event-bus";
 import { DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, PLUGIN_MODE } from "src/core/types";
 import type { LazySettings } from "src/core/types";
-import type OnDemandPlugin from "src/main";
 import { DraftSession, pendingSummary } from "src/ui/drafts/draft-session";
 import type { ReviewChangesOptions } from "src/ui/modals/review-changes-modal";
 import { showRestoreDraftModal, showReviewChangesModal } from "src/ui/modals/review-changes-modal";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("obsidian", async () => await import("src/__mocks__/obsidian"));
@@ -23,35 +22,26 @@ function setup(options: { drift?: Drift | null; detectFails?: boolean } = {}) {
         data,
         persisted: structuredClone(data),
         currentProfileId: DEFAULT_PROFILE_ID,
-        save: vi.fn(async (saved: LazySettings) => {
-            service.persisted = structuredClone(saved);
-        }),
     };
     const plugin = {
-        core: { settingsService: service },
+        getDraftSource: () => service,
         data,
         settings,
         manifests: [{ id: "foo", name: "Foo" }],
         configureLogger: vi.fn(),
         isPluginEnabledOnDisk: (id: string) => id === "bar",
-        saveSettings: vi.fn(async () => {
-            service.persisted = structuredClone(service.data);
+        saveSettings: vi.fn(async (snapshot?: LazySettings) => {
+            service.persisted = structuredClone(snapshot ?? service.data);
         }),
         loadSettings: vi.fn(async () => {
             // Put the saved values back into the live objects, as the settings service does on reload.
             Object.assign(settings, structuredClone(service.persisted.profiles[DEFAULT_PROFILE_ID].settings));
         }),
-        events: { emit: vi.fn(async () => {}) },
-        features: {
-            get: () => ({
-                detect: async () => {
-                    if (options.detectFails) throw new Error("unreadable");
-                    return options.drift ?? null;
-                },
-            }),
-        },
+        applyPolicies: vi.fn(async () => {}),
+        // The host reports unreadable external edits as none.
+        detectExternalChanges: async () => (options.detectFails ? null : (options.drift ?? null)),
     };
-    const drafts = new DraftSession({} as App, plugin as unknown as OnDemandPlugin);
+    const drafts = new DraftSession({} as App, plugin as unknown as SettingsUiHost);
     const listener = vi.fn();
     drafts.onChange(listener);
     const stage = (id = "foo", mode: PLUGIN_MODE = PLUGIN_MODE.LAZY) => {
@@ -177,9 +167,9 @@ describe("draft session surfaces", () => {
 
     it("still applies the answer when remembering it fails", async () => {
         vi.mocked(showRestoreDraftModal).mockResolvedValue({ action: "restore", dontAskAgain: true });
-        const { drafts, stash, service, settings } = setup();
+        const { drafts, stash, plugin, settings } = setup();
         stash();
-        service.save.mockRejectedValueOnce(new Error("disk full"));
+        plugin.saveSettings.mockRejectedValueOnce(new Error("disk full"));
         drafts.offerRestoreOnPageOpen("plugin-table");
         await drafts.restoring;
         expect(Notice.messages).toContain("Could not save the restore preference. This choice still applies to this draft.");
@@ -257,7 +247,7 @@ describe("draft session review and save", () => {
         expect(reviewed?.changes).toEqual([expect.objectContaining({ group: "plugins", label: "Foo" })]);
         expect(reviewed?.label).toBe("Save & apply (1)");
         expect(plugin.saveSettings).toHaveBeenCalledOnce();
-        expect(plugin.events.emit).toHaveBeenCalledWith(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds: ["foo"], externalChangesConfirmed: true });
+        expect(plugin.applyPolicies).toHaveBeenCalledWith(["foo"], { externalChangesConfirmed: true });
         expect(Notice.messages).toContain("Settings saved and applied");
         expect(drafts.hasPendingChanges).toBe(false);
         expect(listener).toHaveBeenLastCalledWith("refresh", undefined);
@@ -283,7 +273,7 @@ describe("draft session review and save", () => {
         drafts.markDirty();
         await drafts.reviewAndSave();
         expect(reviewed?.label).toBe("Save changes");
-        expect(plugin.events.emit).not.toHaveBeenCalled();
+        expect(plugin.applyPolicies).not.toHaveBeenCalled();
         expect(Notice.messages).toContain("Settings saved");
     });
 
