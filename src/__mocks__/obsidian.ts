@@ -44,8 +44,16 @@ export class TFile {
     path = "";
 }
 
-export function debounce<T extends (...args: never[]) => unknown>(fn: T, _timeout?: number, _leading?: boolean): T {
-    return fn;
+/** Runs at once, so nothing is ever pending for `run` or `cancel`. */
+export function debounce<T extends unknown[], V>(fn: (...args: [...T]) => V, _timeout?: number, _resetTimer?: boolean) {
+    const debounced = Object.assign((...args: [...T]) => {
+        fn(...args);
+        return debounced;
+    }, {
+        cancel: () => debounced,
+        run: (): V | void => undefined,
+    });
+    return debounced;
 }
 
 export function normalizePath(path: string): string {
