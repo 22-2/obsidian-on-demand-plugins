@@ -4,7 +4,7 @@ import { installObsidianDom } from "src/__mocks__/obsidian-dom";
 import { Menu } from "src/__mocks__/obsidian-ui";
 import { FileSystemAdapter, Notice, Platform } from "src/__mocks__/obsidian";
 import { debounce } from "obsidian";
-import { PLUGIN_MODE } from "src/core/types";
+import { PLUGIN_MODE, PluginModes } from "src/core/types";
 import type { PLUGIN_MODE as PluginMode } from "src/core/types";
 import { showConfirmModal } from "src/core/confirm-modal";
 import { PluginTable } from "src/features/plugin-table/plugin-table";
@@ -268,6 +268,29 @@ describe("plugin table filters and sorting", () => {
         table.refresh();
         expect(names()).toHaveLength(3);
         expect(summary("updates").style.display).toBe("none");
+    });
+
+    it("counts the plugins in each mode in the mode filter options", () => {
+        const { root, rowOf, select } = setup();
+        const modeFilter = root.querySelector<HTMLSelectElement>("select[aria-labelledby$='-header-mode']")!;
+        const optionText = (mode: PluginMode) => [...modeFilter.options].find((option) => option.value === mode)!.textContent;
+        expect(optionText(PLUGIN_MODE.LAZY)).toBe(`${PluginModes[PLUGIN_MODE.LAZY]} (1)`);
+        expect(optionText(PLUGIN_MODE.LAZY_ON_LAYOUT_READY)).toBe(`${PluginModes[PLUGIN_MODE.LAZY_ON_LAYOUT_READY]} (0)`);
+
+        // The counts follow the other filters and mode edits.
+        change(root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-name']")!, "beta");
+        expect(optionText(PLUGIN_MODE.LAZY)).toBe(`${PluginModes[PLUGIN_MODE.LAZY]} (0)`);
+        expect(optionText(PLUGIN_MODE.ALWAYS_ENABLED)).toBe(`${PluginModes[PLUGIN_MODE.ALWAYS_ENABLED]} (1)`);
+        change(root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-name']")!, "");
+
+        change(select(rowOf("Alpha")), PLUGIN_MODE.ALWAYS_ENABLED);
+        expect(optionText(PLUGIN_MODE.LAZY)).toBe(`${PluginModes[PLUGIN_MODE.LAZY]} (0)`);
+        expect(optionText(PLUGIN_MODE.ALWAYS_ENABLED)).toBe(`${PluginModes[PLUGIN_MODE.ALWAYS_ENABLED]} (2)`);
+
+        // Picking a mode narrows the table but not the other options' counts.
+        change(modeFilter, PLUGIN_MODE.ALWAYS_ENABLED);
+        expect(optionText(PLUGIN_MODE.ALWAYS_DISABLED)).toBe(`${PluginModes[PLUGIN_MODE.ALWAYS_DISABLED]} (1)`);
+        expect(optionText(PLUGIN_MODE.ALWAYS_ENABLED)).toBe(`${PluginModes[PLUGIN_MODE.ALWAYS_ENABLED]} (2)`);
     });
 
     it("sorts by header clicks, with modes in their own order", () => {

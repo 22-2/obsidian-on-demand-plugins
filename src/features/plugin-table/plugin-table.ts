@@ -1,9 +1,11 @@
 import type { PluginUpdateManifest } from "@obsidian-typings/obsidian-public-latest";
 import {
+    columnFacetingFeature,
     columnFilteringFeature,
     columnVisibilityFeature,
     constructTable,
     createColumnHelper,
+    createFacetedRowModel,
     createFilteredRowModel,
     createSortedRowModel,
     filterFn_includesString,
@@ -53,6 +55,8 @@ const features = tableFeatures({
     coreReactivityFeature: storeReactivityBindings(),
     columnFilteringFeature,
     filteredRowModel: createFilteredRowModel(),
+    columnFacetingFeature,
+    facetedRowModel: createFacetedRowModel(),
     filterFns: { includesString: filterFn_includesString },
     rowSortingFeature,
     sortedRowModel: createSortedRowModel(),
@@ -199,6 +203,8 @@ export class PluginTable {
     private rowControls = new Map<string, RowControls>();
     /** Sort arrows by column, updated in place so sorting does not rebuild the header. */
     private sortIndicators = new Map<string, HTMLElement>();
+    /** Options of the mode filter, so their counts can follow the other filters without rebuilding the head. */
+    private modeFilterOptions = new Map<string, HTMLOptionElement>();
     /** community-plugins.json as last read, so "in memory only" can be told apart from a saved enable. */
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
@@ -313,6 +319,7 @@ export class PluginTable {
         this.rowData = this.rowData.map((row) => ({ ...row, ...this.loadState(row.id) }));
         this.syncOptions();
         for (const row of this.rowData) this.renderLoadedCell(row);
+        this.updateModeFilterCounts();
         this.updateSummary();
     }
 
@@ -457,6 +464,7 @@ export class PluginTable {
         this.colgroupEl.empty();
         this.theadEl.empty();
         this.sortIndicators.clear();
+        this.modeFilterOptions.clear();
         const visibleColumns = this.table.getVisibleLeafColumns();
 
         for (const column of visibleColumns) {
@@ -504,11 +512,7 @@ export class PluginTable {
                     ["false", "No"],
                 ]);
             } else if (column.id === "mode") {
-                this.createFilterSelect(
-                    th,
-                    column,
-                    MODE_ORDER.map((mode) => [mode, PluginModes[mode]]),
-                );
+                this.createFilterSelect(th, column, MODE_ORDER.map((mode) => [mode, PluginModes[mode]]), (value, option) => this.modeFilterOptions.set(value, option));
             } else if (TEXT_FILTER_COLUMNS.has(column.id)) {
                 const wrap = th.createDiv({ cls: "lazy-plugin-table-filter-wrap" });
                 const input = wrap.createEl("input", { type: "text", cls: "lazy-plugin-table-filter-input", attr: { placeholder: "Filter...", "aria-labelledby": this.headerId(column.id) } });
@@ -558,10 +562,13 @@ export class PluginTable {
         this.tableEl.style.minWidth = `${widths.reduce((sum, width) => sum + width, 0)}px`;
     }
 
-    private createFilterSelect(th: HTMLElement, column: TableColumn, options: [string, string][]) {
+    private createFilterSelect(th: HTMLElement, column: TableColumn, options: [string, string][], onOption?: (value: string, option: HTMLOptionElement) => void) {
         const select = th.createEl("select", { cls: "dropdown lazy-plugin-table-filter-input", attr: { "aria-labelledby": this.headerId(column.id) } });
         select.createEl("option", { text: "All", value: "" });
-        for (const [value, label] of options) select.createEl("option", { text: label, value });
+        for (const [value, label] of options) {
+            const option = select.createEl("option", { text: label, value });
+            onOption?.(value, option);
+        }
         select.value = filterText(column.getFilterValue());
         select.addEventListener("change", () => column.setFilterValue(select.value === "" ? undefined : select.value));
     }
@@ -582,6 +589,22 @@ export class PluginTable {
         for (const [id, { tr }] of this.rowControls) {
             // Rows filtered out leave the document but stay cached, so showing them again is instant.
             if (!visible.has(id)) tr.remove();
+        }
+        this.updateModeFilterCounts();
+    }
+
+    /** Counts the modes among the rows on screen, so the filter options follow the other filters. */
+    private updateModeFilterCounts(): void {
+        const modeColumn = this.modeFilterOptions.size > 0 ? this.table.getColumn("mode") : undefined;
+        if (!modeColumn) return;
+        // The faceted rows apply every filter except this column's own, so picking a mode
+        // does not zero the other options.
+        const counts = new Map<PLUGIN_MODE, number>();
+        for (const row of modeColumn.getFacetedRowModel().rows) {
+            counts.set(row.original.mode, (counts.get(row.original.mode) ?? 0) + 1);
+        }
+        for (const mode of MODE_ORDER) {
+            this.modeFilterOptions.get(mode)?.setText(`${PluginModes[mode]} (${counts.get(mode) ?? 0})`);
         }
     }
 
@@ -738,6 +761,7 @@ export class PluginTable {
         this.rowData = this.rowData.map((row) => (changed.has(row.id) ? { ...row, mode: this.host.getMode(row.id) } : row));
         this.syncOptions();
         for (const row of this.rowData) if (changed.has(row.id)) this.syncModeControls(row);
+        this.updateModeFilterCounts();
         this.renderPendingBar();
     }
 
