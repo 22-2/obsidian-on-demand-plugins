@@ -6,6 +6,7 @@ import { FileSystemAdapter, Notice, Platform } from "src/__mocks__/obsidian";
 import { debounce } from "obsidian";
 import { PLUGIN_MODE } from "src/core/types";
 import type { PLUGIN_MODE as PluginMode } from "src/core/types";
+import { showConfirmModal } from "src/core/confirm-modal";
 import { PluginTable } from "src/features/plugin-table/plugin-table";
 import type { PluginTableHost } from "src/features/plugin-table/plugin-table-host";
 import { defaultTableState } from "src/features/plugin-table/table-state";
@@ -21,6 +22,7 @@ vi.mock("obsidian", async () => {
     return { ...base, ...(await import("src/__mocks__/obsidian-ui")), debounce: vi.fn(base.debounce), setTooltip: (el: HTMLElement, text: string) => el.setAttribute("aria-label", text) };
 });
 vi.mock("src/ui/show-in-community-plugins", () => ({ showInCommunityPlugins: vi.fn() }));
+vi.mock("src/core/confirm-modal", () => ({ showConfirmModal: vi.fn() }));
 vi.mock("src/ui/settings/helpers", async (importOriginal) => ({ ...(await importOriginal<typeof import("src/ui/settings/helpers")>()), openPluginDirectory: vi.fn() }));
 
 const MANIFESTS = [
@@ -29,7 +31,7 @@ const MANIFESTS = [
     { id: "gamma", name: "Gamma", version: "3.0.0", author: "Cy", description: "Third plugin" },
 ] as PluginManifest[];
 
-function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unknown; extra?: PluginManifest[] } = {}) {
+function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unknown; extra?: PluginManifest[]; showUninstall?: boolean } = {}) {
     document.body.className = options.touch ? "is-mobile" : "";
     const modes: Record<string, PluginMode> = { alpha: PLUGIN_MODE.LAZY, beta: PLUGIN_MODE.ALWAYS_ENABLED, gamma: PLUGIN_MODE.ALWAYS_DISABLED, delta: PLUGIN_MODE.LAZY_ON_LAYOUT_READY };
     const loaded = new Set(["beta"]);
@@ -38,6 +40,7 @@ function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unk
             updates: { alpha: { version: "1.1.0" } } as Record<string, { version: string }>,
             plugins: {} as Record<string, { _loaded: boolean }>,
             enabledPlugins: new Set<string>(),
+            uninstallPlugin: vi.fn(async () => {}),
         },
         vault: { adapter: {} as object, readConfigJson: vi.fn(async () => options.saved ?? ["beta"]) },
         setting: { open: vi.fn(), openTabById: vi.fn() },
@@ -61,6 +64,7 @@ function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unk
         selfId: "on-demand-plugins",
         getManifests: () => [...MANIFESTS, ...(options.extra ?? [])],
         getMode: (id) => modes[id],
+        showUninstallInTableMenu: () => options.showUninstall === true,
         stageMode: (id, mode) => {
             if (modes[id] === mode) return false;
             modes[id] = mode;
@@ -102,6 +106,7 @@ beforeEach(() => {
     Platform.isDesktopApp = false;
     vi.mocked(showInCommunityPlugins).mockClear();
     vi.mocked(openPluginDirectory).mockClear();
+    vi.mocked(showConfirmModal).mockReset().mockResolvedValue(true);
 });
 
 afterEach(() => {
@@ -388,6 +393,40 @@ describe("plugin table selection and row menu", () => {
         expect(rowOf("Alpha").classList.contains("is-selected")).toBe(false);
     });
 
+    it("adds the uninstall action only when enabled, and confirms before removing", async () => {
+        const off = setup();
+        expect(rightClick(off.rowOf("Beta")).find("Uninstall plugin")).toBeUndefined();
+        document.body.empty();
+
+        const on = setup({ showUninstall: true });
+        const item = rightClick(on.rowOf("Beta")).find("Uninstall plugin")!;
+        expect(item.destructive).toBe(true);
+
+        vi.mocked(showConfirmModal).mockResolvedValueOnce(false);
+        item.click();
+        await flush();
+        expect(on.app.plugins.uninstallPlugin).not.toHaveBeenCalled();
+
+        vi.mocked(showConfirmModal).mockResolvedValueOnce(true);
+        rightClick(on.rowOf("Beta")).find("Uninstall plugin")!.click();
+        await flush();
+        expect(on.app.plugins.uninstallPlugin).toHaveBeenCalledWith("beta");
+        expect(Notice.messages).toContain("Uninstalled Beta");
+    });
+
+    it("uninstalls the selected plugins together and reports failures", async () => {
+        const { rowOf, app } = setup({ showUninstall: true });
+        app.plugins.uninstallPlugin.mockRejectedValueOnce(new Error("locked"));
+        rowOf("Alpha").click();
+        rowOf("Gamma").dispatchEvent(new MouseEvent("click", { ctrlKey: true }));
+
+        rightClick(rowOf("Gamma")).find("Uninstall 2 plugins")!.click();
+        await flush();
+
+        expect(app.plugins.uninstallPlugin).toHaveBeenNthCalledWith(2, "gamma");
+        expect(Notice.messages).toContain("Failed to uninstall Alpha");
+    });
+
     it("offers the single-plugin actions for one row", async () => {
         Platform.isDesktopApp = true;
         const { rowOf, app, openLazyOptions } = setup();
@@ -484,10 +523,11 @@ describe("On-Demand's own row", () => {
 
     it("offers every action except changing its settings", () => {
         Platform.isDesktopApp = true;
-        const { rowOf, app } = setup({ extra: [self] });
+        const { rowOf, app } = setup({ extra: [self], showUninstall: true });
         const menu = rightClick(rowOf("On-Demand"));
         expect(menu.find("Lazy settings")).toBeUndefined();
         expect(menu.find("Mode")).toBeUndefined();
+        expect(menu.find("Uninstall plugin")).toBeUndefined();
         menu.find("Open plugin settings")!.click();
         expect(app.setting.openTabById).toHaveBeenCalledWith("on-demand-plugins");
         expect(menu.find("Show in community plugins")).toBeDefined();

@@ -38,7 +38,7 @@ export type DraftStash = {
 };
 
 /** Top-level keys described explicitly; any other differing key is reported generically so nothing pending stays hidden. */
-const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog", "restoreDraftBehavior"]);
+const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog", "restoreDraftBehavior", "showUninstallInTableMenu"]);
 const DESCRIBED_DEVICE_KEYS = new Set<string>(["plugins", "defaultMode", "pruneUninstalledEntries"]);
 const DEVICE_KEY_LABELS: Record<string, string> = {
     lazyOnViews: "View activation rules",
@@ -321,6 +321,15 @@ function describeRootSettings(data: LazySettings, baseline: LazySettings): Pendi
             from: RESTORE_DRAFT_BEHAVIOR_LABELS[baseline.restoreDraftBehavior],
             to: RESTORE_DRAFT_BEHAVIOR_LABELS[data.restoreDraftBehavior],
             revert: () => (data.restoreDraftBehavior = baseline.restoreDraftBehavior),
+        });
+    }
+    if (data.showUninstallInTableMenu !== baseline.showUninstallInTableMenu) {
+        changes.push({
+            group: "settings",
+            label: "Uninstall from plugin table",
+            from: onOff(baseline.showUninstallInTableMenu),
+            to: onOff(data.showUninstallInTableMenu),
+            revert: () => (data.showUninstallInTableMenu = baseline.showUninstallInTableMenu),
         });
     }
     const dataRecord = data as unknown as Record<string, unknown>;

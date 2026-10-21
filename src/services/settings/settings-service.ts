@@ -106,6 +106,7 @@ export class SettingsService {
 
         this.currentProfileId = this.selectActiveProfileId();
         this.normalizeRestoreDraftBehavior(loaded);
+        this.normalizeShowUninstallInTableMenu();
         Object.values(this.data.profiles).forEach((profile) => this.normalizeProfileSettings(profile));
         this.dropDeadFields();
         this.settings = this.data.profiles[this.currentProfileId].settings;
@@ -178,6 +179,12 @@ export class SettingsService {
         if (!Object.hasOwn(loaded, "restoreDraftBehavior") && isRestoreDraftBehavior(fromProfile)) this.data.restoreDraftBehavior = fromProfile;
         if (!isRestoreDraftBehavior(this.data.restoreDraftBehavior)) this.data.restoreDraftBehavior = DEFAULT_SETTINGS.restoreDraftBehavior;
         for (const profile of Object.values(this.data.profiles)) delete (profile.settings as unknown as Partial<Record<string, unknown>>).restoreDraftBehavior;
+    }
+
+    private normalizeShowUninstallInTableMenu() {
+        if (typeof this.data.showUninstallInTableMenu !== "boolean") {
+            this.data.showUninstallInTableMenu = DEFAULT_SETTINGS.showUninstallInTableMenu;
+        }
     }
 
     /**

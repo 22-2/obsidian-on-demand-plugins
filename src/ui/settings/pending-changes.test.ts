@@ -67,6 +67,17 @@ describe("PendingChanges", () => {
         ]);
     });
 
+    it("describes and reverts the shared uninstall menu setting", () => {
+        const source = createSource();
+        const pending = new PendingChanges(() => source);
+        source.data.showUninstallInTableMenu = true;
+
+        const [change] = pending.describeChanges(describer);
+        expect(change).toMatchObject({ group: "settings", label: "Uninstall from plugin table", from: "Off", to: "On" });
+        change.revert?.();
+        expect(source.data.showUninstallInTableMenu).toBe(false);
+    });
+
     it("reverts a single change back to the baseline", () => {
         const source = createSource();
         const pending = new PendingChanges(() => source);

@@ -117,6 +117,20 @@ describe("SettingsService loading", () => {
         });
     });
 
+    it("falls back to off for a missing or non-boolean uninstall menu setting", async () => {
+        const missing = createService(migratedDataWith());
+        await missing.service.load();
+        expect(missing.service.data.showUninstallInTableMenu).toBe(false);
+
+        const invalid = createService(migratedDataWith({ showUninstallInTableMenu: "yes" }));
+        await invalid.service.load();
+        expect(invalid.service.data.showUninstallInTableMenu).toBe(false);
+
+        const enabled = createService(migratedDataWith({ showUninstallInTableMenu: true }));
+        await enabled.service.load();
+        expect(enabled.service.data.showUninstallInTableMenu).toBe(true);
+    });
+
     it("blocks invalid profile data instead of replacing it with defaults", async () => {
         const { service, plugin } = createService({ profiles: null, desktopProfileId: null, mobileProfileId: null });
 

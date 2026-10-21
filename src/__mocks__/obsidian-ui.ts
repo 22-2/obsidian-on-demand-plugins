@@ -80,6 +80,7 @@ export class MenuItem {
     icon = "";
     checked = false;
     disabled = false;
+    destructive = false;
     submenu?: Menu;
     private callback?: () => void;
     setTitle(title: string) {
@@ -99,6 +100,10 @@ export class MenuItem {
         return this;
     }
     setWarning() {
+        return this;
+    }
+    setDestructive() {
+        this.destructive = true;
         return this;
     }
     onClick(callback: () => void) {

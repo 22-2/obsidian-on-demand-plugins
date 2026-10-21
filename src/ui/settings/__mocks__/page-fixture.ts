@@ -10,6 +10,7 @@ export function createPageFixture(maintenance?: unknown) {
     const data: LazySettings = {
         showConsoleLog: false,
         restoreDraftBehavior: "ask",
+        showUninstallInTableMenu: false,
         desktopProfileId: "home",
         mobileProfileId: "work",
         profiles: {

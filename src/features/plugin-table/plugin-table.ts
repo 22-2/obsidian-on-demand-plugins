@@ -17,6 +17,7 @@ import type { ColumnFiltersState, FilterFn, SortFn, SortingState, Table } from "
 import { storeReactivityBindings } from "@tanstack/table-core/store-reactivity-bindings";
 import type { Debouncer, MenuItem, Menu as MenuType, PluginManifest } from "obsidian";
 import { ButtonComponent, DropdownComponent, ExtraButtonComponent, FileSystemAdapter, Menu, Notice, Platform, debounce, setIcon, setTooltip } from "obsidian";
+import { showConfirmModal } from "src/core/confirm-modal";
 import { PLUGIN_MODE, PluginModes, isPluginMode } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import type { PluginTableHost } from "src/features/plugin-table/plugin-table-host";
@@ -155,6 +156,13 @@ function filterText(value: unknown): string {
 /** `MenuItem.setSubmenu` is not in Obsidian's public API, so this is the one place that relies on it. */
 function addSubmenu(item: MenuItem): MenuType {
     return (item as unknown as { setSubmenu(): MenuType }).setSubmenu();
+}
+
+/** `MenuItem.setDestructive` is missing from the public typings, so fall back to the old warning style if unavailable. */
+function markDestructive(item: MenuItem): void {
+    const candidate = item as MenuItem & { setDestructive?: () => void };
+    if (candidate.setDestructive) candidate.setDestructive();
+    else item.setWarning(true);
 }
 
 function hasUpdate(row: PluginTableRow): boolean {
@@ -769,7 +777,47 @@ export class PluginTable {
 
         menu.addSeparator();
         this.addCopyItems(menu, targets, single);
+
+        const uninstallable = targets.filter((row) => !row.locked);
+        if (this.host.showUninstallInTableMenu() && uninstallable.length > 0) {
+            menu.addSeparator();
+            menu.addItem((item) => {
+                markDestructive(item);
+                item.setTitle(single ? "Uninstall plugin" : `Uninstall ${pluralizePlugins(uninstallable.length)}`)
+                    .setIcon("trash-2")
+                    .onClick(() => void this.uninstallPlugins(uninstallable));
+            });
+        }
         return menu;
+    }
+
+    /** Deletes the plugin folders through Obsidian, after an explicit confirmation. */
+    private async uninstallPlugins(rows: readonly PluginTableRow[]): Promise<void> {
+        const [first] = rows;
+        const message = rows.length === 1
+            ? `Uninstall ${first.name}? This removes the plugin and its files from the current vault.`
+            : `Uninstall ${pluralizePlugins(rows.length)}? This removes these plugins and their files from the current vault.\n\n${rows.map((row) => row.name).join("\n")}`;
+        if ((await showConfirmModal(this.host.app, { message })) !== true) return;
+
+        // Obsidian handles disabling, removing the folder and updating its manifest.
+        const plugins = this.host.app.plugins as unknown as { uninstallPlugin?: (pluginId: string) => Promise<void> };
+        const failed: string[] = [];
+        for (const row of rows) {
+            try {
+                if (!plugins.uninstallPlugin) throw new Error("Uninstall is unavailable");
+                await plugins.uninstallPlugin(row.id);
+            } catch (error) {
+                console.error(error);
+                failed.push(row.name);
+            }
+        }
+        this.refresh();
+
+        if (failed.length > 0) {
+            new Notice(`Failed to uninstall ${failed.length === 1 ? failed[0] : pluralizePlugins(failed.length)}`);
+            return;
+        }
+        new Notice(`Uninstalled ${rows.length === 1 ? first.name : pluralizePlugins(rows.length)}`);
     }
 
     private addCopyItems(menu: MenuType, targets: readonly PluginTableRow[], single: PluginTableRow | null): void {

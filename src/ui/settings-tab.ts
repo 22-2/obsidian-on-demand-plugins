@@ -165,6 +165,20 @@ export class SettingsTab extends PluginSettingTab {
                                     });
                                 },
                             },
+                            {
+                                name: "Uninstall from plugin table",
+                                desc: "Add an Uninstall action to the plugin table's row menu. It removes the plugin files from the vault.",
+                                // Shared, like the draft prompt, so the destructive action is not enabled by another profile.
+                                render: (setting) => {
+                                    setting.addToggle((toggle) =>
+                                        toggle.setValue(this.plugin.data.showUninstallInTableMenu === true).onChange(async (value) => {
+                                            await this.saveImmediateChanges((data) => {
+                                                data.showUninstallInTableMenu = value;
+                                            });
+                                        }),
+                                    );
+                                },
+                            },
                         ],
                     },
                 ],

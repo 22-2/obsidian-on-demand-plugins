@@ -18,6 +18,7 @@ function setup() {
         manifest: { id: "on-demand-plugins", name: "On-Demand" },
         manifests: [] as unknown[],
         settings: { plugins: {} as Record<string, unknown> },
+        data: { showUninstallInTableMenu: true },
         updateManifests: vi.fn(function (this: { manifests: unknown[] }) {
             this.manifests = manifests;
         }),
@@ -43,6 +44,7 @@ describe("plugin table host", () => {
         expect(host.app).toBe(plugin.app);
         expect(host.drafts).toBe(drafts);
         expect(host.getMode("alpha")).toBe(PLUGIN_MODE.LAZY);
+        expect(host.showUninstallInTableMenu()).toBe(true);
     });
 
     it("stages a mode in the live settings and reports whether it changed", () => {
