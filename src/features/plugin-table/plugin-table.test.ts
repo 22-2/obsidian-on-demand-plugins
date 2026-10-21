@@ -281,6 +281,22 @@ describe("plugin table filters and sorting", () => {
         expect(onStateChange).toHaveBeenLastCalledWith(expect.objectContaining({ sorting: [{ id: "mode", desc: true }] }));
     });
 
+    it("reuses rendered rows and the header when filtering and sorting", () => {
+        const { root, rowOf, header } = setup();
+        const alpha = rowOf("Alpha");
+        const nameHeader = header("name");
+        const nameFilter = root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-name']")!;
+
+        change(nameFilter, "beta");
+        expect(alpha.isConnected).toBe(false);
+        change(nameFilter, "");
+        expect(rowOf("Alpha")).toBe(alpha);
+
+        nameHeader.click();
+        expect(header("name")).toBe(nameHeader);
+        expect(rowOf("Alpha")).toBe(alpha);
+    });
+
     it("sorts and hides columns from the header menu", () => {
         const { header, names, root, onStateChange } = setup();
         const menu = rightClick(header("name"));

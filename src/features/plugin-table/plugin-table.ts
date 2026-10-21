@@ -62,6 +62,7 @@ const features = tableFeatures({
 
 type Features = typeof features;
 type TableColumn = ReturnType<Table<Features, PluginTableRow>["getAllLeafColumns"]>[number];
+type TableRow = ReturnType<Table<Features, PluginTableRow>["getRowModel"]>["rows"][number];
 
 const helper = createColumnHelper<Features, PluginTableRow>();
 
@@ -131,7 +132,7 @@ interface SummaryItem {
     count: HTMLElement;
 }
 
-/** Controls kept per rendered row so mode edits and load events update cells in place. */
+/** Controls kept per row, reused across renders so mode edits and load events update cells in place. */
 interface RowControls {
     tr: HTMLElement;
     loadedCell?: HTMLElement;
@@ -196,6 +197,8 @@ export class PluginTable {
     /** Plugin IDs in on-screen order, used to resolve range selection. */
     private visibleIds: string[] = [];
     private rowControls = new Map<string, RowControls>();
+    /** Sort arrows by column, updated in place so sorting does not rebuild the header. */
+    private sortIndicators = new Map<string, HTMLElement>();
     /** community-plugins.json as last read, so "in memory only" can be told apart from a saved enable. */
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
@@ -263,7 +266,7 @@ export class PluginTable {
             onSortingChange: (updater) => {
                 this.sorting = functionalUpdate(updater, this.sorting);
                 this.syncOptions();
-                this.renderHead();
+                this.updateSortIndicators();
                 this.renderBody();
                 this.saveState();
             },
@@ -276,6 +279,8 @@ export class PluginTable {
             onColumnVisibilityChange: (updater) => {
                 this.columnVisibility = { ...functionalUpdate(updater, this.columnVisibility), actions: this.touchUi };
                 this.syncOptions();
+                // The cells themselves change with the columns, so the rendered rows cannot be reused.
+                this.resetRenderedRows();
                 this.renderHead();
                 this.renderBody();
                 this.saveState();
@@ -294,6 +299,8 @@ export class PluginTable {
         this.rowData = this.buildRows();
         // Leave the updates view once nothing is left to update, so the table does not stay empty.
         if (!this.rowData.some(hasUpdate)) this.showUpdatesOnly = false;
+        // The data was rebuilt, so the rendered rows would show stale cells: drop them and build again.
+        this.resetRenderedRows();
         this.syncOptions();
         this.renderBody();
         this.updateSummary();
@@ -449,6 +456,7 @@ export class PluginTable {
     private renderHead(): void {
         this.colgroupEl.empty();
         this.theadEl.empty();
+        this.sortIndicators.clear();
         const visibleColumns = this.table.getVisibleLeafColumns();
 
         for (const column of visibleColumns) {
@@ -463,8 +471,7 @@ export class PluginTable {
             const th = headerRow.createEl("th", { cls: `lazy-plugin-table-th lazy-plugin-table-col-${column.id}` });
             const label = th.createDiv({ cls: "lazy-plugin-table-th-label" });
             label.createSpan({ text: headerText(column), attr: { id: this.headerId(column.id) } });
-            const sorted = column.getIsSorted();
-            if (sorted) label.createSpan({ text: sorted === "desc" ? " ▼" : " ▲", cls: "lazy-plugin-table-sort-indicator" });
+            this.sortIndicators.set(column.id, label.createSpan({ cls: "lazy-plugin-table-sort-indicator" }));
             if (column.getCanSort()) {
                 th.addEventListener("click", (evt) => {
                     if ((evt.target as HTMLElement).closest(".lazy-plugin-table-resizer")) return;
@@ -523,6 +530,23 @@ export class PluginTable {
                 });
             }
         }
+        this.updateSortIndicators();
+    }
+
+    /** Sorting only moves rows, so repaint the arrows instead of rebuilding the whole head. */
+    private updateSortIndicators(): void {
+        for (const column of this.table.getVisibleLeafColumns()) {
+            const indicator = this.sortIndicators.get(column.id);
+            if (!indicator) continue;
+            const sorted = column.getIsSorted();
+            indicator.setText(sorted === "desc" ? " ▼" : sorted === "asc" ? " ▲" : "");
+        }
+    }
+
+    /** Drops the rendered rows, for when their data or cell structure changed and reuse would show stale cells. */
+    private resetRenderedRows(): void {
+        this.tbodyEl.empty();
+        this.rowControls.clear();
     }
 
     /**
@@ -543,59 +567,71 @@ export class PluginTable {
     }
 
     private renderBody(): void {
-        this.tbodyEl.empty();
         const rows = this.table.getRowModel().rows;
         this.visibleIds = rows.map((row) => row.id);
         this.selection.retain(this.visibleIds);
-        this.rowControls.clear();
 
+        // Appending an existing row moves it, so filtering and sorting only reorder the rows
+        // already built. Their controls and listeners survive, which keeps each pass cheap.
         for (const row of rows) {
-            const data = row.original;
-            const tr = this.tbodyEl.createEl("tr");
-            tr.toggleClass("is-loaded", data.loaded);
-            tr.toggleClass("is-selected", this.selection.has(data.id));
-            const controls: RowControls = { tr };
-            this.rowControls.set(data.id, controls);
-            tr.addEventListener("mousedown", (evt) => {
-                // Keep Shift+click from selecting text across rows.
-                if (evt.shiftKey) evt.preventDefault();
-            });
-            tr.addEventListener("click", (evt) => {
-                this.selection.select(data.id, this.visibleIds, { toggle: evt.ctrlKey || evt.metaKey, range: evt.shiftKey });
-                this.syncSelection();
-            });
-            tr.addEventListener("contextmenu", (evt) => {
-                evt.preventDefault();
-                this.selection.selectForContextMenu(data.id);
-                this.syncSelection();
-                this.buildRowMenu().showAtMouseEvent(evt);
-            });
+            const controls = this.rowControls.get(row.id) ?? this.createRowControls(row);
+            controls.tr.toggleClass("is-selected", this.selection.has(row.id));
+            this.tbodyEl.append(controls.tr);
+        }
+        const visible = new Set(this.visibleIds);
+        for (const [id, { tr }] of this.rowControls) {
+            // Rows filtered out leave the document but stay cached, so showing them again is instant.
+            if (!visible.has(id)) tr.remove();
+        }
+    }
 
-            for (const cell of row.getVisibleCells()) {
-                const td = tr.createEl("td", { cls: `lazy-plugin-table-td lazy-plugin-table-col-${cell.column.id}` });
-                switch (cell.column.id) {
-                    case "name":
-                        this.renderNameCell(td, data);
-                        break;
-                    case "loaded":
-                        controls.loadedCell = td;
-                        this.renderLoadedCell(data);
-                        break;
-                    case "mode":
-                        this.renderModeCell(td, data, controls);
-                        break;
-                    case "actions":
-                        this.renderActionsCell(td, data);
-                        break;
-                    default: {
-                        const value = cell.getValue();
-                        // The remaining columns are the plain text fields.
-                        const text = typeof value === "string" ? value : "";
-                        td.setText(text);
-                    }
+    private createRowControls(row: TableRow): RowControls {
+        const data = row.original;
+        const tr = this.tbodyEl.createEl("tr");
+        tr.toggleClass("is-loaded", data.loaded);
+        tr.toggleClass("is-selected", this.selection.has(data.id));
+        const controls: RowControls = { tr };
+        this.rowControls.set(data.id, controls);
+        tr.addEventListener("mousedown", (evt) => {
+            // Keep Shift+click from selecting text across rows.
+            if (evt.shiftKey) evt.preventDefault();
+        });
+        tr.addEventListener("click", (evt) => {
+            this.selection.select(data.id, this.visibleIds, { toggle: evt.ctrlKey || evt.metaKey, range: evt.shiftKey });
+            this.syncSelection();
+        });
+        tr.addEventListener("contextmenu", (evt) => {
+            evt.preventDefault();
+            this.selection.selectForContextMenu(data.id);
+            this.syncSelection();
+            this.buildRowMenu().showAtMouseEvent(evt);
+        });
+
+        for (const cell of row.getVisibleCells()) {
+            const td = tr.createEl("td", { cls: `lazy-plugin-table-td lazy-plugin-table-col-${cell.column.id}` });
+            switch (cell.column.id) {
+                case "name":
+                    this.renderNameCell(td, data);
+                    break;
+                case "loaded":
+                    controls.loadedCell = td;
+                    this.renderLoadedCell(data);
+                    break;
+                case "mode":
+                    this.renderModeCell(td, data, controls);
+                    break;
+                case "actions":
+                    this.renderActionsCell(td, data);
+                    break;
+                default: {
+                    const value = cell.getValue();
+                    // The remaining columns are the plain text fields.
+                    const text = typeof value === "string" ? value : "";
+                    td.setText(text);
                 }
             }
         }
+        return controls;
     }
 
     /** Reflect the selection on rendered rows without rebuilding the table. */
