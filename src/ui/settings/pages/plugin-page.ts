@@ -93,7 +93,7 @@ export class PluginPage extends SettingPage {
                 button
                     .setIcon("refresh-cw")
                     .setTooltip("Refresh plugin list")
-                    .onClick(() => this.refreshList());
+                    .onClick(() => void this.refreshList());
             });
         // No row name: the placeholder already says what the field is, and a name column only leaves a gap.
         const filterSetting = new Setting(this.containerEl);
@@ -122,7 +122,7 @@ export class PluginPage extends SettingPage {
                 button
                     .setIcon("refresh-cw")
                     .setTooltip("Refresh plugin list")
-                    .onClick(() => this.refreshList());
+                    .onClick(() => void this.refreshList());
             });
         this.containerEl.createDiv({ cls: "lazy-plugin-infinite-host" });
         this.renderInfiniteList();
@@ -135,7 +135,9 @@ export class PluginPage extends SettingPage {
         await this.plugin.openPluginTable();
         this.app.setting.close();
     }
-    private refreshList() {
+    private async refreshList() {
+        // Plugins copied into the plugins folder are only known to Obsidian after it rescans the disk.
+        await this.app.plugins.loadManifests();
         this.plugin.updateManifests();
         void this.refreshCommunityPluginSnapshot();
         // Re-render the list directly: tab.update() does not

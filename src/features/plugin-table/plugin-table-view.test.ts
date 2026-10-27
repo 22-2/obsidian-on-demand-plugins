@@ -19,7 +19,7 @@ function setup(stored?: unknown) {
     const storage = new Map<string, unknown>(stored === undefined ? [] : [["on-demand:plugin-table-state", stored]]);
     const app = {
         workspace: { on },
-        plugins: { on, updates: {}, plugins: {}, enabledPlugins: new Set<string>() },
+        plugins: { on, loadManifests: vi.fn(async () => undefined), updates: {}, plugins: {}, enabledPlugins: new Set<string>() },
         vault: { adapter: {}, readConfigJson: vi.fn(async () => []) },
         loadLocalStorage: (key: string) => storage.get(key) ?? null,
         saveLocalStorage: (key: string, value: unknown) => storage.set(key, value),
@@ -51,7 +51,7 @@ function setup(stored?: unknown) {
     } as unknown as PluginTableHost;
     const view = new PluginTableView({ app } as unknown as WorkspaceLeaf, host);
     document.body.appendChild((view as unknown as { containerEl: HTMLElement }).containerEl);
-    return { view, drafts, handlers, storage, getManifests, unsubscribe, emit: (...args: Parameters<DraftListener>) => listener?.(...args) };
+    return { app, view, drafts, handlers, storage, getManifests, unsubscribe, emit: (...args: Parameters<DraftListener>) => listener?.(...args) };
 }
 
 beforeAll(() => installObsidianDom());
@@ -84,7 +84,7 @@ describe("plugin table view", () => {
     });
 
     it("re-reads the rows for draft changes from other surfaces and for plugin events", async () => {
-        const { view, emit, handlers, getManifests } = setup();
+        const { app, view, emit, handlers, getManifests } = setup();
         await view.onOpen();
         const reads = () => getManifests.mock.calls.length;
         const before = reads();
@@ -92,8 +92,12 @@ describe("plugin table view", () => {
         emit("edit", {});
         emit("refresh", undefined);
         handlers.get("changed")!();
+        expect(reads()).toBe(before + 3);
+
+        // The refresh action rescans the plugins folder first, so the copied-in plugins show up.
         (view as unknown as { actions: { callback: () => void }[] }).actions[0].callback();
-        expect(reads()).toBe(before + 4);
+        await vi.waitFor(() => expect(reads()).toBe(before + 4));
+        expect(app.plugins.loadManifests).toHaveBeenCalledOnce();
 
         handlers.get(PLUGIN_LOAD_STATE_CHANGED_EVENT)!();
         expect(reads()).toBe(before + 4);

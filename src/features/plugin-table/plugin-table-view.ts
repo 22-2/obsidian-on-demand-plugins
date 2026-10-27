@@ -39,7 +39,7 @@ export class PluginTableView extends ItemView {
         const drafts = this.host.drafts;
         drafts.openSurface("plugin-table");
 
-        this.addAction("refresh-cw", "Refresh plugin list", () => this.table?.refresh());
+        this.addAction("refresh-cw", "Refresh plugin list", () => void this.rescanAndRefresh());
 
         const defaults = defaultTableState(this.contentEl.doc.body.hasClass("is-phone"));
         this.contentEl.empty();
@@ -62,6 +62,12 @@ export class PluginTableView extends ItemView {
 
         // Not awaited: the view opens behind the prompt instead of waiting for the answer.
         drafts.offerRestoreOnPageOpen("plugin-table");
+    }
+
+    /** Plugins copied into the plugins folder are only known to Obsidian after it rescans the disk. */
+    private async rescanAndRefresh() {
+        await this.app.plugins.loadManifests();
+        this.table?.refresh();
     }
 
     async onClose() {
