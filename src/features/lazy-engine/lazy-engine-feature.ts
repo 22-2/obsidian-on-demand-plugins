@@ -1,8 +1,6 @@
 import type { WorkspaceLeaf } from "obsidian";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
-import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";
-import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
@@ -18,7 +16,6 @@ import { patchPluginInitialization } from "src/patches/plugin-initialization";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchPluginRegisterView } from "src/patches/view-registry";
 import { patchSetViewState } from "src/patches/view-state";
-import type { CoreContainer } from "src/services/core-container";
 
 export class LazyEngineFeature implements AppFeature {
     public commandCache!: CommandCacheService;
@@ -28,12 +25,10 @@ export class LazyEngineFeature implements AppFeature {
     private fileLoader!: FileLazyLoader;
     private layoutReadyLoader?: LayoutReadyLoader;
     private ctx!: PluginContext;
-    private events!: EventBus;
 
-    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
+    onload(ctx: PluginContext) {
         this.layoutReadyLoader?.stop();
         this.ctx = ctx;
-        this.events = events;
 
         // 1. Core Engine parts
         // The cache only needs a way to run a wrapped command, so it takes a callback

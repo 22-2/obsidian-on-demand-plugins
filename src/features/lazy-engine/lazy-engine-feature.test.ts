@@ -1,11 +1,8 @@
 import log from "loglevel";
-import type { EventBus } from "src/core/event-bus";
-import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext, SettingsChange } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import type { EnableDisableHooks } from "src/patches/plugin-enable-disable";
-import type { CoreContainer } from "src/services/core-container";
 import type { MockInstance } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -143,7 +140,7 @@ function setup(options: { modes?: Record<string, Mode>; loaded?: string[]; layou
     } as unknown as PluginContext;
 
     const feature = new LazyEngineFeature();
-    feature.onload(ctx, {} as CoreContainer, {} as FeatureManager, {} as EventBus);
+    feature.onload(ctx);
 
     return {
         feature,
@@ -441,7 +438,7 @@ describe("LazyEngineFeature layout-ready flow", () => {
         const t = setup({ modes: { p0: PLUGIN_MODE.LAZY_ON_LAYOUT_READY } });
         const oldCallback = t.workspace.onLayoutReady.mock.calls[0][0];
         t.feature.onunload();
-        t.feature.onload(t.ctx, {} as CoreContainer, {} as FeatureManager, {} as EventBus);
+        t.feature.onload(t.ctx);
         oldCallback();
         await Promise.resolve();
         expect(t.runner.ensurePluginLoaded).not.toHaveBeenCalled();
@@ -452,7 +449,7 @@ describe("LazyEngineFeature layout-ready flow", () => {
     it("replaces the previous callback if onload is called again", async () => {
         const t = setup({ modes: { p0: PLUGIN_MODE.LAZY_ON_LAYOUT_READY } });
         const oldCallback = t.workspace.onLayoutReady.mock.calls[0][0];
-        t.feature.onload(t.ctx, {} as CoreContainer, {} as FeatureManager, {} as EventBus);
+        t.feature.onload(t.ctx);
         oldCallback();
         await Promise.resolve();
         expect(t.runner.ensurePluginLoaded).not.toHaveBeenCalled();
