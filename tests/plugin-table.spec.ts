@@ -12,6 +12,16 @@ async function startFrom(obsidian: ObsidianAPI, mode: string) {
     return plugin;
 }
 
+async function startUnloadedAndUnsaved(obsidian: ObsidianAPI) {
+    await obsidian.page.evaluate(async (id) => {
+        await app.plugins.disablePlugin(id);
+        app.plugins.enabledPlugins.delete(id);
+        const saved = await app.vault.readConfigJson("community-plugins");
+        if (!Array.isArray(saved)) throw new Error("Invalid community plugins configuration");
+        await app.vault.writeConfigJson("community-plugins", saved.filter((value: unknown) => value !== id));
+    }, targetPluginId);
+}
+
 async function openTable(obsidian: ObsidianAPI) {
     const plugin = await obsidian.plugin(pluginUnderTestId);
     await plugin.evaluate((instance) => (instance as unknown as TablePlugin).openPluginTable());
@@ -134,4 +144,118 @@ test("plugin table lists On-Demand itself as always loaded, without a mode to ch
     await expect(row.locator(".lazy-plugin-table-lamp.is-memory-only")).toHaveCount(0);
     await expect(row.locator(".lazy-plugin-table-mode-fixed")).toHaveText("✅ Always enabled");
     await expect(row.getByRole("combobox")).toHaveCount(0);
+});
+
+test("load a lazy plugin in memory, unload it, and keep the startup setting unchanged", async ({ obsidian }) => {
+    await startFrom(obsidian, "lazy");
+    await startUnloadedAndUnsaved(obsidian);
+    const { view, row } = await openTable(obsidian);
+    const loaded = row.getByRole("combobox", { name: /^Loaded / });
+    await expect(loaded).toBeEnabled();
+    await expect(loaded).toHaveValue("off");
+    await expect(loaded.locator("option[value=saved]")).toHaveCount(0);
+    await loaded.selectOption("memory");
+    await expect.poll(() => obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), targetPluginId)).toBe(true);
+    await expect(loaded).toHaveValue("memory");
+    await expect.poll(() => obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), targetPluginId)).toBe(true);
+    expect(await obsidian.page.evaluate(async (id) => (await app.vault.readConfigJson("community-plugins") as string[]).includes(id), targetPluginId)).toBe(false);
+    await expect(view.locator(".lazy-plugin-table-pending button")).toHaveCount(0);
+
+    await loaded.selectOption("off");
+    await expect(loaded).toHaveValue("off");
+    await expect.poll(() => obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), targetPluginId)).toBe(false);
+    expect(await modeOf(obsidian)).toBe("lazy");
+});
+
+test("a staged mode cannot persist an in-memory plugin before review and discard restores its choices", async ({ obsidian }) => {
+    await startFrom(obsidian, "lazy");
+    await startUnloadedAndUnsaved(obsidian);
+    const { view, row } = await openTable(obsidian);
+    const loaded = row.getByRole("combobox", { name: /^Loaded / });
+    await expect(loaded).toBeEnabled();
+    await loaded.selectOption("memory");
+    await expect(loaded).toHaveValue("memory");
+    await row.getByRole("combobox", { name: /^Mode / }).selectOption("alwaysEnabled");
+
+    await expect(loaded).toHaveValue("memory");
+    await expect(loaded.locator("option[value=memory]")).toHaveAttribute("hidden", "");
+    await expect(loaded.locator("option[value=saved]")).toHaveCount(0);
+    expect(await obsidian.page.evaluate(async (id) => (await app.vault.readConfigJson("community-plugins") as string[]).includes(id), targetPluginId)).toBe(false);
+
+    await view.getByRole("button", { name: "Discard…", exact: true }).click();
+    const reviewPage = await obsidian.findPage((candidate) => candidate.locator(".lazy-review-changes-modal"), { timeout: 10_000 });
+    await reviewPage.locator(".lazy-review-changes-modal").getByRole("button", { name: /Discard/ }).click();
+    await expect.poll(() => modeOf(obsidian)).toBe("lazy");
+    await expect(loaded).toHaveValue("memory");
+    await expect(loaded.locator("option[value=memory]")).not.toHaveAttribute("hidden", "");
+});
+
+test("temporarily unloading a persistent plugin leaves it enabled after restarting", async ({ obsidian }) => {
+    await startFrom(obsidian, "alwaysEnabled");
+    await obsidian.page.evaluate(async (id) => {
+        await app.plugins.enablePlugin(id);
+        app.plugins.enabledPlugins.add(id);
+        const saved = await app.vault.readConfigJson("community-plugins");
+        if (!Array.isArray(saved)) throw new Error("Invalid community plugins configuration");
+        await app.vault.writeConfigJson("community-plugins", [...new Set([...saved, id])]);
+    }, targetPluginId);
+    const { row } = await openTable(obsidian);
+    const loaded = row.getByRole("combobox", { name: /^Loaded / });
+    await expect(loaded).toBeEnabled();
+    await expect(loaded).toHaveValue("saved");
+    await expect(loaded.locator("option[value=memory]")).toHaveCount(0);
+    await loaded.selectOption("off");
+    await expect(loaded).toHaveValue("off");
+    await expect.poll(() => obsidian.page.evaluate((id) => Boolean(app.plugins.plugins[id]?._loaded), targetPluginId)).toBe(false);
+    expect(await obsidian.page.evaluate(async (id) => (await app.vault.readConfigJson("community-plugins") as string[]).includes(id), targetPluginId)).toBe(true);
+
+    await obsidian.reload({ expectLoaded: [pluginUnderTestId, targetPluginId] });
+    const reopened = await openTable(obsidian);
+    await expect(reopened.row.getByRole("combobox", { name: /^Loaded / })).toHaveValue("saved");
+});
+
+test("a lazy plugin saved externally can be changed to in-memory loading", async ({ obsidian }) => {
+    await startFrom(obsidian, "lazy");
+    await obsidian.page.evaluate(async (id) => {
+        await app.plugins.enablePlugin(id);
+        app.plugins.enabledPlugins.add(id);
+        const saved = await app.vault.readConfigJson("community-plugins");
+        if (!Array.isArray(saved)) throw new Error("Invalid community plugins configuration");
+        await app.vault.writeConfigJson("community-plugins", [...new Set([...saved, id])]);
+    }, targetPluginId);
+    const { row } = await openTable(obsidian);
+    const loaded = row.getByRole("combobox", { name: /^Loaded / });
+    await expect(loaded).toBeEnabled();
+    await expect(loaded).toHaveValue("saved");
+    await loaded.selectOption("memory");
+    await expect.poll(() => obsidian.page.evaluate(async (id) => (await app.vault.readConfigJson("community-plugins") as string[]).includes(id), targetPluginId)).toBe(false);
+    await expect(loaded).toHaveValue("memory");
+    expect(await modeOf(obsidian)).toBe("lazy");
+});
+
+test("an already loaded plugin can become persistent without a restart", async ({ obsidian }) => {
+    await startFrom(obsidian, "alwaysEnabled");
+    await startUnloadedAndUnsaved(obsidian);
+    await obsidian.page.evaluate((id) => app.plugins.enablePlugin(id), targetPluginId);
+    const { row } = await openTable(obsidian);
+    const loaded = row.getByRole("combobox", { name: /^Loaded / });
+    await expect(loaded).toBeEnabled();
+    await expect(loaded).toHaveValue("memory");
+    await loaded.selectOption("saved");
+    await expect(loaded).toHaveValue("saved");
+    await expect.poll(() => obsidian.page.evaluate(async (id) => (await app.vault.readConfigJson("community-plugins") as string[]).includes(id), targetPluginId)).toBe(true);
+    expect(await modeOf(obsidian)).toBe("alwaysEnabled");
+});
+
+test("filtering to no results and clearing it preserves the staged edit", async ({ obsidian }) => {
+    await startFrom(obsidian, "lazy");
+    const { view, row } = await openTable(obsidian);
+    await row.getByRole("combobox", { name: /^Mode / }).selectOption("alwaysDisabled");
+    const filter = view.getByRole("textbox", { name: "Name", exact: true });
+    await filter.fill("not-a-real-plugin-🚀-".repeat(20));
+    await expect(view.locator("tbody tr").filter({ hasText: "BRAT" })).toHaveCount(0);
+    await expect(view.locator(".lazy-plugin-table-pending")).toContainText("1 unsaved change");
+    await filter.fill("BRAT");
+    await expect(row.getByRole("combobox", { name: /^Mode / })).toHaveValue("alwaysDisabled");
+    expect(await modeOf(obsidian)).toBe("alwaysDisabled");
 });

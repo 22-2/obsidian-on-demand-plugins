@@ -44,7 +44,7 @@ function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unk
             uninstallPlugin: vi.fn(async () => {}),
             enablePlugin: vi.fn(async (id: string) => { loaded.add(id); syncLoaded(); }),
             disablePlugin: vi.fn(async (id: string) => { loaded.delete(id); syncLoaded(); }),
-            enablePluginAndSave: vi.fn(async (id: string) => { savedIds.add(id); loaded.add(id); syncLoaded(); }),
+            enablePluginAndSave: vi.fn(async (id: string) => { savedIds.add(id); loaded.add(id); syncLoaded(); return true; }),
             disablePluginAndSave: vi.fn(async (id: string) => { savedIds.delete(id); loaded.delete(id); syncLoaded(); }),
         },
         vault: { adapter: {} as object, readConfigJson: vi.fn(async () => options.saved !== undefined && !Array.isArray(options.saved) ? options.saved : [...savedIds]) },

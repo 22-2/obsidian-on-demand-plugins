@@ -17,6 +17,7 @@ import {
 } from "@tanstack/table-core";
 import type { ColumnFiltersState, FilterFn, SortFn, SortingState, Table } from "@tanstack/table-core";
 import { storeReactivityBindings } from "@tanstack/table-core/store-reactivity-bindings";
+import pWaitFor from "p-wait-for";
 import type { Debouncer, MenuItem, Menu as MenuType, PluginManifest } from "obsidian";
 import { ButtonComponent, DropdownComponent, ExtraButtonComponent, FileSystemAdapter, Menu, Notice, Platform, debounce, setIcon, setTooltip } from "obsidian";
 import { showConfirmModal } from "src/core/confirm-modal";
@@ -741,9 +742,13 @@ export class PluginTable {
             if (value === "off") {
                 if (isPluginLoaded(this.host.app, pluginId)) await plugins.disablePlugin(pluginId);
             } else if (value === "saved" && !saved) {
-                await plugins.enablePluginAndSave(pluginId);
+                if (!(await plugins.enablePluginAndSave(pluginId))) throw new Error(`Failed to enable ${pluginId}`);
+                await this.waitForSavedState(pluginId, true);
             } else {
-                if (value === "memory" && saved) await plugins.disablePluginAndSave(pluginId);
+                if (value === "memory" && saved) {
+                    await plugins.disablePluginAndSave(pluginId);
+                    await this.waitForSavedState(pluginId, false);
+                }
                 if (!isPluginLoaded(this.host.app, pluginId)) await plugins.enablePlugin(pluginId);
             }
         } catch (error) {
@@ -753,6 +758,14 @@ export class PluginTable {
             this.changingLoadState.delete(pluginId);
             await this.refreshCommunityPluginSnapshot();
         }
+    }
+
+    /** Obsidian schedules community-plugins.json writes after its AndSave methods return. */
+    private async waitForSavedState(pluginId: string, saved: boolean): Promise<void> {
+        await pWaitFor(async () => {
+            const ids: unknown = await this.host.app.vault.readConfigJson("community-plugins");
+            return Array.isArray(ids) && ids.includes(pluginId) === saved;
+        }, { interval: 100, timeout: 5000 });
     }
 
     private renderModeCell(td: HTMLElement, data: PluginTableRow, controls: RowControls): void {
