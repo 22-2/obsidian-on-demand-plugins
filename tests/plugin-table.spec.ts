@@ -129,7 +129,7 @@ test("plugin table lists On-Demand itself as always loaded, without a mode to ch
     await view.getByRole("textbox", { name: "Name", exact: true }).fill("On-Demand");
     const row = view.locator("tbody tr").filter({ hasText: "On-Demand" });
     await expect(row).toHaveCount(1);
-    await expect(row.locator(".lazy-plugin-table-col-loaded")).toHaveText("Yes");
+    await expect(row.locator(".lazy-plugin-table-col-loaded")).toHaveText("Persistent");
     await expect(row.locator(".lazy-plugin-table-lamp.is-loaded")).toHaveCount(1);
     await expect(row.locator(".lazy-plugin-table-lamp.is-memory-only")).toHaveCount(0);
     await expect(row.locator(".lazy-plugin-table-mode-fixed")).toHaveText("✅ Always enabled");

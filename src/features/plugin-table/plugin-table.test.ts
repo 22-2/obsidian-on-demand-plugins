@@ -35,14 +35,19 @@ function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unk
     document.body.className = options.touch ? "is-mobile" : "";
     const modes: Record<string, PluginMode> = { alpha: PLUGIN_MODE.LAZY, beta: PLUGIN_MODE.ALWAYS_ENABLED, gamma: PLUGIN_MODE.ALWAYS_DISABLED, delta: PLUGIN_MODE.LAZY_ON_LAYOUT_READY };
     const loaded = new Set(["beta"]);
+    const savedIds = new Set(Array.isArray(options.saved) ? options.saved as string[] : ["beta"]);
     const app = {
         plugins: {
             updates: { alpha: { version: "1.1.0" } } as Record<string, { version: string }>,
             plugins: {} as Record<string, { _loaded: boolean }>,
             enabledPlugins: new Set<string>(),
             uninstallPlugin: vi.fn(async () => {}),
+            enablePlugin: vi.fn(async (id: string) => { loaded.add(id); syncLoaded(); }),
+            disablePlugin: vi.fn(async (id: string) => { loaded.delete(id); syncLoaded(); }),
+            enablePluginAndSave: vi.fn(async (id: string) => { savedIds.add(id); loaded.add(id); syncLoaded(); }),
+            disablePluginAndSave: vi.fn(async (id: string) => { savedIds.delete(id); loaded.delete(id); syncLoaded(); }),
         },
-        vault: { adapter: {} as object, readConfigJson: vi.fn(async () => options.saved ?? ["beta"]) },
+        vault: { adapter: {} as object, readConfigJson: vi.fn(async () => options.saved !== undefined && !Array.isArray(options.saved) ? options.saved : [...savedIds]) },
         setting: { open: vi.fn(), openTabById: vi.fn() },
     };
     const syncLoaded = () => {
@@ -152,8 +157,7 @@ describe("plugin table rendering", () => {
 
         expect(rowOf("Gamma").querySelector(".lazy-plugin-table-lamp.is-memory-only")).not.toBeNull();
         const cell = rowOf("Gamma").querySelector<HTMLElement>(".lazy-plugin-table-col-loaded")!;
-        expect(cell.textContent).toBe("Yes");
-        expect(cell.getAttribute("aria-label")).toBe("Loaded (in memory only)");
+        expect(cell.querySelector("select")?.value).toBe("memory");
     });
 
     it("ignores an unreadable community-plugins.json", async () => {
@@ -162,8 +166,8 @@ describe("plugin table rendering", () => {
         table.refresh();
         await flush();
 
-        expect(rowOf("Beta").querySelector(".lazy-plugin-table-col-loaded")?.textContent).toBe("Yes");
-        expect(rowOf("Alpha").querySelector(".lazy-plugin-table-col-loaded")?.textContent).toBe("No");
+        expect(rowOf("Beta").querySelector<HTMLSelectElement>(".lazy-plugin-table-col-loaded select")?.disabled).toBe(true);
+        expect(rowOf("Alpha").querySelector<HTMLSelectElement>(".lazy-plugin-table-col-loaded select")?.disabled).toBe(true);
     });
 
     it("adds a row menu button only on touch layouts", () => {
@@ -376,13 +380,53 @@ describe("plugin table filters and sorting", () => {
         const { header, root, names } = setup({ state });
         expect((root.querySelector("col") as HTMLElement).style.width).toBe("300px");
         // Name, loaded and mode widths, plus the description's minimum.
-        expect(root.querySelector<HTMLElement>(".lazy-plugin-table")!.style.minWidth).toBe("840px");
+        expect(root.querySelector<HTMLElement>(".lazy-plugin-table")!.style.minWidth).toBe("880px");
         header("name").querySelector<HTMLElement>(".lazy-plugin-table-resizer")!.click();
         expect(names()).toEqual(["Beta", "Alpha", "Gamma"]);
     });
 });
 
 describe("plugin table mode editing", () => {
+    it("toggles runtime state and restricts saved loads to always enabled", async () => {
+        const { rowOf, app, drafts } = setup();
+        await flush();
+        const loadedSelect = (name: string) => rowOf(name).querySelector<HTMLSelectElement>(".lazy-plugin-table-col-loaded select")!;
+        expect([...loadedSelect("Alpha").options].map((option) => option.value)).toEqual(["off", "memory"]);
+        expect([...loadedSelect("Beta").options].map((option) => option.value)).toEqual(["off", "saved"]);
+        expect(loadedSelect("Beta").selectedOptions[0].textContent).toBe("Persistent");
+        expect(loadedSelect("Beta").getAttribute("aria-label")).toBe("Loaded now and enabled for the next startup");
+        change(loadedSelect("Alpha"), "memory");
+        await flush();
+        expect(app.plugins.enablePlugin).toHaveBeenCalledWith("alpha");
+        expect(loadedSelect("Alpha").value).toBe("memory");
+        change(loadedSelect("Beta"), "off");
+        await flush();
+        expect(app.plugins.disablePlugin).toHaveBeenCalledWith("beta");
+        expect(app.plugins.disablePluginAndSave).not.toHaveBeenCalled();
+        expect(drafts.markDirty).not.toHaveBeenCalled();
+    });
+
+    it("persists only mode-compatible loads and protects pending mode changes", async () => {
+        const { rowOf, app, select } = setup({ saved: ["alpha"] });
+        await flush();
+        const loadedSelect = (name: string) => rowOf(name).querySelector<HTMLSelectElement>(".lazy-plugin-table-col-loaded select")!;
+        change(loadedSelect("Alpha"), "memory");
+        await flush();
+        expect(app.plugins.disablePluginAndSave).toHaveBeenCalledWith("alpha");
+        expect(app.plugins.enablePlugin).toHaveBeenCalledWith("alpha");
+        change(loadedSelect("Beta"), "saved");
+        await flush();
+        expect(app.plugins.enablePluginAndSave).toHaveBeenCalledWith("beta");
+        change(select(rowOf("Alpha")), PLUGIN_MODE.ALWAYS_ENABLED);
+        expect(loadedSelect("Alpha").value).toBe("memory");
+        expect(loadedSelect("Alpha").selectedOptions[0].hidden).toBe(true);
+        expect([...loadedSelect("Alpha").options].filter((option) => !option.hidden).map((option) => option.value)).toEqual(["off"]);
+        loadedSelect("Alpha").createEl("option", { value: "saved", text: "Persistent" });
+        change(loadedSelect("Alpha"), "saved");
+        await flush();
+        expect(app.plugins.enablePluginAndSave).toHaveBeenCalledTimes(1);
+    });
+
     it("stages a mode from the dropdown and updates the gear in place", () => {
         const { rowOf, select, gear, drafts, names } = setup();
         const alpha = rowOf("Alpha");
@@ -566,7 +610,8 @@ describe("On-Demand's own row", () => {
         const { rowOf, app } = setup({ extra: [self], saved: [] });
         await flush();
         const row = rowOf("On-Demand");
-        expect(row.querySelector(".lazy-plugin-table-col-loaded")?.textContent).toBe("Yes");
+        expect(row.querySelector(".lazy-plugin-table-col-loaded")?.textContent).toBe("Persistent");
+        expect(row.querySelector(".lazy-plugin-table-loaded-fixed")?.getAttribute("aria-label")).toBe("Loaded now and enabled for the next startup");
         expect(row.querySelector(".lazy-plugin-table-lamp.is-memory-only")).toBeNull();
         expect(row.querySelector(".lazy-plugin-table-mode-cell select")).toBeNull();
         expect(row.querySelector(".lazy-plugin-table-mode-fixed")?.textContent).toBe("✅ Always enabled");

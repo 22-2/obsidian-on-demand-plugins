@@ -1115,6 +1115,25 @@ button.lazy-plugin-table-summary-item.is-active {
     background: var(--color-blue);
 }
 
+.lazy-plugin-table-col-loaded .dropdown {
+    width: calc(100% - 16px);
+    min-width: 0;
+    height: 26px;
+    border: 1px solid transparent;
+    background-color: transparent;
+    box-shadow: none;
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-table-loaded-fixed {
+    padding-left: calc(0.8em + 1px);
+    font-size: var(--font-ui-smaller);
+}
+
+.is-mobile .lazy-plugin-table-col-loaded .dropdown {
+    min-height: 36px;
+}
+
 .lazy-plugin-table-td.lazy-plugin-table-col-mode {
     padding-top: var(--size-2-1);
     padding-bottom: var(--size-2-1);

@@ -113,7 +113,7 @@ const TEXT_FILTER_COLUMNS = new Set(["name", "id", "description"]);
 const DEFAULT_WIDTHS: Record<string, number> = {
     name: 300,
     id: 180,
-    loaded: 90,
+    loaded: 130,
     mode: 240,
     actions: 52,
 };
@@ -184,7 +184,7 @@ export interface PluginTableOptions {
 
 /**
  * Plugin table built with headless TanStack Table and hand-written DOM. It only
- * edits loading modes, through the shared draft, and never toggles plugins itself.
+ * edits loading modes through the shared draft and can toggle live load state.
  */
 export class PluginTable {
     private readonly host: PluginTableHost;
@@ -208,6 +208,7 @@ export class PluginTable {
     /** community-plugins.json as last read, so "in memory only" can be told apart from a saved enable. */
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
+    private readonly changingLoadState = new Set<string>();
 
     private containerEl: HTMLElement;
     private summaryItems: Record<SummaryFilter, SummaryItem>;
@@ -507,7 +508,7 @@ export class PluginTable {
                 this.createFilterSelect(th, column, [
                     ["true", "Yes"],
                     // A select cannot be indented with CSS, so the two kinds of Yes are indented with spaces.
-                    ["saved", "   Saved"],
+                    ["saved", "   Persistent"],
                     ["memory", "   In memory only"],
                     ["false", "No"],
                 ]);
@@ -682,7 +683,7 @@ export class PluginTable {
         if (data.author) td.createSpan({ cls: "lazy-plugin-table-author", text: data.author });
     }
 
-    /** A lamp and Yes/No; plugins are switched only through their mode. */
+    /** The saved state is constrained by the startup mode; runtime unloading never changes it. */
     private renderLoadedCell(data: PluginTableRow): void {
         const controls = this.rowControls.get(data.id);
         const td = controls?.loadedCell;
@@ -692,9 +693,66 @@ export class PluginTable {
         const lamp = td.createSpan({ cls: "lazy-plugin-table-lamp", attr: { "aria-hidden": "true" } });
         lamp.toggleClass("is-loaded", data.loaded);
         lamp.toggleClass("is-memory-only", data.memoryOnly);
-        // The lamp colour and the tooltip carry the in-memory detail.
-        td.createSpan({ text: data.loaded ? "Yes" : "No" });
-        setTooltip(td, data.status);
+        if (data.locked) {
+            const fixed = td.createSpan({ cls: "lazy-plugin-table-loaded-fixed", text: "Persistent" });
+            setTooltip(fixed, "Loaded now and enabled for the next startup");
+            return;
+        }
+        const saved = this.savedCommunityPluginIds?.has(data.id);
+        const pending = this.host.drafts.pendingPluginIds.has(data.id);
+        const current = data.loaded ? (data.memoryOnly ? "memory" : "saved") : "off";
+        const canMemory = data.mode !== PLUGIN_MODE.ALWAYS_ENABLED && !(pending && saved === true);
+        const canPersist = data.mode === PLUGIN_MODE.ALWAYS_ENABLED && !(pending && saved === false);
+        const select = new DropdownComponent(td).addOption("off", "Off");
+        if (canMemory || current === "memory") select.addOption("memory", "In memory");
+        if (canPersist || current === "saved") select.addOption("saved", "Persistent");
+        // A staged mode can temporarily make the live state unavailable as a choice.
+        // Keep its label as the selected value while hiding it from the menu.
+        for (const option of select.selectEl.options) {
+            if ((option.value === "memory" && !canMemory) || (option.value === "saved" && !canPersist)) {
+                option.hidden = true;
+                option.disabled = true;
+            }
+        }
+        select.selectEl.setAttr("aria-labelledby", `${this.headerId("loaded")} ${this.nameId(data.id)}`);
+        if (data.loaded && !data.memoryOnly && saved !== undefined) setTooltip(select.selectEl, "Loaded now and enabled for the next startup");
+        select.setValue(current);
+        select.selectEl.disabled = saved === undefined || this.changingLoadState.has(data.id);
+        select.selectEl.addEventListener("click", (event) => event.stopPropagation());
+        select.onChange((value) => {
+            if (value !== "off" && value !== "memory" && value !== "saved") return;
+            void this.changeLoadState(data.id, value);
+        });
+    }
+
+    private async changeLoadState(pluginId: string, value: "off" | "memory" | "saved"): Promise<void> {
+        const row = this.rowData.find((item) => item.id === pluginId);
+        const saved = this.savedCommunityPluginIds?.has(pluginId);
+        if (!row || row.locked || saved === undefined || this.changingLoadState.has(pluginId)) return;
+        const pending = this.host.drafts.pendingPluginIds.has(pluginId);
+        if (value === "memory" && (row.mode === PLUGIN_MODE.ALWAYS_ENABLED || (pending && saved))) return;
+        if (value === "saved" && (row.mode !== PLUGIN_MODE.ALWAYS_ENABLED || (pending && !saved))) return;
+        this.changingLoadState.add(pluginId);
+        const cell = this.rowControls.get(pluginId)?.loadedCell;
+        const select = cell?.querySelector("select");
+        if (select) select.disabled = true;
+        try {
+            const plugins = this.host.app.plugins;
+            if (value === "off") {
+                if (isPluginLoaded(this.host.app, pluginId)) await plugins.disablePlugin(pluginId);
+            } else if (value === "saved" && !saved) {
+                await plugins.enablePluginAndSave(pluginId);
+            } else {
+                if (value === "memory" && saved) await plugins.disablePluginAndSave(pluginId);
+                if (!isPluginLoaded(this.host.app, pluginId)) await plugins.enablePlugin(pluginId);
+            }
+        } catch (error) {
+            console.error(`Failed to change load state for ${pluginId}`, error);
+            new Notice(`Failed to change load state for ${row.name}`);
+        } finally {
+            this.changingLoadState.delete(pluginId);
+            await this.refreshCommunityPluginSnapshot();
+        }
     }
 
     private renderModeCell(td: HTMLElement, data: PluginTableRow, controls: RowControls): void {
@@ -764,7 +822,10 @@ export class PluginTable {
         const changed = new Set(ids);
         this.rowData = this.rowData.map((row) => (changed.has(row.id) ? { ...row, mode: this.host.getMode(row.id) } : row));
         this.syncOptions();
-        for (const row of this.rowData) if (changed.has(row.id)) this.syncModeControls(row);
+        for (const row of this.rowData) if (changed.has(row.id)) {
+            this.syncModeControls(row);
+            this.renderLoadedCell(row);
+        }
         this.updateModeFilterCounts();
         this.renderPendingBar();
     }
