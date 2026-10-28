@@ -320,6 +320,26 @@ describe("plugin table filters and sorting", () => {
         expect(rowOf("Alpha")).toBe(alpha);
     });
 
+    it("keeps matching rows in place when the filter changes", () => {
+        const { root, rowOf, names } = setup();
+        const alpha = rowOf("Alpha");
+        const beta = rowOf("Beta");
+        const tbody = root.querySelector("tbody")!;
+        const insert = vi.spyOn(tbody, "insertBefore");
+        const input = root.querySelector<HTMLInputElement>("input[aria-labelledby$='-header-name']")!;
+        const initialOrder = names();
+
+        change(input, "a");
+        expect(names()).toEqual(initialOrder);
+        expect(insert).not.toHaveBeenCalled();
+        change(input, "alpha");
+        expect(rowOf("Alpha")).toBe(alpha);
+        expect(insert).not.toHaveBeenCalled();
+        change(input, "");
+        expect(rowOf("Beta")).toBe(beta);
+        expect(names()).toEqual(initialOrder);
+    });
+
     it("sorts and hides columns from the header menu", () => {
         const { header, names, root, onStateChange } = setup();
         const menu = rightClick(header("name"));

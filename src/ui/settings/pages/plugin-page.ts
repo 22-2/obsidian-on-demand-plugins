@@ -51,6 +51,7 @@ export class PluginPage extends SettingPage {
     private tab: SettingsTab;
     private infiniteScrollObserver?: IntersectionObserver;
     private loadedCount = 0;
+    private rowCache = new Map<string, HTMLElement>();
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
     private loadStateRef?: EventRef;
@@ -63,6 +64,7 @@ export class PluginPage extends SettingPage {
     }
     display() {
         this.disconnectInfiniteScroll();
+        this.rowCache.clear();
         this.tab.offerRestoreOnPageOpen("plugin-management");
         this.watchPluginLoadState();
         // Plugin installations can happen while the settings modal is open.
@@ -140,6 +142,8 @@ export class PluginPage extends SettingPage {
         await this.app.plugins.loadManifests();
         this.plugin.updateManifests();
         void this.refreshCommunityPluginSnapshot();
+        this.rowCache.clear();
+        this.containerEl.querySelector<HTMLElement>(".lazy-plugin-infinite-host")?.empty();
         // Re-render the list directly: tab.update() does not
         // guarantee the open page is re-displayed, so relying
         // on it leaves live badges (e.g. Enabled after an
@@ -157,29 +161,36 @@ export class PluginPage extends SettingPage {
         this.disconnectInfiniteScroll();
         const host = this.containerEl.querySelector<HTMLElement>(".lazy-plugin-infinite-host");
         if (!host) return;
-        host.empty();
         // Mobile keyboards often append a space after a completed name; normalize
         // only the query so typing and internal spaces in plugin names stay intact.
         const query = this.filter.trim().toLowerCase();
         const plugins = this.plugin.manifests.filter((manifest) => (!query || manifest.name.toLowerCase().includes(query)) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
         // The compact toggle sits at the right edge of the count line. It has no visible label,
         // so its tooltip supplies the accessible name.
-        const toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
-        const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
-        compactControl.createSpan({ text: "Compact list" });
-        new ToggleComponent(compactControl)
-            .setValue(this.compact)
-            .setTooltip("Compact list")
-            .onChange((value) => {
-                this.compact = value;
-                saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
-                this.renderInfiniteList();
-            });
-        toolbar.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
-        const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
+        let toolbar = host.querySelector<HTMLElement>(".lazy-plugin-list-toolbar");
+        if (!toolbar) {
+            toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
+            const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
+            compactControl.createSpan({ text: "Compact list" });
+            new ToggleComponent(compactControl)
+                .setValue(this.compact)
+                .setTooltip("Compact list")
+                .onChange((value) => {
+                    this.compact = value;
+                    saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
+                    host.querySelector<HTMLElement>(".lazy-plugin-list-body")?.toggleClass("is-compact", value);
+                });
+            toolbar.createDiv({ cls: "lazy-plugin-results-count" });
+            host.createDiv({ cls: "lazy-plugin-list-body" });
+        }
+        toolbar.querySelector<HTMLElement>(".lazy-plugin-results-count")?.setText(`${plugins.length} plugins`);
+        const listEl = host.querySelector<HTMLElement>(".lazy-plugin-list-body")!;
         listEl.toggleClass("is-compact", this.compact);
         this.loadedCount = Math.min(PluginPage.PAGE_SIZE, plugins.length);
+        const visible = new Set(plugins.slice(0, this.loadedCount).map((manifest) => manifest.id));
+        for (const [id, row] of this.rowCache) if (!visible.has(id)) row.remove();
         this.appendPluginRows(listEl, plugins, 0, this.loadedCount);
+        host.querySelector(".lazy-plugin-infinite-sentinel")?.remove();
         if (this.loadedCount >= plugins.length) return;
         const sentinel = host.createDiv({ cls: "lazy-plugin-infinite-sentinel", attr: { "aria-hidden": "true" } });
         const activeWindow = host.ownerDocument.defaultView;
@@ -202,7 +213,17 @@ export class PluginPage extends SettingPage {
     private appendPluginRows(listEl: HTMLElement, plugins: SettingsUiHost["manifests"], start: number, end: number) {
         plugins.slice(start, end).forEach((manifest) => {
             if (!manifest) return;
+            const cached = this.rowCache.get(manifest.id);
+            if (cached) {
+                if (!cached.isConnected) {
+                    const badge = cached.querySelector<HTMLElement>(".lazy-plugin-enabled-badge");
+                    if (badge) setEnabledBadgeState(badge, this.app, manifest.id, this.savedCommunityPluginIds);
+                    listEl.append(cached);
+                }
+                return;
+            }
             const setting = new Setting(listEl).setName(manifest.name);
+            this.rowCache.set(manifest.id, setting.settingEl);
             setting.setClass("lazy-plugin-mode-row");
             // Give variable-length descriptions their own line so metadata
             // always starts at a predictable position within each row.
@@ -275,6 +296,12 @@ export class PluginPage extends SettingPage {
                 button.buttonEl.addClass("lazy-plugin-row-actions-mobile");
             });
         });
+        let next: Element | null = null;
+        for (let i = end - 1; i >= start; i--) {
+            const row = this.rowCache.get(plugins[i].id)!;
+            if (row.nextElementSibling !== next) listEl.insertBefore(row, next);
+            next = row;
+        }
     }
     /**
      * Enables or disables the plugin in memory only. Unlike a mode change, this does

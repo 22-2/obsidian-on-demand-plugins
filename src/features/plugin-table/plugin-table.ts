@@ -578,17 +578,21 @@ export class PluginTable {
         this.visibleIds = rows.map((row) => row.id);
         this.selection.retain(this.visibleIds);
 
-        // Appending an existing row moves it, so filtering and sorting only reorder the rows
-        // already built. Their controls and listeners survive, which keeps each pass cheap.
-        for (const row of rows) {
-            const controls = this.rowControls.get(row.id) ?? this.createRowControls(row);
-            controls.tr.toggleClass("is-selected", this.selection.has(row.id));
-            this.tbodyEl.append(controls.tr);
-        }
         const visible = new Set(this.visibleIds);
         for (const [id, { tr }] of this.rowControls) {
             // Rows filtered out leave the document but stay cached, so showing them again is instant.
             if (!visible.has(id)) tr.remove();
+        }
+        for (const row of rows) {
+            const controls = this.rowControls.get(row.id) ?? this.createRowControls(row);
+            controls.tr.toggleClass("is-selected", this.selection.has(row.id));
+        }
+        // Keep rows already in the right position connected to avoid needless DOM moves.
+        let next: Element | null = null;
+        for (let i = rows.length - 1; i >= 0; i--) {
+            const tr = this.rowControls.get(rows[i].id)!.tr;
+            if (tr.parentElement !== this.tbodyEl || tr.nextElementSibling !== next) this.tbodyEl.insertBefore(tr, next);
+            next = tr;
         }
         this.updateModeFilterCounts();
     }
