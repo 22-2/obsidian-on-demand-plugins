@@ -283,10 +283,39 @@ describe("LazyCommandRunner", () => {
         });
 
         it("should return false after the readiness wait times out", async () => {
+            const viewRegistry = new EventEmitter();
+            mockCtx.app.viewRegistry = viewRegistry;
             const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean } }).commandExecutor;
             vi.spyOn(executor, "isCommandExecutable").mockReturnValue(false);
 
             await expect(runner.waitForCommand("cmd1", 1)).resolves.toBe(false);
+            expect(viewRegistry.listenerCount("view-registered")).toBe(0);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(0);
+        });
+
+        it("removes both listeners when either event makes the command ready", async () => {
+            const viewRegistry = new EventEmitter();
+            mockCtx.app.viewRegistry = viewRegistry;
+            let ready = false;
+            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean } }).commandExecutor;
+            vi.spyOn(executor, "isCommandExecutable").mockImplementation(() => ready);
+            const waiting = runner.waitForCommand("cmd1");
+            expect(viewRegistry.listenerCount("view-registered")).toBe(1);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(1);
+            ready = true;
+            mockCtx.app.workspace!.emit("layout-change");
+            await expect(waiting).resolves.toBe(true);
+            expect(viewRegistry.listenerCount("view-registered")).toBe(0);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(0);
+        });
+
+        it("cancels command waits when the runner is cleared", async () => {
+            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean } }).commandExecutor;
+            vi.spyOn(executor, "isCommandExecutable").mockReturnValue(false);
+            const waiting = runner.waitForCommand("cmd1");
+            runner.clear();
+            await expect(waiting).resolves.toBe(false);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(0);
         });
 
         it("should return false when no readiness event source exists", async () => {
@@ -314,6 +343,7 @@ describe("LazyCommandRunner", () => {
 
             await expect(runner.waitForPluginLoaded("test-plugin")).resolves.toBe(true);
             expect(utilsMs.isPluginLoaded).toHaveBeenCalledWith(mockCtx.app, "test-plugin");
+            expect(pWaitFor).toHaveBeenCalledWith(expect.any(Function), { interval: 100, timeout: 8000 });
         });
     });
 });

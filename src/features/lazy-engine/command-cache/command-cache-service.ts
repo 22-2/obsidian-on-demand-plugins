@@ -1,6 +1,5 @@
 import log from "loglevel";
 import type { PluginManifest } from "obsidian";
-import pTimeout from "p-timeout";
 import pWaitFor from "p-wait-for";
 import type { CachedCommand } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
@@ -286,14 +285,7 @@ export class CommandCacheService {
 
     private async waitForPluginReadyForCommandSnapshot(pluginId: string, timeoutMs = 8000): Promise<void> {
         try {
-            await pTimeout(
-                pWaitFor(() => this.isPluginReadyForCommandSnapshot(pluginId), {
-                    interval: 100,
-                }),
-                {
-                    milliseconds: timeoutMs,
-                },
-            );
+            await pWaitFor(() => this.isPluginReadyForCommandSnapshot(pluginId), { interval: 100, timeout: timeoutMs });
         } catch {
             // Keep the cache refresh moving even if Obsidian never flips the loaded flag.
             // The subsequent command snapshot will still capture whatever registered successfully.
