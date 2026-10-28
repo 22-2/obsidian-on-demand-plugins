@@ -147,6 +147,7 @@ function setup(options: { modes?: Record<string, Mode>; loaded?: string[]; layou
 
     return {
         feature,
+        ctx,
         plugins,
         workspace,
         cache: mocks.cache,
@@ -155,6 +156,7 @@ function setup(options: { modes?: Record<string, Mode>; loaded?: string[]; layou
         saved,
         isLoaded: (id: string) => Boolean(instances[id]?._loaded),
         fireLayoutReady: () => layoutReadyCallback?.(),
+        runLayoutReady: () => (feature as unknown as { layoutReadyLoader: { run(): Promise<void> } }).layoutReadyLoader.run(),
     };
 }
 
@@ -385,7 +387,7 @@ describe("LazyEngineFeature layout-ready flow", () => {
         const running = new Promise<void>((resolve) => { release = resolve; });
         t.runner.ensurePluginLoaded.mockImplementation(async () => { await running; return true; });
         t.cache.registerCachedCommands.mockClear();
-        const work = (t.feature as unknown as { onLayoutReady(): Promise<void> }).onLayoutReady();
+        const work = t.runLayoutReady();
         const result = work.then(() => "completed", (error: unknown) => error instanceof Error ? error.name : String(error));
         expect(t.runner.ensurePluginLoaded).toHaveBeenCalledTimes(3);
         t.feature.onunload();
@@ -403,7 +405,7 @@ describe("LazyEngineFeature layout-ready flow", () => {
         let release!: () => void;
         const running = new Promise<void>((resolve) => { release = resolve; });
         t.cache.refreshStaleCacheForPlugin.mockImplementation(async () => { await running; });
-        const work = (t.feature as unknown as { onLayoutReady(): Promise<void> }).onLayoutReady();
+        const work = t.runLayoutReady();
         const result = work.then(() => "completed", (error: unknown) => error instanceof Error ? error.name : String(error));
         expect(t.cache.refreshStaleCacheForPlugin).toHaveBeenCalledTimes(3);
         t.feature.onunload();
@@ -418,7 +420,7 @@ describe("LazyEngineFeature layout-ready flow", () => {
         const running = new Promise<void>((resolve) => { release = resolve; });
         t.runner.ensurePluginLoaded.mockImplementation(async () => { await running; return true; });
         t.cache.registerCachedCommands.mockClear();
-        const work = (t.feature as unknown as { onLayoutReady(): Promise<void> }).onLayoutReady();
+        const work = t.runLayoutReady();
         t.feature.onunload();
         release();
         await work;
@@ -433,6 +435,29 @@ describe("LazyEngineFeature layout-ready flow", () => {
         await Promise.resolve();
         expect(t.runner.ensurePluginLoaded).not.toHaveBeenCalled();
         expect(t.cache.getStaleCachedPluginIds).not.toHaveBeenCalled();
+    });
+
+    it("ignores an old callback even after the feature is loaded again", async () => {
+        const t = setup({ modes: { p0: PLUGIN_MODE.LAZY_ON_LAYOUT_READY } });
+        const oldCallback = t.workspace.onLayoutReady.mock.calls[0][0];
+        t.feature.onunload();
+        t.feature.onload(t.ctx, {} as CoreContainer, {} as FeatureManager, {} as EventBus);
+        oldCallback();
+        await Promise.resolve();
+        expect(t.runner.ensurePluginLoaded).not.toHaveBeenCalled();
+        t.fireLayoutReady();
+        await vi.waitFor(() => expect(t.runner.ensurePluginLoaded).toHaveBeenCalledOnce());
+    });
+
+    it("replaces the previous callback if onload is called again", async () => {
+        const t = setup({ modes: { p0: PLUGIN_MODE.LAZY_ON_LAYOUT_READY } });
+        const oldCallback = t.workspace.onLayoutReady.mock.calls[0][0];
+        t.feature.onload(t.ctx, {} as CoreContainer, {} as FeatureManager, {} as EventBus);
+        oldCallback();
+        await Promise.resolve();
+        expect(t.runner.ensurePluginLoaded).not.toHaveBeenCalled();
+        t.fireLayoutReady();
+        await vi.waitFor(() => expect(t.runner.ensurePluginLoaded).toHaveBeenCalledOnce());
     });
 });
 
