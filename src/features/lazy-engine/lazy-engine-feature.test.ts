@@ -377,6 +377,63 @@ describe("LazyEngineFeature layout-ready flow", () => {
         expect(t.runner.ensurePluginLoaded).toHaveBeenCalledTimes(ids.length);
         expect(maximum).toBe(3);
     });
+
+    it("settles without refreshing caches when unloaded with queued plugins", async () => {
+        const ids = ["p0", "p1", "p2", "p3", "p4"];
+        const t = setup({ modes: Object.fromEntries(ids.map((id) => [id, PLUGIN_MODE.LAZY_ON_LAYOUT_READY])) });
+        let release!: () => void;
+        const running = new Promise<void>((resolve) => { release = resolve; });
+        t.runner.ensurePluginLoaded.mockImplementation(async () => { await running; return true; });
+        t.cache.registerCachedCommands.mockClear();
+        const work = (t.feature as unknown as { onLayoutReady(): Promise<void> }).onLayoutReady();
+        const result = work.then(() => "completed", (error: unknown) => error instanceof Error ? error.name : String(error));
+        expect(t.runner.ensurePluginLoaded).toHaveBeenCalledTimes(3);
+        t.feature.onunload();
+        release();
+
+        expect(await result).toBe("completed");
+        expect(t.runner.ensurePluginLoaded).toHaveBeenCalledTimes(3);
+        expect(t.cache.registerCachedCommands).not.toHaveBeenCalled();
+        expect(t.cache.getStaleCachedPluginIds).not.toHaveBeenCalled();
+    });
+
+    it("settles when unloaded with stale cache refreshes still queued", async () => {
+        const t = setup();
+        t.cache.getStaleCachedPluginIds.mockReturnValue(["p0", "p1", "p2", "p3"]);
+        let release!: () => void;
+        const running = new Promise<void>((resolve) => { release = resolve; });
+        t.cache.refreshStaleCacheForPlugin.mockImplementation(async () => { await running; });
+        const work = (t.feature as unknown as { onLayoutReady(): Promise<void> }).onLayoutReady();
+        const result = work.then(() => "completed", (error: unknown) => error instanceof Error ? error.name : String(error));
+        expect(t.cache.refreshStaleCacheForPlugin).toHaveBeenCalledTimes(3);
+        t.feature.onunload();
+        release();
+        expect(await result).toBe("completed");
+        expect(t.cache.refreshStaleCacheForPlugin).toHaveBeenCalledTimes(3);
+    });
+
+    it("does not refresh after a running load finishes following unload", async () => {
+        const t = setup({ modes: { p0: PLUGIN_MODE.LAZY_ON_LAYOUT_READY } });
+        let release!: () => void;
+        const running = new Promise<void>((resolve) => { release = resolve; });
+        t.runner.ensurePluginLoaded.mockImplementation(async () => { await running; return true; });
+        t.cache.registerCachedCommands.mockClear();
+        const work = (t.feature as unknown as { onLayoutReady(): Promise<void> }).onLayoutReady();
+        t.feature.onunload();
+        release();
+        await work;
+        expect(t.cache.registerCachedCommands).not.toHaveBeenCalled();
+        expect(t.cache.getStaleCachedPluginIds).not.toHaveBeenCalled();
+    });
+
+    it("ignores a layout-ready callback delivered after unload", async () => {
+        const t = setup({ modes: { p0: PLUGIN_MODE.LAZY_ON_LAYOUT_READY } });
+        t.feature.onunload();
+        t.fireLayoutReady();
+        await Promise.resolve();
+        expect(t.runner.ensurePluginLoaded).not.toHaveBeenCalled();
+        expect(t.cache.getStaleCachedPluginIds).not.toHaveBeenCalled();
+    });
 });
 
 describe("LazyEngineFeature.setPluginMode", () => {

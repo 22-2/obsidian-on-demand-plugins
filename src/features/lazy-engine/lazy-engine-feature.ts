@@ -1,6 +1,5 @@
 import log from "loglevel";
 import type { WorkspaceLeaf } from "obsidian";
-import PQueue from "p-queue";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";
@@ -29,11 +28,14 @@ export class LazyEngineFeature implements AppFeature {
 
     private viewLoader!: ViewLazyLoader;
     private fileLoader!: FileLazyLoader;
-    private layoutReadyQueue!: PQueue;
+    private generation = 0;
+    private active = false;
     private ctx!: PluginContext;
     private events!: EventBus;
 
     onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
+        this.generation++;
+        this.active = true;
         this.ctx = ctx;
         this.events = events;
 
@@ -69,8 +71,6 @@ export class LazyEngineFeature implements AppFeature {
         this.viewLoader.registerActiveLeafReload();
         this.fileLoader.register();
 
-        this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });
-
         // 4. Initialize cache BEFORE hooking onLayoutReady: when the plugin is
         // (re)loaded after the workspace is already ready, onLayoutReady fires the
         // callback synchronously, and the stale-cache refresh would then run against
@@ -82,26 +82,36 @@ export class LazyEngineFeature implements AppFeature {
     }
 
     onunload() {
+        this.generation++;
+        this.active = false;
         this.commandCache?.clear();
         this.lazyRunner?.clear();
-        this.layoutReadyQueue?.clear();
     }
 
     private registerLayoutReadyLoader() {
+        const generation = this.generation;
         this.ctx.app.workspace.onLayoutReady(() => {
+            if (generation !== this.generation) return;
             void this.onLayoutReady();
         });
     }
 
     private async onLayoutReady() {
+        if (!this.active) return;
+        const generation = this.generation;
+        await this.loadAfterLayoutReady(generation);
+    }
+
+    private async loadAfterLayoutReady(generation: number) {
         const manifests = this.ctx.getManifests();
 
         const toLoad = manifests.filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
 
         if (toLoad.length > 0) {
-            const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => logger.error("Failed loading plugin onLayoutReady", manifest.id, err))));
-
-            await Promise.all(tasks);
+            await this.runLayoutTasks(toLoad.map((manifest) => manifest.id), generation, async (id) => {
+                await this.lazyRunner.ensurePluginLoaded(id).catch((err) => logger.error("Failed loading plugin onLayoutReady", id, err));
+            });
+            if (generation !== this.generation) return;
             this.commandCache.registerCachedCommands();
         }
 
@@ -109,15 +119,27 @@ export class LazyEngineFeature implements AppFeature {
         // avoid registering wrappers for command IDs that may no longer exist (issue #6).
         // Rebuild them here, after layout-ready plugins are loaded, so the wasEnabled
         // check inside refreshStaleCacheForPlugin sees the final enabled state.
-        await this.refreshStaleCommandCaches();
+        if (generation === this.generation) await this.refreshStaleCommandCaches(generation);
     }
 
-    private async refreshStaleCommandCaches() {
+    private async refreshStaleCommandCaches(generation: number) {
         const staleIds = this.commandCache.getStaleCachedPluginIds();
         if (staleIds.length === 0) return;
 
-        const tasks = staleIds.map((pluginId) => this.layoutReadyQueue.add(() => this.commandCache.refreshStaleCacheForPlugin(pluginId).catch((err) => logger.error("Failed refreshing stale command cache", pluginId, err))));
-        await Promise.all(tasks);
+        await this.runLayoutTasks(staleIds, generation, async (id) => {
+            await this.commandCache.refreshStaleCacheForPlugin(id).catch((err) => logger.error("Failed refreshing stale command cache", id, err));
+        });
+    }
+
+    /** Stop taking new work after unload; already running plugin loads finish normally. */
+    private async runLayoutTasks(ids: readonly string[], generation: number, task: (id: string) => Promise<void>): Promise<void> {
+        let next = 0;
+        const worker = async () => {
+            while (generation === this.generation && next < ids.length) {
+                await task(ids[next++]);
+            }
+        };
+        await Promise.all(Array.from({ length: Math.min(3, ids.length) }, worker));
     }
 
     /**
