@@ -1207,7 +1207,93 @@ button.lazy-plugin-table-summary-item.is-active {
 }
 
 .is-mobile .lazy-plugin-table-mode-cell .dropdown {
-    min-height: 36px;
+    min-height: 44px;
+}
+
+.is-mobile .lazy-plugin-table-col-loaded .dropdown,
+.is-mobile .lazy-plugin-table-col-actions .clickable-icon {
+    min-height: 44px;
+}
+
+.is-mobile .lazy-plugin-table-col-actions .clickable-icon {
+    width: 44px;
+    min-width: 44px;
+}
+
+.lazy-plugin-table-phone-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.is-phone .lazy-plugin-table-phone-header-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.is-phone .lazy-plugin-table-phone-header-icon .svg-icon {
+    width: var(--icon-s);
+    height: var(--icon-s);
+}
+
+.is-phone .lazy-plugin-table-col-loaded,
+.is-phone .lazy-plugin-table-col-mode,
+.is-phone .lazy-plugin-table-col-actions {
+    padding-inline: 0;
+    text-align: center;
+}
+
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-col-loaded,
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-col-mode,
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-col-actions {
+    display: none;
+}
+
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-filter-input {
+    height: 36px;
+}
+
+.is-phone .lazy-plugin-table-col-loaded .lazy-plugin-table-phone-icon-control,
+.is-phone .lazy-plugin-table-col-mode .lazy-plugin-table-phone-icon-control,
+.is-phone .lazy-plugin-table-col-actions .clickable-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+}
+
+.is-phone .lazy-plugin-table-phone-state-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+}
+
+.is-phone .lazy-plugin-table-phone-state-icon.is-loaded,
+.is-phone .lazy-plugin-table-phone-icon-control.is-persistent {
+    color: var(--text-success);
+}
+
+.is-phone .lazy-plugin-table-phone-state-icon.is-memory-only,
+.is-phone .lazy-plugin-table-phone-icon-control.is-memory-only {
+    color: var(--color-blue);
+}
+
+.is-phone .lazy-plugin-table-phone-icon-control.is-off {
+    color: var(--text-faint);
+}
+
+.is-phone .lazy-plugin-table-mode-cell .lazy-plugin-table-phone-icon-control {
+    color: var(--text-normal);
 }
 
 .is-mobile .lazy-plugin-table-pending {

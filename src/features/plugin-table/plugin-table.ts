@@ -51,6 +51,14 @@ export interface PluginTableRow {
 }
 
 const MODE_ORDER: PLUGIN_MODE[] = [PLUGIN_MODE.ALWAYS_DISABLED, PLUGIN_MODE.LAZY, PLUGIN_MODE.LAZY_ON_LAYOUT_READY, PLUGIN_MODE.ALWAYS_ENABLED];
+const MODE_ICONS: Record<PLUGIN_MODE, string> = {
+    [PLUGIN_MODE.ALWAYS_DISABLED]: "circle-off",
+    [PLUGIN_MODE.LAZY]: "hand",
+    [PLUGIN_MODE.LAZY_ON_LAYOUT_READY]: "rocket",
+    [PLUGIN_MODE.ALWAYS_ENABLED]: "circle-check",
+};
+const LOAD_STATE_ICONS = { off: "power-off", memory: "zap", saved: "power" } as const;
+const PHONE_HEADER_ICONS: Record<string, string> = { loaded: "power", mode: "sliders-horizontal", actions: "ellipsis-vertical" };
 
 const features = tableFeatures({
     coreReactivityFeature: storeReactivityBindings(),
@@ -119,6 +127,9 @@ const DEFAULT_WIDTHS: Record<string, number> = {
     actions: 52,
 };
 
+/** Phone widths keep the editable controls in reach without the desktop table's long first swipe. */
+const PHONE_WIDTHS: Record<string, number> = { name: 210, loaded: 44, mode: 44, actions: 44 };
+
 /** Columns without a set width (the description) keep at least this much before the table scrolls sideways. */
 const UNSIZED_MIN_WIDTH = 240;
 
@@ -143,6 +154,7 @@ interface RowControls {
     loadedCell?: HTMLElement;
     gear?: ExtraButtonComponent;
     dropdown?: DropdownComponent;
+    modeIconButton?: ExtraButtonComponent;
 }
 
 function pluralizePlugins(count: number): string {
@@ -224,6 +236,7 @@ export class PluginTable {
     private stopResize?: () => void;
     /** Touch layouts get a menu button per row, since they have no right-click. */
     private readonly touchUi: boolean;
+    private readonly phoneUi: boolean;
     /**
      * Controls are named with aria-labelledby, pointing at the header and name text already
      * on screen: Obsidian shows any aria-label as a tooltip, which these controls do not need.
@@ -235,9 +248,10 @@ export class PluginTable {
         this.options = options;
         // Obsidian marks mobile layouts on the body, including its mobile emulation, which Platform does not follow.
         this.touchUi = host.doc.body.hasClass("is-mobile");
+        this.phoneUi = host.doc.body.hasClass("is-phone");
         this.sorting = options.initialState.sorting;
         // The actions column follows the device, so a state saved on one device never hides it on another.
-        this.columnVisibility = { ...options.initialState.columnVisibility, actions: this.touchUi };
+        this.columnVisibility = { ...options.initialState.columnVisibility, description: this.phoneUi ? false : options.initialState.columnVisibility.description, actions: this.touchUi };
         this.columnWidths = { ...options.initialState.columnWidths };
         this.rowData = this.buildRows();
 
@@ -287,7 +301,8 @@ export class PluginTable {
                 this.updateSummary();
             },
             onColumnVisibilityChange: (updater) => {
-                this.columnVisibility = { ...functionalUpdate(updater, this.columnVisibility), actions: this.touchUi };
+                const nextVisibility = functionalUpdate(updater, this.columnVisibility);
+                this.columnVisibility = { ...nextVisibility, description: this.phoneUi ? false : nextVisibility.description, actions: this.touchUi };
                 this.syncOptions();
                 // The cells themselves change with the columns, so the rendered rows cannot be reused.
                 this.resetRenderedRows();
@@ -464,6 +479,7 @@ export class PluginTable {
     }
 
     private getWidth(id: string): number | undefined {
+        if (this.phoneUi && PHONE_WIDTHS[id] !== undefined) return PHONE_WIDTHS[id];
         return this.columnWidths[id] ?? DEFAULT_WIDTHS[id];
     }
 
@@ -485,7 +501,13 @@ export class PluginTable {
         visibleColumns.forEach((column, index) => {
             const th = headerRow.createEl("th", { cls: `lazy-plugin-table-th lazy-plugin-table-col-${column.id}` });
             const label = th.createDiv({ cls: "lazy-plugin-table-th-label" });
-            label.createSpan({ text: headerText(column), attr: { id: this.headerId(column.id) } });
+            const labelText = this.phoneUi && column.id === "actions" ? "Actions" : headerText(column);
+            const accessibleLabel = label.createSpan({ text: labelText, attr: { id: this.headerId(column.id) } });
+            if (this.phoneUi && column.id !== "name") {
+                accessibleLabel.addClass("lazy-plugin-table-phone-sr-only");
+                const icon = label.createSpan({ cls: "lazy-plugin-table-phone-header-icon", attr: { "aria-hidden": "true" } });
+                setIcon(icon, PHONE_HEADER_ICONS[column.id]);
+            }
             this.sortIndicators.set(column.id, label.createSpan({ cls: "lazy-plugin-table-sort-indicator" }));
             if (column.getCanSort()) {
                 th.addEventListener("click", (evt) => {
@@ -509,7 +531,7 @@ export class PluginTable {
 
         const filterRow = this.theadEl.createEl("tr", { cls: "lazy-plugin-table-filter-row" });
         for (const column of visibleColumns) {
-            const th = filterRow.createEl("th");
+            const th = filterRow.createEl("th", { cls: `lazy-plugin-table-col-${column.id}` });
             if (column.id === "loaded") {
                 this.createFilterSelect(th, column, [
                     ["true", "Yes"],
@@ -696,6 +718,27 @@ export class PluginTable {
         if (!controls || !td) return;
         controls.tr.toggleClass("is-loaded", data.loaded);
         td.empty();
+        const saved = this.savedCommunityPluginIds?.has(data.id);
+        const current = data.loaded ? (data.memoryOnly ? "memory" : "saved") : "off";
+        if (this.phoneUi) {
+            const icon = LOAD_STATE_ICONS[current];
+            const stateLabel = current === "off" ? "Not loaded" : current === "memory" ? "Loaded in memory" : "Loaded persistently";
+            if (data.locked) {
+                const fixed = td.createSpan({ cls: `lazy-plugin-table-phone-state-icon is-loaded${data.memoryOnly ? " is-memory-only" : ""}`, attr: { "aria-label": `${stateLabel}: ${data.name}` } });
+                setIcon(fixed, icon);
+                return;
+            }
+            const button = new ExtraButtonComponent(td).setIcon(icon).setTooltip(`${stateLabel}: ${data.name}`);
+            button.extraSettingsEl.addClass("lazy-plugin-table-phone-icon-control");
+            button.extraSettingsEl.toggleClass("is-off", current === "off");
+            button.extraSettingsEl.toggleClass("is-memory-only", current === "memory");
+            button.extraSettingsEl.toggleClass("is-persistent", current === "saved");
+            button.extraSettingsEl.setAttr("aria-label", `${stateLabel}: ${data.name}`);
+            button.setDisabled(saved === undefined || this.changingLoadState.has(data.id));
+            button.onClick(() => this.showLoadedStateMenu(data, button));
+            button.extraSettingsEl.addEventListener("click", (event) => event.stopPropagation());
+            return;
+        }
         const lamp = td.createSpan({ cls: "lazy-plugin-table-lamp", attr: { "aria-hidden": "true" } });
         lamp.toggleClass("is-loaded", data.loaded);
         lamp.toggleClass("is-memory-only", data.memoryOnly);
@@ -704,9 +747,7 @@ export class PluginTable {
             setTooltip(fixed, "Loaded now and enabled for the next startup");
             return;
         }
-        const saved = this.savedCommunityPluginIds?.has(data.id);
         const pending = this.host.drafts.pendingPluginIds.has(data.id);
-        const current = data.loaded ? (data.memoryOnly ? "memory" : "saved") : "off";
         const canMemory = data.mode !== PLUGIN_MODE.ALWAYS_ENABLED && !(pending && saved === true);
         const canPersist = data.mode === PLUGIN_MODE.ALWAYS_ENABLED && !(pending && saved === false);
         const select = new DropdownComponent(td).addOption("off", "Off");
@@ -729,6 +770,25 @@ export class PluginTable {
             if (value !== "off" && value !== "memory" && value !== "saved") return;
             void this.changeLoadState(data.id, value);
         });
+    }
+
+    private showLoadedStateMenu(data: PluginTableRow, button: ExtraButtonComponent): void {
+        const saved = this.savedCommunityPluginIds?.has(data.id);
+        if (saved === undefined || data.locked || this.changingLoadState.has(data.id)) return;
+        const pending = this.host.drafts.pendingPluginIds.has(data.id);
+        const current = data.loaded ? (data.memoryOnly ? "memory" : "saved") : "off";
+        const canMemory = data.mode !== PLUGIN_MODE.ALWAYS_ENABLED && !(pending && saved);
+        const canPersist = data.mode === PLUGIN_MODE.ALWAYS_ENABLED && !(pending && !saved);
+        const menu = new Menu();
+        menu.addItem((item) => item.setTitle("Off").setIcon(LOAD_STATE_ICONS.off).setChecked(current === "off").onClick(() => void this.changeLoadState(data.id, "off")));
+        if (canMemory || current === "memory") {
+            menu.addItem((item) => item.setTitle("In memory").setIcon(LOAD_STATE_ICONS.memory).setChecked(current === "memory").onClick(() => void this.changeLoadState(data.id, "memory")));
+        }
+        if (canPersist || current === "saved") {
+            menu.addItem((item) => item.setTitle("Persistent").setIcon(LOAD_STATE_ICONS.saved).setChecked(current === "saved").onClick(() => void this.changeLoadState(data.id, "saved")));
+        }
+        const rect = button.extraSettingsEl.getBoundingClientRect();
+        menu.showAtPosition({ x: rect.left, y: rect.bottom }, button.extraSettingsEl.doc);
     }
 
     private async changeLoadState(pluginId: string, value: "off" | "memory" | "saved"): Promise<void> {
@@ -775,6 +835,21 @@ export class PluginTable {
 
     private renderModeCell(td: HTMLElement, data: PluginTableRow, controls: RowControls): void {
         const wrapper = td.createDiv({ cls: "lazy-plugin-table-mode-cell" });
+        if (this.phoneUi) {
+            if (data.locked) {
+                const fixed = wrapper.createSpan({ cls: "lazy-plugin-table-phone-state-icon lazy-plugin-table-phone-mode-icon", attr: { "aria-label": `${PluginModes[data.mode]}: ${data.name}` } });
+                setIcon(fixed, MODE_ICONS[data.mode]);
+                return;
+            }
+            const button = new ExtraButtonComponent(wrapper).setIcon(MODE_ICONS[data.mode]).setTooltip(`${PluginModes[data.mode]}: ${data.name}`);
+            button.extraSettingsEl.addClass("lazy-plugin-table-phone-icon-control");
+            button.extraSettingsEl.addClass("lazy-plugin-table-phone-mode-icon");
+            button.extraSettingsEl.setAttr("aria-label", `${PluginModes[data.mode]}: ${data.name}`);
+            button.onClick(() => this.showModeMenu(data, button));
+            button.extraSettingsEl.addEventListener("click", (event) => event.stopPropagation());
+            controls.modeIconButton = button;
+            return;
+        }
         if (data.locked) {
             wrapper.createSpan({ cls: "lazy-plugin-table-mode-fixed", text: PluginModes[data.mode] });
             return;
@@ -795,10 +870,25 @@ export class PluginTable {
         this.syncModeControls(data);
     }
 
+    private showModeMenu(data: PluginTableRow, button: ExtraButtonComponent): void {
+        const menu = new Menu();
+        for (const mode of MODE_ORDER) {
+            menu.addItem((item) => item.setTitle(PluginModes[mode]).setIcon(MODE_ICONS[mode]).setChecked(data.mode === mode).onClick(() => this.applyMode([data.id], mode)));
+        }
+        const rect = button.extraSettingsEl.getBoundingClientRect();
+        menu.showAtPosition({ x: rect.left, y: rect.bottom }, button.extraSettingsEl.doc);
+    }
+
     /** The lazy options only take effect in Lazy on demand, so the gear shows only there. */
     private syncModeControls(data: PluginTableRow): void {
         const controls = this.rowControls.get(data.id);
-        if (!controls?.gear || !controls.dropdown) return;
+        if (!controls) return;
+        if (controls.modeIconButton) {
+            controls.modeIconButton.setIcon(MODE_ICONS[data.mode]).setTooltip(`${PluginModes[data.mode]}: ${data.name}`);
+            controls.modeIconButton.extraSettingsEl.setAttr("aria-label", `${PluginModes[data.mode]}: ${data.name}`);
+            return;
+        }
+        if (!controls.gear || !controls.dropdown) return;
         controls.dropdown.setValue(data.mode);
         const isLazy = data.mode === PLUGIN_MODE.LAZY;
         controls.gear.setDisabled(!isLazy);
@@ -1013,6 +1103,7 @@ export class PluginTable {
             const submenu = addSubmenu(item);
             for (const col of this.table.getAllLeafColumns()) {
                 if (!col.getCanHide()) continue;
+                if (this.phoneUi && col.id === "description") continue;
                 submenu.addItem((subItem) =>
                     subItem
                         .setTitle(headerText(col))

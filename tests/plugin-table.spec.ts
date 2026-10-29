@@ -1,4 +1,6 @@
 import type { ObsidianAPI } from "obsidian-e2e-toolkit";
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
 import { expect, test } from "./fixtures";
 import { pluginUnderTestId, targetPluginId, useOnDemandPlugins } from "./test-utils";
 
@@ -87,7 +89,7 @@ test("closing the plugin table sets its draft aside and offers it back on reopen
     await expect(view.locator(".lazy-plugin-table-pending")).toContainText("1 unsaved change");
 });
 
-test("plugin table switches to the touch layout on phones", async ({ obsidian }) => {
+test("plugin table switches to the touch layout on phones", async ({ obsidian }, testInfo) => {
     await startFrom(obsidian, "lazy");
     // Mobile classes must be in place before the view opens, since the table picks its layout when it is built.
     await obsidian.emulateMobile("phone");
@@ -97,6 +99,20 @@ test("plugin table switches to the touch layout on phones", async ({ obsidian })
     const view = obsidian.page.locator(".lazy-plugin-table-view");
     const row = view.locator("tbody tr").filter({ hasText: "BRAT" });
     await expect(row).toHaveCount(1);
+    // Mobile Obsidian hides workspace tabs for its native bottom navigation. Expose this active pane
+    // in a phone-sized frame so the browser screenshot captures the actual touch layout.
+    await obsidian.page.addStyleTag({ content: ".workspace-tabs.mod-active { display: flex !important; position: fixed; inset: 0; z-index: 9999; width: 390px !important; height: 844px !important; }" });
+    const wrapper = view.locator(".lazy-plugin-table-wrapper");
+    await expect.poll(() => wrapper.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(24);
+    await expect(view.locator("thead .lazy-plugin-table-col-description")).toHaveCount(0);
+    const modeIcon = row.locator(".lazy-plugin-table-col-mode .lazy-plugin-table-phone-icon-control");
+    const loadedIcon = row.locator(".lazy-plugin-table-col-loaded .lazy-plugin-table-phone-icon-control");
+    await expect(modeIcon).toHaveAttribute("aria-label", /^🤲 Lazy on demand: BRAT$/);
+    await expect(loadedIcon).toHaveAttribute("aria-label", /^Not loaded: BRAT$/);
+    const screenshotPath = path.resolve(".ci-artifacts/ui-screenshots/plugin-table/mobile-after.png");
+    await mkdir(path.dirname(screenshotPath), { recursive: true });
+    await view.screenshot({ path: screenshotPath, animations: "disabled" });
+    await testInfo.attach("Plugin table on phone after responsive sizing", { path: screenshotPath, contentType: "image/png" });
 
     // Phones hide the long text columns at first so the name and mode fit.
     await expect(view.locator("thead .lazy-plugin-table-col-author")).toHaveCount(0);
@@ -104,10 +120,24 @@ test("plugin table switches to the touch layout on phones", async ({ obsidian })
     // Touch screens have no right-click, so each row gets a menu button.
     const actions = row.locator(".lazy-plugin-table-col-actions .clickable-icon");
     await expect(actions).toHaveCount(1);
+    await expect.poll(() => actions.evaluate((el) => el.getBoundingClientRect().width)).toBeGreaterThanOrEqual(44);
 
     test.skip(process.platform === "darwin", "The native macOS menu is unavailable to Playwright DOM locators.");
-    await actions.dispatchEvent("click");
+    await modeIcon.click();
+    const nextMode = obsidian.page.locator(".menu-item").filter({ hasText: "🚀 Lazy on layout ready" });
+    await expect(nextMode).toHaveCount(1);
+    await nextMode.click();
+    await expect(modeIcon).toHaveAttribute("aria-label", /^🚀 Lazy on layout ready: BRAT$/);
+    await loadedIcon.click();
+    const offState = obsidian.page.locator(".menu-item").filter({ hasText: "Off" });
+    await expect(offState).toHaveCount(1);
+    await offState.click();
+    await expect(loadedIcon).toHaveAttribute("aria-label", /^Not loaded: BRAT$/);
+    await actions.click();
     await expect(obsidian.page.locator(".menu-item").filter({ hasText: "Show in community plugins" })).toHaveCount(1);
+    const menuScreenshotPath = path.resolve(".ci-artifacts/ui-screenshots/plugin-table/mobile-actions-menu.png");
+    await obsidian.page.screenshot({ path: menuScreenshotPath, animations: "disabled" });
+    await testInfo.attach("Plugin row actions on phone", { path: menuScreenshotPath, contentType: "image/png" });
 });
 
 test("opening the table from plugin management keeps the draft live", async ({ obsidian }) => {

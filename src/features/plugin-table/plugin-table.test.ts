@@ -31,8 +31,8 @@ const MANIFESTS = [
     { id: "gamma", name: "Gamma", version: "3.0.0", author: "Cy", description: "Third plugin" },
 ] as PluginManifest[];
 
-function setup(options: { touch?: boolean; state?: PluginTableState; saved?: unknown; extra?: PluginManifest[]; showUninstall?: boolean } = {}) {
-    document.body.className = options.touch ? "is-mobile" : "";
+function setup(options: { touch?: boolean; phone?: boolean; state?: PluginTableState; saved?: unknown; extra?: PluginManifest[]; showUninstall?: boolean } = {}) {
+    document.body.className = options.phone ? "is-mobile is-phone" : options.touch ? "is-mobile" : "";
     const modes: Record<string, PluginMode> = { alpha: PLUGIN_MODE.LAZY, beta: PLUGIN_MODE.ALWAYS_ENABLED, gamma: PLUGIN_MODE.ALWAYS_DISABLED, delta: PLUGIN_MODE.LAZY_ON_LAYOUT_READY };
     const loaded = new Set(["beta"]);
     const savedIds = new Set(Array.isArray(options.saved) ? options.saved as string[] : ["beta"]);
@@ -181,6 +181,29 @@ describe("plugin table rendering", () => {
 
         expect(Menu.last().find("Lazy settings")).toBeDefined();
         expect(touch.rowOf("Alpha").classList.contains("is-selected")).toBe(true);
+    });
+
+    it("uses icon controls and always hides the description on phones", async () => {
+        const state = { ...defaultTableState(false), columnVisibility: { description: true } };
+        const phone = setup({ phone: true, state });
+        await flush();
+
+        const row = phone.rowOf("Alpha");
+        expect(phone.root.querySelector("thead .lazy-plugin-table-col-description")).toBeNull();
+        expect(phone.root.querySelector("thead .lazy-plugin-table-th.lazy-plugin-table-col-loaded .lazy-plugin-table-phone-header-icon")).not.toBeNull();
+        expect(row.querySelector(".lazy-plugin-table-col-loaded select")).toBeNull();
+        expect(row.querySelector(".lazy-plugin-table-col-loaded .lazy-plugin-table-phone-icon-control")?.getAttribute("aria-label")).toBe("Not loaded: Alpha");
+        expect(row.querySelector(".lazy-plugin-table-col-mode select")).toBeNull();
+        expect(row.querySelector(".lazy-plugin-table-col-mode .lazy-plugin-table-phone-icon-control")?.getAttribute("aria-label")).toBe(`${PluginModes[PLUGIN_MODE.LAZY]}: Alpha`);
+
+        row.querySelector<HTMLElement>(".lazy-plugin-table-col-mode .lazy-plugin-table-phone-icon-control")!.click();
+        expect(Menu.last().items.map((item) => item.title)).toEqual(Object.values(PluginModes));
+        document.body.empty();
+
+        const secondPhone = setup({ phone: true, state });
+        await flush();
+        secondPhone.rowOf("Alpha").querySelector<HTMLElement>(".lazy-plugin-table-col-loaded .lazy-plugin-table-phone-icon-control")!.click();
+        expect(Menu.last().items.map((item) => item.title)).toEqual(["Off", "In memory"]);
     });
 
     it("removes itself on destroy", () => {
