@@ -958,6 +958,11 @@ button.lazy-plugin-table-summary-item.is-active {
     white-space: nowrap;
 }
 
+.lazy-plugin-table thead th:not(:last-child),
+.lazy-plugin-table tbody td:not(:last-child) {
+    border-right: 1px solid var(--background-modifier-border);
+}
+
 .lazy-plugin-table-th {
     position: relative;
     background-color: var(--background-secondary);
@@ -978,6 +983,10 @@ button.lazy-plugin-table-summary-item.is-active {
     align-items: center;
     gap: var(--size-4-1);
     cursor: pointer;
+}
+
+.lazy-plugin-table-sort-indicator {
+    font-size: 0.7em;
 }
 
 .lazy-plugin-table-resizer {
