@@ -214,6 +214,8 @@ export class PluginTable {
     private containerEl: HTMLElement;
     private summaryItems: Record<SummaryFilter, SummaryItem>;
     private pendingEl: HTMLElement;
+    /** The scroll container around the table. */
+    private wrapperEl: HTMLElement;
     private tableEl: HTMLTableElement;
     private colgroupEl: HTMLTableColElement;
     private theadEl: HTMLTableSectionElement;
@@ -254,8 +256,8 @@ export class PluginTable {
         // Right-aligned opposite the filters, so saving sits where the settings bar puts it.
         this.pendingEl = summary.createDiv({ cls: "lazy-plugin-table-pending" });
 
-        const wrapper = this.containerEl.createDiv({ cls: "lazy-plugin-table-wrapper" });
-        this.tableEl = wrapper.createEl("table", { cls: "lazy-plugin-table" });
+        this.wrapperEl = this.containerEl.createDiv({ cls: "lazy-plugin-table-wrapper" });
+        this.tableEl = this.wrapperEl.createEl("table", { cls: "lazy-plugin-table" });
         this.colgroupEl = this.tableEl.createEl("colgroup");
         this.theadEl = this.tableEl.createEl("thead");
         this.tbodyEl = this.tableEl.createEl("tbody");
@@ -304,6 +306,8 @@ export class PluginTable {
 
     /** Re-read the plugins and the draft, e.g. after a save, a discard or an install. */
     refresh(): void {
+        // Rebuilding the rows must not move the view, e.g. when an uninstall makes the table refresh.
+        const scrollTop = this.wrapperEl.scrollTop;
         this.rowData = this.buildRows();
         // Leave the updates view once nothing is left to update, so the table does not stay empty.
         if (!this.rowData.some(hasUpdate)) this.showUpdatesOnly = false;
@@ -313,6 +317,7 @@ export class PluginTable {
         this.renderBody();
         this.updateSummary();
         this.renderPendingBar();
+        this.wrapperEl.scrollTop = scrollTop;
         void this.refreshCommunityPluginSnapshot();
     }
 
