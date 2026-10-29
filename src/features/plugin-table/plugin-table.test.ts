@@ -514,7 +514,8 @@ describe("plugin table selection and row menu", () => {
         rightClick(on.rowOf("Beta")).find("Uninstall plugin")!.click();
         await flush();
         expect(on.app.plugins.uninstallPlugin).toHaveBeenCalledWith("beta");
-        expect(Notice.messages).toContain("Uninstalled Beta");
+        expect(Notice.messages).toEqual(expect.arrayContaining(["Uninstalling Beta…", "Uninstalled Beta"]));
+        expect(Notice.messages.indexOf("Uninstalling Beta…")).toBeLessThan(Notice.messages.indexOf("Uninstalled Beta"));
     });
 
     it("uninstalls the selected plugins together and reports failures", async () => {

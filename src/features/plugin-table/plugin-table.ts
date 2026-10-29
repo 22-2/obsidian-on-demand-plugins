@@ -942,6 +942,8 @@ export class PluginTable {
             : `Uninstall ${pluralizePlugins(rows.length)}? This removes these plugins and their files from the current vault.\n\n${rows.map((row) => row.name).join("\n")}`;
         if ((await showConfirmModal(this.host.app, { message })) !== true) return;
 
+        const label = rows.length === 1 ? first.name : pluralizePlugins(rows.length);
+        new Notice(`Uninstalling ${label}…`);
         // Obsidian handles disabling, removing the folder and updating its manifest.
         const plugins = this.host.app.plugins as unknown as { uninstallPlugin?: (pluginId: string) => Promise<void> };
         const failed: string[] = [];
@@ -960,7 +962,7 @@ export class PluginTable {
             new Notice(`Failed to uninstall ${failed.length === 1 ? failed[0] : pluralizePlugins(failed.length)}`);
             return;
         }
-        new Notice(`Uninstalled ${rows.length === 1 ? first.name : pluralizePlugins(rows.length)}`);
+        new Notice(`Uninstalled ${label}`);
     }
 
     private addCopyItems(menu: MenuType, targets: readonly PluginTableRow[], single: PluginTableRow | null): void {
