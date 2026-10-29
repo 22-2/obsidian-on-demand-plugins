@@ -122,7 +122,7 @@ test("plugin table switches to the touch layout on phones", async ({ obsidian },
     await testInfo.attach("Plugin table on phone after responsive sizing", { path: screenshotPath, contentType: "image/png" });
 
     // Phones hide the long text columns at first so the name and mode fit.
-    await expect(view.locator("thead .lazy-plugin-table-col-author")).toHaveCount(0);
+    await expect(row.locator(".lazy-plugin-table-author")).toBeHidden();
     await expect(view.locator("thead .lazy-plugin-table-col-description")).toHaveCount(0);
     // Touch screens have no right-click, so each row gets a menu button.
     const actions = row.locator(".lazy-plugin-table-col-actions .clickable-icon");

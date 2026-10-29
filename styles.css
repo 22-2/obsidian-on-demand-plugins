@@ -1201,6 +1201,10 @@ button.lazy-plugin-table-summary-item.is-active {
     color: var(--text-faint);
 }
 
+.is-mobile .lazy-plugin-table-author {
+    display: none;
+}
+
 /* On-Demand's own mode is fixed; it lines up with the text of the dropdowns above and below. */
 .lazy-plugin-table-mode-fixed {
     display: flex;
