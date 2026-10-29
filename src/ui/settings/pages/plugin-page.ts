@@ -138,6 +138,7 @@ export class PluginPage extends SettingPage {
         this.app.setting.close();
     }
     private async refreshList() {
+        new Notice("Refreshing plugin list…");
         // Plugins copied into the plugins folder are only known to Obsidian after it rescans the disk.
         await this.app.plugins.loadManifests();
         this.plugin.updateManifests();
@@ -149,6 +150,7 @@ export class PluginPage extends SettingPage {
         // on it leaves live badges (e.g. Enabled after an
         // on-demand load) stale.
         this.renderInfiniteList();
+        new Notice("Plugin list refreshed");
     }
     hide() {
         this.disconnectInfiniteScroll();

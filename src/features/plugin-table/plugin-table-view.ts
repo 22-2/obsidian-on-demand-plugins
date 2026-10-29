@@ -1,5 +1,5 @@
 import type { WorkspaceLeaf } from "obsidian";
-import { ItemView } from "obsidian";
+import { ItemView, Notice } from "obsidian";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
 import { PluginTable } from "src/features/plugin-table/plugin-table";
@@ -66,8 +66,10 @@ export class PluginTableView extends ItemView {
 
     /** Plugins copied into the plugins folder are only known to Obsidian after it rescans the disk. */
     private async rescanAndRefresh() {
+        new Notice("Refreshing plugin list…");
         await this.app.plugins.loadManifests();
         this.table?.refresh();
+        new Notice("Plugin list refreshed");
     }
 
     async onClose() {

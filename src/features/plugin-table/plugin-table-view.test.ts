@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import type { App, WorkspaceLeaf } from "obsidian";
+import { Notice } from "src/__mocks__/obsidian";
 import { installObsidianDom } from "src/__mocks__/obsidian-dom";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import { PLUGIN_MODE } from "src/core/types";
@@ -95,9 +96,11 @@ describe("plugin table view", () => {
         expect(reads()).toBe(before + 3);
 
         // The refresh action rescans the plugins folder first, so the copied-in plugins show up.
+        Notice.clearMessages();
         (view as unknown as { actions: { callback: () => void }[] }).actions[0].callback();
         await vi.waitFor(() => expect(reads()).toBe(before + 4));
         expect(app.plugins.loadManifests).toHaveBeenCalledOnce();
+        expect(Notice.messages).toEqual(["Refreshing plugin list…", "Plugin list refreshed"]);
 
         handlers.get(PLUGIN_LOAD_STATE_CHANGED_EVENT)!();
         expect(reads()).toBe(before + 4);
