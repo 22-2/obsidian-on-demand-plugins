@@ -739,18 +739,19 @@ export class PluginTable {
             button.extraSettingsEl.addEventListener("click", (event) => event.stopPropagation());
             return;
         }
-        const lamp = td.createSpan({ cls: "lazy-plugin-table-lamp", attr: { "aria-hidden": "true" } });
+        const cellContent = td.createDiv({ cls: "lazy-plugin-table-loaded-cell" });
+        const lamp = cellContent.createSpan({ cls: "lazy-plugin-table-lamp", attr: { "aria-hidden": "true" } });
         lamp.toggleClass("is-loaded", data.loaded);
         lamp.toggleClass("is-memory-only", data.memoryOnly);
         if (data.locked) {
-            const fixed = td.createSpan({ cls: "lazy-plugin-table-loaded-fixed", text: "Persistent" });
+            const fixed = cellContent.createSpan({ cls: "lazy-plugin-table-loaded-fixed", text: "Persistent" });
             setTooltip(fixed, "Loaded now and enabled for the next startup");
             return;
         }
         const pending = this.host.drafts.pendingPluginIds.has(data.id);
         const canMemory = data.mode !== PLUGIN_MODE.ALWAYS_ENABLED && !(pending && saved === true);
         const canPersist = data.mode === PLUGIN_MODE.ALWAYS_ENABLED && !(pending && saved === false);
-        const select = new DropdownComponent(td).addOption("off", "Off");
+        const select = new DropdownComponent(cellContent).addOption("off", "Off");
         if (canMemory || current === "memory") select.addOption("memory", "In memory");
         if (canPersist || current === "saved") select.addOption("saved", "Persistent");
         // A staged mode can temporarily make the live state unavailable as a choice.

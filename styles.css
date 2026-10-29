@@ -1110,7 +1110,6 @@ button.lazy-plugin-table-summary-item.is-active {
     display: inline-block;
     width: 6px;
     height: 6px;
-    margin-right: var(--size-4-2);
     border-radius: 50%;
     background: var(--text-faint);
     vertical-align: middle;
@@ -1124,18 +1123,30 @@ button.lazy-plugin-table-summary-item.is-active {
     background: var(--color-blue);
 }
 
-.lazy-plugin-table-col-loaded .dropdown {
-    width: calc(100% - 16px);
+.lazy-plugin-table-loaded-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    min-width: 0;
+}
+
+.lazy-plugin-table-loaded-cell .lazy-plugin-table-lamp {
+    flex: 0 0 6px;
+}
+
+.lazy-plugin-table-loaded-cell .dropdown {
+    flex: 1 1 auto;
+    width: auto;
     min-width: 0;
     height: 26px;
     border: 1px solid transparent;
     background-color: transparent;
     box-shadow: none;
     font-size: var(--font-ui-smaller);
+    padding-left: 0;
 }
 
 .lazy-plugin-table-loaded-fixed {
-    padding-left: calc(0.8em + 1px);
     font-size: var(--font-ui-smaller);
 }
 

@@ -39,9 +39,16 @@ function modeOf(obsidian: ObsidianAPI) {
     return obsidian.page.evaluate((id) => (app.plugins.plugins["on-demand-plugins"] as unknown as TablePlugin).getPluginMode(id), targetPluginId);
 }
 
-test("plugin table stages a mode from its column and saves it through the shared review", async ({ obsidian }) => {
+test("plugin table stages a mode from its column and saves it through the shared review", async ({ obsidian }, testInfo) => {
     await startFrom(obsidian, "lazy");
     const { view, row } = await openTable(obsidian);
+    const loadedCell = row.locator(".lazy-plugin-table-loaded-cell");
+    await expect(loadedCell).toHaveCSS("align-items", "center");
+    await expect(loadedCell.locator("select.dropdown:not(.is-measuring)")).toHaveCSS("padding-left", "0px");
+    const screenshotPath = path.resolve(".ci-artifacts/ui-screenshots/plugin-table/desktop-loaded-alignment.png");
+    await mkdir(path.dirname(screenshotPath), { recursive: true });
+    await view.screenshot({ path: screenshotPath, animations: "disabled" });
+    await testInfo.attach("Plugin table loaded status alignment on desktop", { path: screenshotPath, contentType: "image/png" });
 
     const gear = row.locator(".lazy-plugin-table-mode-cell .clickable-icon");
     await expect(gear).toBeVisible();
