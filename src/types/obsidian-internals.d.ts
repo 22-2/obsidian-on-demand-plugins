@@ -12,7 +12,6 @@ declare module "obsidian" {
     interface Vault {
         getConfigFile(name: string): string;
         readConfigJson(name: string): Promise<unknown>;
-        writeConfigJson(name: string, data: unknown): Promise<void>;
     }
 
     interface WorkspaceLeaf {

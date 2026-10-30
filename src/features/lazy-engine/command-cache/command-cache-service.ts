@@ -1,8 +1,7 @@
 import log from "loglevel";
 import type { PluginManifest } from "obsidian";
-import pTimeout from "p-timeout";
 import pWaitFor from "p-wait-for";
-import type { CachedCommand, PluginLoader } from "src/core/interfaces";
+import type { CachedCommand } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import { isLazyMode, isPluginLoaded } from "src/core/utils";
 import { CommandCacheStore } from "src/features/lazy-engine/command-cache/command-cache-store";
@@ -10,18 +9,18 @@ import { waitForPluginInitialization } from "src/patches/plugin-initialization";
 
 const logger = log.getLogger("OnDemandPlugin/CommandCacheService");
 
-// Re-export for consumers
 export class CommandCacheService {
     private store: CommandCacheStore;
     private registeredWrappers = new Set<string>();
     private wrapperCommands = new Map<string, unknown>();
 
     private ctx: PluginContext;
-    private pluginLoader: PluginLoader;
+    /** Runs the real command behind a wrapper; the cache never loads plugins itself. */
+    private runLazyCommand: (commandId: string) => Promise<void>;
 
-    constructor(ctx: PluginContext, pluginLoader: PluginLoader) {
+    constructor(ctx: PluginContext, runLazyCommand: (commandId: string) => Promise<void>) {
         this.ctx = ctx;
-        this.pluginLoader = pluginLoader;
+        this.runLazyCommand = runLazyCommand;
         this.store = new CommandCacheStore(ctx);
     }
 
@@ -80,21 +79,6 @@ export class CommandCacheService {
     async ensureCommandsCached(pluginId: string): Promise<void> {
         if (this.store.isValid(pluginId)) return;
         if (await this.refreshCommandsForPlugin(pluginId)) this.store.persist();
-    }
-
-    async forceReloadPluginCache(pluginId: string): Promise<void> {
-        const cachedIds = this.store.getIds(pluginId);
-        const hadWrappers = cachedIds ? Array.from(cachedIds).some((commandId) => this.isWrapperCommand(commandId)) : false;
-
-        try {
-            await this.snapshotCommandsForPlugin(pluginId);
-            this.persistCache();
-        } finally {
-            // The snapshot removes wrappers first; restore them from the previous cache on failure.
-            if (hadWrappers) {
-                this.registerCachedCommandsForPlugin(pluginId);
-            }
-        }
     }
 
     /** Capture without serializing the entire cache; bulk rebuilds persist once at the end. */
@@ -188,7 +172,7 @@ export class CommandCacheService {
                 name: cached.name,
                 icon: cached.icon,
                 callback: () => {
-                    void this.pluginLoader.runLazyCommand(commandId);
+                    void this.runLazyCommand(commandId);
                 },
             };
 
@@ -301,14 +285,7 @@ export class CommandCacheService {
 
     private async waitForPluginReadyForCommandSnapshot(pluginId: string, timeoutMs = 8000): Promise<void> {
         try {
-            await pTimeout(
-                pWaitFor(() => this.isPluginReadyForCommandSnapshot(pluginId), {
-                    interval: 100,
-                }),
-                {
-                    milliseconds: timeoutMs,
-                },
-            );
+            await pWaitFor(() => this.isPluginReadyForCommandSnapshot(pluginId), { interval: 100, timeout: timeoutMs });
         } catch {
             // Keep the cache refresh moving even if Obsidian never flips the loaded flag.
             // The subsequent command snapshot will still capture whatever registered successfully.

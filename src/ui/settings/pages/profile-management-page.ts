@@ -3,18 +3,18 @@ import type { App, ButtonComponent } from "obsidian";
 import { ExtraButtonComponent, Menu, Modal, Notice, Setting, SettingPage } from "obsidian";
 import type { DeviceType } from "src/core/types";
 import { showConfirmModal } from "src/core/confirm-modal";
-import type OnDemandPlugin from "src/main";
 import type { SettingsTab } from "src/ui/settings-tab";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import { openBackupDirectory } from "src/ui/settings/helpers";
 import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 export class ProfileManagementPage extends SettingPage {
     private app: App;
-    private plugin: OnDemandPlugin;
+    private plugin: SettingsUiHost;
     private tab: SettingsTab;
     private createName = "";
 
-    constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
+    constructor(app: App, plugin: SettingsUiHost, tab: SettingsTab) {
         super();
         this.app = app;
         this.plugin = plugin;
@@ -35,8 +35,7 @@ export class ProfileManagementPage extends SettingPage {
             text.appendText(" may cause conflicts or overwrite changes.");
         });
         this.containerEl.prepend(syncNotice);
-        const service = this.plugin.core.settingsService;
-        const profileIds = Object.keys(service.data.profiles);
+        const profileIds = Object.keys(this.plugin.data.profiles);
 
         new Setting(this.containerEl)
             .setName("Profiles")
@@ -76,16 +75,15 @@ export class ProfileManagementPage extends SettingPage {
             });
 
         new Setting(this.containerEl).setName("Device defaults").setHeading().setDesc("Choose the profile loaded by default on each device type.");
-        this.renderDeviceDefault("Desktop", "desktop", service.data.desktopProfileId);
-        this.renderDeviceDefault("Mobile", "mobile", service.data.mobileProfileId);
+        this.renderDeviceDefault("Desktop", "desktop", this.plugin.data.desktopProfileId);
+        this.renderDeviceDefault("Mobile", "mobile", this.plugin.data.mobileProfileId);
     }
 
     private renderProfileCard(list: HTMLElement, id: string) {
-        const service = this.plugin.core.settingsService;
-        const profile = service.data.profiles[id];
-        const isCurrent = id === service.currentProfileId;
-        const isDesktopDefault = id === service.data.desktopProfileId;
-        const isMobileDefault = id === service.data.mobileProfileId;
+        const profile = this.plugin.data.profiles[id];
+        const isCurrent = id === this.plugin.currentProfileId;
+        const isDesktopDefault = id === this.plugin.data.desktopProfileId;
+        const isMobileDefault = id === this.plugin.data.mobileProfileId;
         const row = list.createDiv({ cls: ["lazy-profile-card", isCurrent ? "is-current" : ""] });
         row.setAttr("role", "group");
 
@@ -137,7 +135,7 @@ export class ProfileManagementPage extends SettingPage {
                         .setIcon("folder-open")
                         .onClick(() => void openBackupDirectory(this.plugin)),
                 );
-                if (profileIdsFor(service).length > 1 && !isCurrent) {
+                if (profileIdsFor(this.plugin).length > 1 && !isCurrent) {
                     menu.addSeparator();
                     menu.addItem((item) =>
                         item
@@ -152,9 +150,8 @@ export class ProfileManagementPage extends SettingPage {
     }
 
     private renderDeviceDefault(label: string, type: DeviceType, currentId: string) {
-        const service = this.plugin.core.settingsService;
         new Setting(this.containerEl).setName(label).addDropdown((dropdown) => {
-            Object.values(service.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
+            Object.values(this.plugin.data.profiles).forEach((profile) => dropdown.addOption(profile.id, profile.name));
             dropdown.setValue(currentId).onChange(async (profileId) => {
                 await this.tab.saveImmediateChanges((data) => {
                     if (type === "desktop") data.desktopProfileId = profileId;
@@ -190,9 +187,8 @@ export class ProfileManagementPage extends SettingPage {
                 .onClick(async () => {
                     const nextName = name.trim();
                     if (!nextName) return;
-                    const service = this.plugin.core.settingsService;
                     // Renaming to the same name changes nothing, so keep the draft clean.
-                    if (nextName === service.data.profiles[id]?.name) {
+                    if (nextName === this.plugin.data.profiles[id]?.name) {
                         modal.close();
                         return;
                     }
@@ -215,8 +211,7 @@ export class ProfileManagementPage extends SettingPage {
     }
 
     private async deleteProfile(id: string, name: string) {
-        const service = this.plugin.core.settingsService;
-        if (id === service.data.desktopProfileId || id === service.data.mobileProfileId) {
+        if (id === this.plugin.data.desktopProfileId || id === this.plugin.data.mobileProfileId) {
             new Notice("Assign another device default before deleting this profile.");
             return;
         }
@@ -231,7 +226,7 @@ export class ProfileManagementPage extends SettingPage {
     }
 }
 
-function profileIdsFor(service: OnDemandPlugin["core"]["settingsService"]) {
-    return Object.keys(service.data.profiles);
+function profileIdsFor(host: Pick<SettingsUiHost, "data">) {
+    return Object.keys(host.data.profiles);
 }
 /* eslint-enable @typescript-eslint/no-misused-promises, no-useless-escape -- End of the async-handler bridge. */

@@ -21,6 +21,13 @@ test("mobile plugin management remains usable at phone and tablet widths", async
     // The longest mode label exposes wrapping and dropdown overflow at narrow widths.
     await plugin.evaluate((instance, id) => instance.updatePluginSettings(id, "lazyOnLayoutReady"), targetPluginId);
     const page = await openMobilePluginManagement(obsidian);
+    const originalRow = await page.locator(".lazy-plugin-mode-row").elementHandle();
+    const originalToolbar = await page.locator(".lazy-plugin-list-toolbar").elementHandle();
+    const search = page.locator(".lazy-plugin-filter-row input");
+    await search.fill("no matching plugin");
+    await expect(page.locator(".lazy-plugin-mode-row")).toHaveCount(0);
+    await search.fill("");
+    expect(await page.locator(".lazy-plugin-mode-row").evaluate((el, original) => el === original, originalRow)).toBe(true);
     const artifactDir = path.resolve(".ci-artifacts/ui-screenshots/mobile/plugin-management");
     await mkdir(artifactDir, { recursive: true });
 
@@ -36,6 +43,8 @@ test("mobile plugin management remains usable at phone and tablet widths", async
             await expect(input).toHaveValue(query);
         }
         await input.fill("BRAT");
+        expect(await row.evaluate((el, original) => el === original, originalRow)).toBe(true);
+        expect(await page.locator(".lazy-plugin-list-toolbar").evaluate((el, original) => el === original, originalToolbar)).toBe(true);
         // Obsidian creates a hidden select to measure mobile labels; target the interactive combobox.
         await page.locator(".lazy-plugin-filter-row").getByRole("combobox").selectOption("lazyOnLayoutReady");
         await expect(row).toHaveCount(1);

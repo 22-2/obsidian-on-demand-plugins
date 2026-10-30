@@ -1,15 +1,16 @@
 import { vi } from "vitest";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE } from "src/core/types";
 import type { LazySettings } from "src/core/types";
-import type OnDemandPlugin from "src/main";
 import type { SettingsTab } from "src/ui/settings-tab";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
 import type { ImmediateSettingsChange } from "src/ui/settings/pending-changes";
 
-export function createPageFixture(feature?: unknown) {
+export function createPageFixture(maintenance?: unknown) {
     const profile = (id: string, name: string) => ({ id, name, settings: structuredClone(DEFAULT_DEVICE_SETTINGS) });
     const data: LazySettings = {
         showConsoleLog: false,
         restoreDraftBehavior: "ask",
+        showUninstallInTableMenu: false,
         desktopProfileId: "home",
         mobileProfileId: "work",
         profiles: {
@@ -22,9 +23,12 @@ export function createPageFixture(feature?: unknown) {
     const service = { data, currentProfileId: "home" };
     const plugin = {
         data,
-        core: { settingsService: service },
+        get currentProfileId() {
+            return service.currentProfileId;
+        },
         app: { commands: { executeCommandById: vi.fn() } },
-        features: { get: vi.fn().mockReturnValue(feature) },
+        maintenance,
+        confirmExternalOverwrite: vi.fn().mockResolvedValue(true),
         manifests: [
             { id: "alpha", name: "Alpha" },
             { id: "beta", name: "Beta" },
@@ -55,5 +59,5 @@ export function createPageFixture(feature?: unknown) {
             data.profiles[id] = { id, name, settings: structuredClone(source ? data.profiles[source].settings : DEFAULT_DEVICE_SETTINGS) };
         }),
     };
-    return { data, service, pluginMock: plugin, tabMock: tab, plugin: plugin as unknown as OnDemandPlugin, tab: tab as unknown as SettingsTab };
+    return { data, service, pluginMock: plugin, tabMock: tab, plugin: plugin as unknown as SettingsUiHost, tab: tab as unknown as SettingsTab };
 }

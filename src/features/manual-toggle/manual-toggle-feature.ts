@@ -31,12 +31,12 @@ export class ManualToggleFeature implements AppFeature {
 
     onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
         this.ctx = ctx;
-        ctx._plugin.addCommand({
+        ctx.addCommand({
             id: "enable-plugin-in-memory",
             name: "Enable specific plugin (in memory only)",
             callback: () => this.openEnablePicker(),
         });
-        ctx._plugin.addCommand({
+        ctx.addCommand({
             id: "disable-plugin-in-memory",
             name: "Disable specific plugin (in memory only)",
             callback: () => this.openDisablePicker(),

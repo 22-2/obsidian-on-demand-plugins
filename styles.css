@@ -428,8 +428,9 @@
     background: var(--color-green);
 }
 
+/* Lazy loading keeps plugins out of community-plugins.json, so this is the usual state, not a warning. */
 .lazy-plugin-enabled-badge.is-memory-only::before {
-    background: var(--text-warning);
+    background: var(--color-blue);
 }
 
 .lazy-plugin-meta-badge {
@@ -828,4 +829,498 @@ body:not(.is-mobile) .lazy-plugin-refresh-mobile {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* ── Plugin table view ───────────────────────────────────────────── */
+
+.workspace-leaf-content[data-type="on-demand-plugin-table"] .view-content.lazy-plugin-table-view {
+    /* The table scrolls inside its own wrapper so the summary bar and the sticky header stay put. */
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+.lazy-plugin-table-container {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+}
+
+.lazy-plugin-table-summary {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--size-4-2) var(--size-4-4);
+    padding: var(--size-4-2) var(--size-4-3);
+    border-bottom: 1px solid var(--background-modifier-border);
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.lazy-plugin-table-summary-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--size-4-1) var(--size-4-4);
+}
+
+/* Reset Obsidian's button look so the filter toggles read as plain summary items. */
+button.lazy-plugin-table-summary-item {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--size-4-1);
+    height: auto;
+    margin: calc(-1 * var(--size-2-1)) calc(-1 * var(--size-4-1));
+    padding: var(--size-2-1) var(--size-4-1);
+    border: none;
+    border-radius: var(--radius-s);
+    background: none;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+button.lazy-plugin-table-summary-item:hover,
+button.lazy-plugin-table-summary-item.is-active {
+    background-color: var(--background-modifier-hover);
+}
+
+.lazy-plugin-table-summary-item strong {
+    color: var(--text-normal);
+    font-variant-numeric: tabular-nums;
+    font-weight: var(--font-bold);
+}
+
+.lazy-plugin-table-summary-item-enabled strong {
+    color: var(--text-success);
+}
+
+.lazy-plugin-table-summary-item-disabled strong {
+    color: var(--text-muted);
+}
+
+.lazy-plugin-table-summary-item-updates strong {
+    color: var(--color-green);
+}
+
+.lazy-plugin-table-pending {
+    display: flex;
+    flex-wrap: nowrap;
+    min-width: 0;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--size-4-2);
+    margin-left: auto;
+}
+
+/* On a narrow pane the summary gives way first, so the two buttons stay on one line. */
+.lazy-plugin-table-pending-text {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text-normal);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lazy-plugin-table-pending button {
+    flex: 0 0 auto;
+}
+
+.lazy-plugin-table-wrapper {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+}
+
+.lazy-plugin-table {
+    width: 100%;
+    /* separate: with collapse, borders belong to the table and scroll away from the sticky thead. */
+    border-collapse: separate;
+    border-spacing: 0;
+    table-layout: fixed;
+    font-family: var(--font-interface);
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-table-th,
+.lazy-plugin-table-td {
+    padding: var(--size-4-1) var(--size-4-2);
+    border-bottom: 1px solid var(--background-modifier-border);
+    text-align: left;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.lazy-plugin-table thead th:not(:last-child),
+.lazy-plugin-table tbody td:not(:last-child) {
+    border-right: 1px solid var(--background-modifier-border);
+}
+
+.lazy-plugin-table-th {
+    position: relative;
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+    font-weight: var(--font-semibold);
+    user-select: none;
+}
+
+/* Stick the whole thead so the filter row stays with the column headers. */
+.lazy-plugin-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.lazy-plugin-table-th-label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    cursor: pointer;
+}
+
+.lazy-plugin-table-sort-indicator {
+    font-size: 0.7em;
+}
+
+.lazy-plugin-table-resizer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 100%;
+    cursor: col-resize;
+    /* Without this, a touch drag on the handle scrolls the table instead of resizing the column. */
+    touch-action: none;
+}
+
+.lazy-plugin-table-filter-row th {
+    padding: 0 var(--size-4-1) var(--size-4-1);
+    background-color: var(--background-secondary);
+}
+
+/* Flat and short: a full form field per column made the header read as a second table. */
+.lazy-plugin-table .lazy-plugin-table-filter-input {
+    width: 100%;
+    height: 24px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-s);
+    background-color: var(--background-modifier-form-field);
+    box-shadow: none;
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-table input.lazy-plugin-table-filter-input {
+    /* The right padding leaves room for the clear button. */
+    padding: 0 var(--size-4-6) 0 var(--size-4-2);
+}
+
+.lazy-plugin-table-filter-wrap {
+    position: relative;
+}
+
+.lazy-plugin-table-filter-clear {
+    position: absolute;
+    top: 50%;
+    right: var(--size-4-1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    transform: translateY(-50%);
+    border-radius: var(--radius-s);
+    color: var(--text-faint);
+    cursor: pointer;
+}
+
+.lazy-plugin-table-filter-clear:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.lazy-plugin-table-filter-clear.is-hidden {
+    display: none;
+}
+
+.lazy-plugin-table-filter-clear .svg-icon {
+    width: 14px;
+    height: 14px;
+}
+
+.lazy-plugin-table .lazy-plugin-table-filter-input:hover {
+    border-color: var(--background-modifier-border);
+}
+
+.lazy-plugin-table .lazy-plugin-table-filter-input:focus {
+    border-color: var(--interactive-accent);
+    box-shadow: none;
+}
+
+.lazy-plugin-table tbody tr:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* Same token the file explorer uses, since the selection mimics it. */
+.lazy-plugin-table tbody tr.is-selected {
+    background-color: var(--nav-item-background-selected);
+}
+
+/* Bold text on every loaded row was too bright on dark themes; only the name stands out. */
+.lazy-plugin-table tbody tr {
+    color: var(--text-faint);
+}
+
+.lazy-plugin-table tbody tr.is-loaded {
+    color: var(--text-muted);
+}
+
+.lazy-plugin-table tbody tr.is-loaded .lazy-plugin-table-name {
+    color: var(--text-normal);
+    font-weight: var(--font-medium);
+}
+
+.lazy-plugin-table-version {
+    margin-left: var(--size-4-1);
+    color: var(--text-faint);
+    font-weight: var(--font-normal);
+}
+
+/* Inline-flex keeps the icon on the text line inside the ellipsized cell. */
+.lazy-plugin-table-update-icon {
+    display: inline-flex;
+    margin-right: var(--size-4-1);
+    color: var(--color-green);
+    vertical-align: middle;
+}
+
+.lazy-plugin-table-update-icon svg {
+    width: var(--icon-xs);
+    height: var(--icon-xs);
+}
+
+/* The same lamp as the settings list's enabled badge. */
+.lazy-plugin-table-lamp {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    vertical-align: middle;
+}
+
+.lazy-plugin-table-lamp.is-loaded {
+    background: var(--color-green);
+}
+
+.lazy-plugin-table-lamp.is-memory-only {
+    background: var(--color-blue);
+}
+
+.lazy-plugin-table-loaded-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    min-width: 0;
+}
+
+.lazy-plugin-table-loaded-cell .lazy-plugin-table-lamp {
+    flex: 0 0 6px;
+}
+
+.lazy-plugin-table-loaded-cell .dropdown {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    height: 26px;
+    border: 1px solid transparent;
+    background-color: transparent;
+    box-shadow: none;
+    font-size: var(--font-ui-smaller);
+    padding-left: 0;
+}
+
+.lazy-plugin-table-loaded-fixed {
+    font-size: var(--font-ui-smaller);
+}
+
+.is-mobile .lazy-plugin-table-col-loaded .dropdown {
+    min-height: 36px;
+}
+
+.lazy-plugin-table-td.lazy-plugin-table-col-mode {
+    padding-top: var(--size-2-1);
+    padding-bottom: var(--size-2-1);
+}
+
+.lazy-plugin-table-mode-cell {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-1);
+    min-width: 0;
+}
+
+/* Every row has one, so it reads as plain text until the row is pointed at or focused;
+   the chevron alone says it can be changed. */
+.lazy-plugin-table-mode-cell .dropdown {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 26px;
+    border: 1px solid transparent;
+    background-color: transparent;
+    box-shadow: none;
+    color: inherit;
+    font-size: var(--font-ui-smaller);
+}
+
+.lazy-plugin-table-mode-cell .dropdown:hover,
+.lazy-plugin-table-mode-cell .dropdown:focus,
+.lazy-plugin-table-mode-cell .dropdown:focus-visible {
+    border-color: transparent;
+    background-color: transparent;
+    box-shadow: none;
+}
+
+/* The dropdown stays flat when focused, so the row marks where the keyboard is instead. */
+.lazy-plugin-table tbody tr:focus-within {
+    background-color: var(--background-modifier-hover);
+}
+
+.lazy-plugin-table tbody tr.is-loaded .lazy-plugin-table-mode-cell .dropdown {
+    color: var(--text-normal);
+}
+
+.lazy-plugin-table-author {
+    margin-left: var(--size-4-2);
+    color: var(--text-faint);
+}
+
+.is-mobile .lazy-plugin-table-author {
+    display: none;
+}
+
+/* On-Demand's own mode is fixed; it lines up with the text of the dropdowns above and below. */
+.lazy-plugin-table-mode-fixed {
+    display: flex;
+    align-items: center;
+    height: 26px;
+    padding-left: calc(0.8em + 1px);
+    font-size: var(--font-ui-smaller);
+}
+
+/* Hidden, not removed, so the dropdowns stay aligned across rows. */
+.lazy-plugin-table-mode-cell .clickable-icon.is-disabled {
+    visibility: hidden;
+}
+
+.lazy-plugin-table-td.lazy-plugin-table-col-actions {
+    padding: 0;
+    text-align: center;
+}
+
+/* Touch screens need larger targets for the row controls. */
+.is-mobile .lazy-plugin-table-td {
+    padding-top: var(--size-4-2);
+    padding-bottom: var(--size-4-2);
+}
+
+.is-mobile .lazy-plugin-table-mode-cell .dropdown {
+    min-height: 44px;
+}
+
+.is-mobile .lazy-plugin-table-col-loaded .dropdown,
+.is-mobile .lazy-plugin-table-col-actions .clickable-icon {
+    min-height: 44px;
+}
+
+.is-mobile .lazy-plugin-table-col-actions .clickable-icon {
+    width: 44px;
+    min-width: 44px;
+}
+
+.lazy-plugin-table-phone-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.is-phone .lazy-plugin-table-phone-header-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+
+.is-phone .lazy-plugin-table-phone-header-icon .svg-icon {
+    width: var(--icon-s);
+    height: var(--icon-s);
+}
+
+.is-phone .lazy-plugin-table-col-loaded,
+.is-phone .lazy-plugin-table-col-mode,
+.is-phone .lazy-plugin-table-col-actions {
+    padding-inline: 0;
+    text-align: center;
+}
+
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-col-loaded,
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-col-mode,
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-col-actions {
+    display: none;
+}
+
+.is-phone .lazy-plugin-table-filter-row .lazy-plugin-table-filter-input {
+    height: 36px;
+}
+
+.is-phone .lazy-plugin-table-col-loaded .lazy-plugin-table-phone-icon-control,
+.is-phone .lazy-plugin-table-col-mode .lazy-plugin-table-phone-icon-control,
+.is-phone .lazy-plugin-table-col-actions .clickable-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+}
+
+.is-phone .lazy-plugin-table-phone-state-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+}
+
+.is-phone .lazy-plugin-table-phone-state-icon.is-loaded,
+.is-phone .lazy-plugin-table-phone-icon-control.is-persistent {
+    color: var(--text-success);
+}
+
+.is-phone .lazy-plugin-table-phone-state-icon.is-memory-only,
+.is-phone .lazy-plugin-table-phone-icon-control.is-memory-only {
+    color: var(--color-blue);
+}
+
+.is-phone .lazy-plugin-table-phone-icon-control.is-off {
+    color: var(--text-faint);
+}
+
+.is-phone .lazy-plugin-table-mode-cell .lazy-plugin-table-phone-icon-control {
+    color: var(--text-normal);
+}
+
+.is-mobile .lazy-plugin-table-pending {
+    /* On a phone the bar wraps; keep the buttons together on their own line at the right. */
+    flex-basis: 100%;
 }

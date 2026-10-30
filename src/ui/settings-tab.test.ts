@@ -1,7 +1,6 @@
 import type { App } from "obsidian";
 import { Notice } from "src/__mocks__/obsidian";
 import { DEFAULT_PROFILE_ID, DEFAULT_SETTINGS, PLUGIN_MODE } from "src/core/types";
-import type OnDemandPlugin from "src/main";
 import { showRestoreDraftModal } from "src/ui/modals/review-changes-modal";
 import { SettingsTab } from "src/ui/settings-tab";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,14 +21,14 @@ function setup() {
     const settings = data.profiles[DEFAULT_PROFILE_ID].settings;
     const service = { data, persisted: structuredClone(data), currentProfileId: DEFAULT_PROFILE_ID };
     const plugin = {
-        core: { settingsService: service },
+        getDraftSource: () => service,
         data,
         settings,
         manifests: [{ id: "foo", name: "Foo" }],
         configureLogger: vi.fn(),
         isPluginEnabledOnDisk: () => false,
     };
-    const tab = new SettingsTab({} as App, plugin as unknown as OnDemandPlugin);
+    const tab = new SettingsTab({} as App, plugin as unknown as ConstructorParameters<typeof SettingsTab>[1]);
     return { tab, settings, service };
 }
 

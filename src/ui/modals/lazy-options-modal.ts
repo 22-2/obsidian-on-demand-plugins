@@ -2,46 +2,26 @@ import log from "loglevel";
 import type { App } from "obsidian";
 import { Modal, Notice, Setting } from "obsidian";
 import type { LazyOptions } from "src/core/types";
-import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
-import type OnDemandPlugin from "src/main";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
+import { currentLazyOptions, stageLazyOptions } from "src/ui/settings/helpers";
 
 const logger = log.getLogger("OnDemandPlugin/LazyOptionsModal");
 
 export class LazyOptionsModal extends Modal {
     // Keep explicit member fields because erasableSyntaxOnly disallows constructor parameter properties.
-    private plugin: OnDemandPlugin;
+    private plugin: SettingsUiHost;
     private pluginId: string;
     private onSave?: () => void;
     private options: LazyOptions;
     private initialOptionsSnapshot: string;
 
-    constructor(app: App, plugin: OnDemandPlugin, pluginId: string, onSave?: () => void) {
+    constructor(app: App, plugin: SettingsUiHost, pluginId: string, onSave?: () => void) {
         super(app);
         this.plugin = plugin;
         this.pluginId = pluginId;
         this.onSave = onSave;
-        const settings = this.plugin.settings.plugins[this.pluginId];
-        const legacyViewTypes = this.plugin.settings.lazyOnViews?.[pluginId] ?? [];
-
-        // Initialize options from existing settings or defaults
-        this.options = settings?.lazyOptions
-            ? structuredClone(settings.lazyOptions)
-            : {
-                  // Legacy view rules are represented by LAZY + lazyOptions/useView.
-                  useView: settings?.mode === "lazy" && legacyViewTypes.length > 0,
-                  viewTypes: legacyViewTypes,
-                  useFile: false,
-                  fileCriteria: this.plugin.settings.lazyOnFiles?.[pluginId] || {},
-              };
-
-        // Special case for Excalidraw if not configured
-        if (pluginId === "obsidian-excalidraw-plugin" && !settings?.lazyOptions) {
-            this.options.useFile = true;
-            this.options.fileCriteria = {
-                suffixes: [".excalidraw"],
-                frontmatterKeys: ["excalidraw-plugin"],
-            };
-        }
+        // Shared with the plugin table, which toggles the same options inline.
+        this.options = currentLazyOptions(this.plugin, pluginId);
 
         this.initialOptionsSnapshot = JSON.stringify(this.options);
     }
@@ -57,7 +37,7 @@ export class LazyOptionsModal extends Modal {
 
         new Setting(contentEl)
             .setName("Cache")
-            .setDesc("Force reload command cache for this plugin only.")
+            .setDesc("Force rebuild the command and view caches for this plugin only. A running plugin is briefly reloaded to capture its views.")
             .addButton((btn) =>
                 btn
                     .setButtonText("Reload this plugin cache")
@@ -66,14 +46,11 @@ export class LazyOptionsModal extends Modal {
                         void (async () => {
                             btn.setDisabled(true);
                             try {
-                                const lazyEngine = this.plugin.features.get(LazyEngineFeature);
-                                if (!lazyEngine) {
-                                    new Notice("Lazy engine is not available");
+                                if (!(await this.plugin.rebuildPluginCaches(this.pluginId))) {
+                                    new Notice("Startup policy is not available");
                                     return;
                                 }
-
-                                await lazyEngine.commandCache.forceReloadPluginCache(this.pluginId);
-                                new Notice(`Reloaded command cache for ${this.pluginId}`);
+                                new Notice(`Reloaded command and view caches for ${this.pluginId}`);
                             } catch (error: unknown) {
                                 const message = error instanceof Error ? error.message : String(error);
                                 new Notice(`Failed to reload cache for ${this.pluginId}`);
@@ -168,19 +145,7 @@ export class LazyOptionsModal extends Modal {
                     .setButtonText("Save")
                     .setCta()
                     .onClick(() => {
-                        const hasChanges = JSON.stringify(this.options) !== this.initialOptionsSnapshot;
-                        if (hasChanges) {
-                            // Plugin settings are sparse until a mode is explicitly
-                            // configured, but advanced options must still be saveable.
-                            const pluginSettings = (this.plugin.settings.plugins[this.pluginId] ??= {
-                                mode: this.plugin.getPluginMode(this.pluginId),
-                                userConfigured: false,
-                            });
-                            pluginSettings.lazyOptions = this.options;
-                            // For backward compatibility during transition, also update the global maps
-                            this.plugin.settings.lazyOnViews[this.pluginId] = this.options.useView ? this.options.viewTypes : [];
-                            this.plugin.settings.lazyOnFiles[this.pluginId] = this.options.useFile ? this.options.fileCriteria : {};
-                        }
+                        const hasChanges = JSON.stringify(this.options) !== this.initialOptionsSnapshot && stageLazyOptions(this.plugin, this.pluginId, this.options);
                         // Notify caller (SettingsTab) so it can mark this plugin as pending
                         if (hasChanges) {
                             try {

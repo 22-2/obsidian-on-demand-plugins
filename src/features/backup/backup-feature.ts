@@ -44,7 +44,7 @@ export class BackupFeature implements AppFeature {
 
     async onload(ctx: PluginContext) {
         this.ctx = ctx;
-        const dir = this.ctx._plugin.manifest.dir;
+        const dir = this.ctx.manifest.dir;
         this.backupDir = normalizePath(`${dir}/backups`);
 
         await this.createInitialInstallBackupIfNeeded();
@@ -111,7 +111,7 @@ export class BackupFeature implements AppFeature {
         const adapter = this.ctx.app.vault.adapter;
 
         // 1. Read files
-        const dataPath = normalizePath(`${this.ctx._plugin.manifest.dir}/data.json`);
+        const dataPath = normalizePath(`${this.ctx.manifest.dir}/data.json`);
         const communityPath = this.ctx.app.vault.getConfigFile("community-plugins");
 
         let dataContent: string;
@@ -282,7 +282,7 @@ export class BackupFeature implements AppFeature {
 
     private async readProfilesSnapshot(): Promise<{ valid: boolean; content?: string }> {
         const adapter = this.ctx.app.vault.adapter;
-        const profilesDir = normalizePath(`${this.ctx._plugin.manifest.dir}/profiles`);
+        const profilesDir = normalizePath(`${this.ctx.manifest.dir}/profiles`);
         if (!(await adapter.exists(profilesDir))) return { valid: false };
 
         const { files } = await adapter.list(profilesDir);

@@ -81,6 +81,8 @@ export interface LazySettings {
     showConsoleLog: boolean;
     /** How to handle an unsaved draft when its settings page is reopened; shared by all profiles. */
     restoreDraftBehavior: RestoreDraftBehavior;
+    /** Whether the plugin table's row menu offers a destructive uninstall action; shared by all profiles. */
+    showUninstallInTableMenu: boolean;
     lastLazyPluginVersion?: string;
     // Reason: refusing unknown schema versions prevents older plugin builds from overwriting newer synced settings.
     settingsSchemaVersion?: number;
@@ -108,6 +110,7 @@ export const SETTINGS_SCHEMA_VERSION = 1;
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
     restoreDraftBehavior: "ask",
+    showUninstallInTableMenu: false,
     profiles: {
         [DEFAULT_PROFILE_ID]: {
             id: DEFAULT_PROFILE_ID,

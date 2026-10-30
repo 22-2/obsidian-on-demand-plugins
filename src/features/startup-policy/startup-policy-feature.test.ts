@@ -96,6 +96,18 @@ describe("combined cache rebuild", () => {
         expect(t.reload).toHaveBeenCalledWith("app:reload");
     });
 
+    it("rebuilds only the requested plugin and does not restart the app", async () => {
+        const t = setup();
+        const [pluginId] = Object.keys(t.settings.plugins);
+        // The real dialog needs a DOM; reuse the mocked one.
+        vi.spyOn(t.feature as unknown as { openProgressDialog: () => ProgressDialog }, "openProgressDialog").mockReturnValue(t.dialog);
+        await t.feature.rebuildPluginCaches(pluginId);
+        expect(t.cache.snapshotCommandsForPlugin).toHaveBeenCalledOnce();
+        expect(t.cache.snapshotCommandsForPlugin).toHaveBeenCalledWith(pluginId);
+        expect(t.cache.persistCache).toHaveBeenCalledOnce();
+        expect(t.reload).not.toHaveBeenCalled();
+    });
+
     it("keeps an already loaded plugin running even when it is absent from enabled settings", async () => {
         const t = setup(1);
         t.plugins.enabledPlugins.clear();
@@ -187,7 +199,7 @@ describe("external community-plugins.json edits", () => {
 
         await t.feature.applyWithProgress(t.dialog);
 
-        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["on-demand-plugins", "plugin-1"], false);
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["on-demand-plugins", "plugin-1"]);
         expect(t.reload).toHaveBeenCalledWith("app:reload");
     });
 
@@ -218,6 +230,6 @@ describe("external community-plugins.json edits", () => {
         await t.feature.applyWithProgress(t.dialog);
 
         expect(t.registry.loadEnabledPluginsFromDisk).toHaveBeenCalled();
-        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "other-device-only", "plugin-1"], false);
+        expect(t.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "other-device-only", "plugin-1"]);
     });
 });

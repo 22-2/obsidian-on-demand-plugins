@@ -1,4 +1,3 @@
-import type { PluginLoader } from "src/core/interfaces";
 import type { PluginContext } from "src/core/plugin-context";
 import * as storageMs from "src/core/storage";
 import * as utilsMs from "src/core/utils";
@@ -31,10 +30,7 @@ type MockCtx = {
 describe("CommandCacheService", () => {
     let service: CommandCacheService;
     let mockCtx: MockCtx;
-    let mockPluginLoader: {
-        waitForPluginLoaded: ReturnType<typeof vi.fn>;
-        runLazyCommand: ReturnType<typeof vi.fn>;
-    };
+    let runLazyCommand: ReturnType<typeof vi.fn<(commandId: string) => Promise<void>>>;
 
     beforeEach(() => {
         vi.resetAllMocks();
@@ -60,12 +56,9 @@ describe("CommandCacheService", () => {
             },
         };
 
-        mockPluginLoader = {
-            waitForPluginLoaded: vi.fn().mockResolvedValue(true),
-            runLazyCommand: vi.fn().mockResolvedValue(undefined),
-        };
+        runLazyCommand = vi.fn<(commandId: string) => Promise<void>>().mockResolvedValue(undefined);
 
-        service = new CommandCacheService(mockCtx as unknown as PluginContext, mockPluginLoader as unknown as PluginLoader);
+        service = new CommandCacheService(mockCtx as unknown as PluginContext, runLazyCommand);
     });
 
     describe("getCommandsForPlugin", () => {
@@ -81,7 +74,6 @@ describe("CommandCacheService", () => {
             const result = await service.getCommandsForPlugin("test-plugin");
 
             expect(mockCtx.obsidianPlugins.enablePlugin).toHaveBeenCalledWith("test-plugin");
-            expect(mockPluginLoader.waitForPluginLoaded).not.toHaveBeenCalled();
 
             expect(result).toHaveLength(1);
             expect(result[0].id).toBe("test-cmd-1");
@@ -95,7 +87,6 @@ describe("CommandCacheService", () => {
             await service.getCommandsForPlugin("test-plugin");
 
             expect(mockCtx.obsidianPlugins.enablePlugin).not.toHaveBeenCalled();
-            expect(mockPluginLoader.waitForPluginLoaded).not.toHaveBeenCalled();
         });
     });
 
@@ -118,7 +109,7 @@ describe("CommandCacheService", () => {
             expect(service.isWrapperCommand("cmd1")).toBe(true);
 
             await addedCmd.callback();
-            expect(mockPluginLoader.runLazyCommand).toHaveBeenCalledWith("cmd1");
+            expect(runLazyCommand).toHaveBeenCalledWith("cmd1");
         });
 
         it("should not register wrapper if command is already registered by real plugin", async () => {
@@ -215,64 +206,6 @@ describe("CommandCacheService", () => {
 
             expect(service.isWrapperCommand("cmd1")).toBe(false);
             expect((service as unknown as { registeredWrappers: Set<string> }).registeredWrappers.has("cmd1")).toBe(false);
-        });
-    });
-
-    describe("forceReloadPluginCache", () => {
-        it("restores the previous wrappers when the snapshot fails", async () => {
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
-            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
-            await service.refreshCommandsForPlugin("test-plugin");
-            mockCtx.obsidianCommands.commands = {};
-            service.registerCachedCommandsForPlugin("test-plugin");
-            expect(service.isWrapperCommand("cmd1")).toBe(true);
-
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
-            mockCtx.obsidianPlugins.enablePlugin.mockRejectedValue(new Error("failed load"));
-            await expect(service.forceReloadPluginCache("test-plugin")).rejects.toThrow("failed load");
-
-            expect(service.isWrapperCommand("cmd1")).toBe(true);
-        });
-
-        it("drops obsolete wrappers when the loaded plugin no longer registers commands", async () => {
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
-
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
-            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
-
-            await service.refreshCommandsForPlugin("test-plugin");
-
-            mockCtx.obsidianCommands.commands = {};
-            service.registerCachedCommandsForPlugin("test-plugin");
-
-            const addedCmd = mockCtx.obsidianCommands.addCommand.mock.calls[0][0] as { id: string };
-            mockCtx.obsidianCommands.commands.cmd1 = addedCmd;
-
-            await service.forceReloadPluginCache("test-plugin");
-
-            expect(mockCtx.obsidianCommands.removeCommand).toHaveBeenCalledWith("cmd1");
-            expect(mockCtx.obsidianCommands.addCommand).toHaveBeenCalledTimes(1);
-            expect(service.getCachedCommand("cmd1")).toBeUndefined();
-            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
-        });
-
-        it("should refresh and persist without registering wrappers when none were active", async () => {
-            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(true);
-
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1" } };
-            mockCtx.getCommandPluginId.mockReturnValue("test-plugin");
-
-            await service.refreshCommandsForPlugin("test-plugin");
-
-            vi.clearAllMocks();
-
-            mockCtx.obsidianCommands.commands = { cmd1: { id: "cmd1", name: "Cmd 1 updated" } };
-            await service.forceReloadPluginCache("test-plugin");
-
-            expect(mockCtx.obsidianCommands.removeCommand).not.toHaveBeenCalled();
-            expect(mockCtx.obsidianCommands.addCommand).not.toHaveBeenCalled();
-            expect(storageMs.saveLocalStorage).toHaveBeenCalled();
         });
     });
 

@@ -1,35 +1,25 @@
 import { PLUGIN_MODE } from "src/core/types";
-import type { SettingsService } from "src/services/settings/settings-service";
-import type OnDemandPlugin from "src/main";
+import type { SettingsHost, SettingsService } from "src/services/settings/settings-service";
 import { CoreContainer } from "src/services/core-container";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createSettingsService, patchEnableDisable } = vi.hoisted(() => ({
+const { createSettingsService } = vi.hoisted(() => ({
     createSettingsService: vi.fn(),
-    patchEnableDisable: vi.fn(),
 }));
 
 vi.mock("src/services/settings/settings-service", () => ({
     SettingsService: class {
-        constructor(plugin: OnDemandPlugin) {
-            return createSettingsService(plugin) as SettingsService;
+        constructor(host: SettingsHost) {
+            return createSettingsService(host) as SettingsService;
         }
     },
-}));
-
-vi.mock("src/patches/plugin-enable-disable", () => ({
-    patchPluginEnableDisable: patchEnableDisable,
 }));
 
 function createContext(settingsService: unknown, version = "3.5.1") {
     const saveSettings = vi.fn().mockResolvedValue(undefined);
     const register = vi.fn();
-    const plugin = {
-        manifest: { version },
-        saveSettings,
-    } as unknown as OnDemandPlugin;
     const ctx = {
-        _plugin: plugin,
+        manifest: { version },
         saveSettings,
         app: {
             vault: {
@@ -57,7 +47,7 @@ describe("CoreContainer initialization", () => {
             data: { profiles: {} as Record<string, { settings: { plugins: Record<string, unknown> } }> },
         };
         const { ctx, saveSettings } = createContext(settingsService);
-        const container = new CoreContainer(ctx as never);
+        const container = new CoreContainer(ctx as never, {} as SettingsHost);
 
         await container.initialize();
 
@@ -67,7 +57,6 @@ describe("CoreContainer initialization", () => {
         });
         // A missing data.json can still be waiting for Sync, so initialization must not publish defaults.
         expect(saveSettings).not.toHaveBeenCalled();
-        expect(patchEnableDisable).toHaveBeenCalledWith(ctx);
     });
 
     it("persists the version update for an existing settings file", async () => {
@@ -76,7 +65,7 @@ describe("CoreContainer initialization", () => {
             data: { lastLazyPluginVersion: "3.5.0", profiles: {} },
         };
         const { ctx, saveSettings } = createContext(settingsService, "3.5.1");
-        const container = new CoreContainer(ctx as never);
+        const container = new CoreContainer(ctx as never, {} as SettingsHost);
 
         await container.initialize();
 

@@ -16,7 +16,7 @@ describe("PluginRegistry", () => {
             configDir: string;
             getConfigFile: ReturnType<typeof vi.fn>;
             readConfigJson: ReturnType<typeof vi.fn>;
-            writeConfigJson: ReturnType<typeof vi.fn>;
+            adapter: { exists: ReturnType<typeof vi.fn>; process: ReturnType<typeof vi.fn>; write: ReturnType<typeof vi.fn> };
         };
     };
     let mockObsidianPlugins: {
@@ -30,9 +30,9 @@ describe("PluginRegistry", () => {
         mockApp = {
             vault: {
                 configDir: "config",
-                getConfigFile: vi.fn().mockReturnValue({ path: "config/community-plugins.json" }),
+                getConfigFile: vi.fn().mockReturnValue("config/community-plugins.json"),
                 readConfigJson: vi.fn(),
-                writeConfigJson: vi.fn(),
+                adapter: { exists: vi.fn().mockResolvedValue(true), process: vi.fn().mockResolvedValue(""), write: vi.fn().mockResolvedValue(undefined) },
             },
         };
 
@@ -95,22 +95,15 @@ describe("PluginRegistry", () => {
         it("should handle error gracefully", async () => {
             mockApp.vault.readConfigJson.mockRejectedValue(new Error("Disk Error"));
 
-            await registry.loadEnabledPluginsFromDisk(true);
+            await registry.loadEnabledPluginsFromDisk();
 
-            expect(registry.enabledPluginsFromDisk.size).toBe(0);
-        });
-
-        it("should handle read errors without logging when console logging is disabled", async () => {
-            mockApp.vault.readConfigJson.mockRejectedValue(new Error("Disk Error"));
-
-            await expect(registry.loadEnabledPluginsFromDisk()).resolves.toBeUndefined();
             expect(registry.enabledPluginsFromDisk.size).toBe(0);
         });
     });
 
     describe("getCommunityPluginsConfigFilePath", () => {
         it("should return the community plugins config file", () => {
-            expect(registry.getCommunityPluginsConfigFilePath()).toEqual({ path: "config/community-plugins.json" });
+            expect(registry.getCommunityPluginsConfigFilePath()).toBe("config/community-plugins.json");
             expect(mockApp.vault.getConfigFile).toHaveBeenCalledWith("community-plugins");
         });
     });
@@ -125,16 +118,26 @@ describe("PluginRegistry", () => {
     });
 
     describe("writeCommunityPluginsFile", () => {
-        it("should use writeConfigJson", async () => {
+        it("replaces the file through adapter.process", async () => {
             await registry.writeCommunityPluginsFile(["plugin-a"]);
-            expect(mockApp.vault.writeConfigJson).toHaveBeenCalledWith("community-plugins", ["plugin-a"]);
+            expect(mockApp.vault.adapter.process).toHaveBeenCalledWith("config/community-plugins.json", expect.any(Function));
+            const transform = mockApp.vault.adapter.process.mock.calls[0]?.[1] as (data: string) => string;
+            expect(transform("[]")).toBe(JSON.stringify(["plugin-a"], null, 2));
+            expect(registry.knownOnDisk).toEqual(new Set(["plugin-a"]));
         });
 
-        it("should handle write errors with and without console logging", async () => {
-            mockApp.vault.writeConfigJson.mockRejectedValue(new Error("Disk Error"));
+        it("creates the file with adapter.write when it does not exist", async () => {
+            mockApp.vault.adapter.exists.mockResolvedValue(false);
+            await registry.writeCommunityPluginsFile(["plugin-a"]);
+            expect(mockApp.vault.adapter.process).not.toHaveBeenCalled();
+            expect(mockApp.vault.adapter.write).toHaveBeenCalledWith("config/community-plugins.json", JSON.stringify(["plugin-a"], null, 2));
+        });
+
+        it("logs write errors without updating knownOnDisk", async () => {
+            mockApp.vault.adapter.process.mockRejectedValue(new Error("Disk Error"));
 
             await expect(registry.writeCommunityPluginsFile(["plugin-a"])).resolves.toBeUndefined();
-            await expect(registry.writeCommunityPluginsFile(["plugin-a"], true)).resolves.toBeUndefined();
+            expect(registry.knownOnDisk.size).toBe(0);
         });
     });
 

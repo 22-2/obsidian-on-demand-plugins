@@ -6,38 +6,12 @@
  * access to the Obsidian runtime and Lazy Plugin settings.
  */
 import type { Commands, Plugins } from "@obsidian-typings/obsidian-public-latest";
-import type { App, EventRef, PluginManifest } from "obsidian";
+import type { App, Command, EventRef, PluginManifest } from "obsidian";
 import type { DeviceSettings, LazySettings, PLUGIN_MODE } from "src/core/types";
 import type OnDemandPlugin from "src/main";
 
 /** Edits a copy of the saved settings; `profileId` is the active profile. */
 export type SettingsChange = (data: LazySettings, profileId: string) => void | Promise<void>;
-
-/**
- * Minimal view of Obsidian's `Commands` object used by services.
- */
-// export interface ObsidianCommands {
-//     commands: Record<string, unknown>;
-//     addCommand: (command: {
-//         id: string;
-//         name: string;
-//         icon?: string;
-//         callback: () => Promise<void>;
-//     }) => void;
-//     removeCommand?: (id: string) => void;
-// }
-
-/**
- * Minimal view of Obsidian's `Plugins` object used by services.
- */
-// export interface ObsidianPlugins {
-//     manifests: Record<string, PluginManifest>;
-//     enabledPlugins: Set<string>;
-//     plugins?: PluginsMap;
-//     enablePlugin: (id: string) => Promise<void>;
-//     disablePlugin: (id: string) => Promise<void>;
-//     loadingPluginId?: string;
-// }
 
 /**
  * The shared context that every service can depend on.
@@ -49,7 +23,8 @@ export interface PluginContext {
     readonly app: App;
     readonly obsidianPlugins: Plugins;
     readonly obsidianCommands: Commands;
-    readonly _plugin: OnDemandPlugin;
+    /** This plugin's own manifest (id, version, dir). */
+    readonly manifest: PluginManifest;
 
     /** Get all plugin manifests (excluding self and platform-filtered). */
     getManifests(): PluginManifest[];
@@ -81,6 +56,9 @@ export interface PluginContext {
     /** Register an event reference. */
     registerEvent(eventRef: EventRef): void;
 
+    /** Register a command owned by this plugin. */
+    addCommand(command: Command): Command;
+
     /** Whether the plugin is enabled on disk (community-plugins.json). */
     isPluginEnabledOnDisk(pluginId: string): boolean;
 }
@@ -96,7 +74,6 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
     };
 
     return {
-        _plugin: plugin,
         get app() {
             return plugin.app;
         },
@@ -105,6 +82,9 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         },
         get obsidianCommands() {
             return appWithInternals.commands;
+        },
+        get manifest() {
+            return plugin.manifest;
         },
         getManifests: () => plugin.manifests,
         getPluginMode: (pluginId) => plugin.getPluginMode(pluginId),
@@ -119,6 +99,7 @@ export function createPluginContext(plugin: OnDemandPlugin): PluginContext {
         saveSettingsChange: (change) => plugin.saveSettingsChange(change),
         register: (unload) => plugin.register(unload),
         registerEvent: (eventRef) => plugin.registerEvent(eventRef),
+        addCommand: (command) => plugin.addCommand(command),
         isPluginEnabledOnDisk: (pluginId) => plugin.isPluginEnabledOnDisk(pluginId),
     };
 }

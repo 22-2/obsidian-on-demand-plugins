@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import log from "loglevel";
 import { Notice } from "obsidian";
 import pWaitFor from "p-wait-for";
 import type { CommandRegistry } from "src/core/interfaces";
@@ -51,8 +52,7 @@ describe("LazyCommandRunner", () => {
             isWrapperCommand: vi.fn(),
         };
 
-        runner = new LazyCommandRunner(mockCtx as unknown as PluginContext);
-        runner.setCommandRegistry(mockRegistry as unknown as CommandRegistry);
+        runner = new LazyCommandRunner(mockCtx as unknown as PluginContext, mockRegistry as unknown as CommandRegistry);
     });
 
     describe("ensurePluginLoaded", () => {
@@ -91,13 +91,17 @@ describe("LazyCommandRunner", () => {
             expect(mockRegistry.syncCommandWrappersForPlugin).toHaveBeenCalledWith("test-plugin");
         });
 
-        it("should return false if enablePlugin or loading fails", async () => {
+        it("should return false and log the error if enablePlugin or loading fails", async () => {
+            const errorSpy = vi.spyOn(log.getLogger("OnDemandPlugin/LazyCommandRunner"), "error").mockImplementation(() => {});
             vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
-            mockCtx.obsidianPlugins.enablePlugin.mockRejectedValue(new Error("Fail"));
+            const failure = new Error("Fail");
+            mockCtx.obsidianPlugins.enablePlugin.mockRejectedValue(failure);
 
             const result = await runner.ensurePluginLoaded("test-plugin");
 
             expect(result).toBe(false);
+            expect(errorSpy).toHaveBeenCalledWith("Error loading plugin test-plugin:", failure);
+            errorSpy.mockRestore();
         });
 
         it("should return false if the plugin does not finish loading", async () => {
@@ -227,13 +231,16 @@ describe("LazyCommandRunner", () => {
             expect(messages).toEqual(["Loading Test Plugin…", "Test Plugin loaded"]);
         });
 
-        it("should log and swallow command readiness errors when console logging is enabled", async () => {
+        it("should log and swallow command readiness errors even when console logging is disabled", async () => {
+            const errorSpy = vi.spyOn(log.getLogger("OnDemandPlugin/LazyCommandRunner"), "error").mockImplementation(() => {});
             mockRegistry.getCachedCommand.mockReturnValue({ id: "cmd1", pluginId: "test-plugin" });
-            mockCtx.getData.mockReturnValue({ showConsoleLog: true });
             vi.spyOn(runner, "ensurePluginLoaded").mockResolvedValue(true);
-            vi.spyOn(runner, "waitForCommand").mockRejectedValue(new Error("readiness failed"));
+            const failure = new Error("readiness failed");
+            vi.spyOn(runner, "waitForCommand").mockRejectedValue(failure);
 
             await expect(runner.runLazyCommand("cmd1")).resolves.toBeUndefined();
+            expect(errorSpy).toHaveBeenCalledWith("Error executing lazy command cmd1:", failure);
+            errorSpy.mockRestore();
         });
     });
 
@@ -276,10 +283,39 @@ describe("LazyCommandRunner", () => {
         });
 
         it("should return false after the readiness wait times out", async () => {
+            const viewRegistry = new EventEmitter();
+            mockCtx.app.viewRegistry = viewRegistry;
             const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean } }).commandExecutor;
             vi.spyOn(executor, "isCommandExecutable").mockReturnValue(false);
 
             await expect(runner.waitForCommand("cmd1", 1)).resolves.toBe(false);
+            expect(viewRegistry.listenerCount("view-registered")).toBe(0);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(0);
+        });
+
+        it("removes both listeners when either event makes the command ready", async () => {
+            const viewRegistry = new EventEmitter();
+            mockCtx.app.viewRegistry = viewRegistry;
+            let ready = false;
+            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean } }).commandExecutor;
+            vi.spyOn(executor, "isCommandExecutable").mockImplementation(() => ready);
+            const waiting = runner.waitForCommand("cmd1");
+            expect(viewRegistry.listenerCount("view-registered")).toBe(1);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(1);
+            ready = true;
+            mockCtx.app.workspace!.emit("layout-change");
+            await expect(waiting).resolves.toBe(true);
+            expect(viewRegistry.listenerCount("view-registered")).toBe(0);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(0);
+        });
+
+        it("cancels command waits when the runner is cleared", async () => {
+            const executor = (runner as unknown as { commandExecutor: { isCommandExecutable: (id: string) => boolean } }).commandExecutor;
+            vi.spyOn(executor, "isCommandExecutable").mockReturnValue(false);
+            const waiting = runner.waitForCommand("cmd1");
+            runner.clear();
+            await expect(waiting).resolves.toBe(false);
+            expect(mockCtx.app.workspace!.listenerCount("layout-change")).toBe(0);
         });
 
         it("should return false when no readiness event source exists", async () => {
@@ -307,6 +343,7 @@ describe("LazyCommandRunner", () => {
 
             await expect(runner.waitForPluginLoaded("test-plugin")).resolves.toBe(true);
             expect(utilsMs.isPluginLoaded).toHaveBeenCalledWith(mockCtx.app, "test-plugin");
+            expect(pWaitFor).toHaveBeenCalledWith(expect.any(Function), { interval: 100, timeout: 8000 });
         });
     });
 });

@@ -9,17 +9,22 @@ import type { DeviceSettings, LazySettings } from "src/core/types";
 import { PLUGIN_MODE } from "src/core/types";
 import { toggleLoggerBy } from "src/core/utils";
 import { BackupFeature } from "src/features/backup/backup-feature";
+import type { CommunityPluginsDrift } from "src/features/community-plugins-drift/community-plugins-drift";
 import { CommunityPluginsDriftFeature } from "src/features/community-plugins-drift/community-plugins-drift-feature";
 import { LazyEngineFeature } from "src/features/lazy-engine/lazy-engine-feature";
 import { MaintenanceFeature } from "src/features/maintenance/maintenance-feature";
 import { ManualToggleFeature } from "src/features/manual-toggle/manual-toggle-feature";
+import { createPluginTableHost } from "src/features/plugin-table/plugin-table-host";
+import { PluginTableView, VIEW_TYPE_PLUGIN_TABLE } from "src/features/plugin-table/plugin-table-view";
 import { StartupPolicyFeature } from "src/features/startup-policy/startup-policy-feature";
 import { CoreContainer } from "src/services/core-container";
 import { SettingsTab } from "src/ui/settings-tab";
+import type { MaintenanceOperations, SettingsUiHost } from "src/ui/settings-ui-host";
+import type { DraftSource } from "src/ui/settings/pending-changes";
 
 const logger = log.getLogger("OnDemandPlugin/OnDemandPlugin");
 
-export default class OnDemandPlugin extends Plugin {
+export default class OnDemandPlugin extends Plugin implements SettingsUiHost {
     // Assigned during onload via loadSettings().
     data!: LazySettings;
     // Assigned during onload via loadSettings().
@@ -35,7 +40,7 @@ export default class OnDemandPlugin extends Plugin {
 
     async onload() {
         const ctx = createPluginContext(this);
-        this.core = new CoreContainer(ctx);
+        this.core = new CoreContainer(ctx, this);
         this.events = new EventBus();
 
         this.features = new FeatureManager(ctx, this.core, this.events);
@@ -76,25 +81,41 @@ export default class OnDemandPlugin extends Plugin {
 
         this.settingsTab = new SettingsTab(this.app, this);
         this.addSettingTab(this.settingsTab);
+        this.registerPluginTable(this.settingsTab);
+    }
+
+    /** The table shares the settings tab's draft; only the view is registered here, so startup builds no table. */
+    private registerPluginTable(settingsTab: SettingsTab) {
+        const host = createPluginTableHost(this, settingsTab.drafts);
+        this.registerView(VIEW_TYPE_PLUGIN_TABLE, (leaf) => new PluginTableView(leaf, host));
+        this.addCommand({ id: "open-plugin-table", name: "Open plugin table", callback: () => void this.openPluginTable() });
+    }
+
+    /** Reveals the open plugin table, or opens one in a new tab. */
+    async openPluginTable() {
+        const { workspace } = this.app;
+        const leaf = workspace.getLeavesOfType(VIEW_TYPE_PLUGIN_TABLE)[0] ?? workspace.getLeaf("tab");
+        if (leaf.view.getViewType() !== VIEW_TYPE_PLUGIN_TABLE) await leaf.setViewState({ type: VIEW_TYPE_PLUGIN_TABLE, active: true });
+        await workspace.revealLeaf(leaf);
     }
 
     private registerEventHandlers() {
-        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options: { force?: boolean; externalChangesConfirmed?: boolean }) => {
+        this.events.on(FeatureEvents.REBUILD_CACHE_REQUESTED, async (options) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
-            await policyFeature?.rebuildWithProgress(null, options?.force ?? false, { externalChangesConfirmed: options?.externalChangesConfirmed });
+            await policyFeature?.rebuildWithProgress(null, options.force ?? false, { externalChangesConfirmed: options.externalChangesConfirmed });
         });
 
-        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options: { pluginIds?: string[]; externalChangesConfirmed?: boolean }) => {
+        this.events.on(FeatureEvents.APPLY_POLICIES_REQUESTED, async (options) => {
             const policyFeature = this.features.get(StartupPolicyFeature);
             if (policyFeature) {
-                await policyFeature.applyWithProgress(null, options?.pluginIds, { externalChangesConfirmed: options?.externalChangesConfirmed });
+                await policyFeature.applyWithProgress(null, options.pluginIds, { externalChangesConfirmed: options.externalChangesConfirmed });
             }
         });
     }
 
     onunload() {
         this.settingsTab?.dispose();
-        void this.features?.unloadAll();
+        this.features?.unloadAll();
         this.core?.destroy();
     }
 
@@ -108,8 +129,17 @@ export default class OnDemandPlugin extends Plugin {
         this.device = this.core.settingsService.data.profiles[profileId]?.name ?? "Unknown";
     }
 
-    async saveSettings() {
-        await this.core.settingsService.save();
+    async saveSettings(snapshot?: LazySettings) {
+        await this.core.settingsService.save(snapshot);
+    }
+
+    get currentProfileId(): string {
+        return this.core.settingsService.currentProfileId;
+    }
+
+    getDraftSource(): DraftSource | undefined {
+        // Undefined until the core exists; the draft then compares against its own snapshot.
+        return this.core?.settingsService;
     }
 
     // ─── Plugin configuration ──────────────────────────────────
@@ -216,14 +246,7 @@ export default class OnDemandPlugin extends Plugin {
     }
 
     async updatePluginSettings(pluginId: string, mode: PLUGIN_MODE) {
-        // Mode changes must not erase the plugin's advanced lazy rules; those
-        // rules are independent of whether the plugin is currently enabled.
-        await this.saveSettingsChange((data, profileId) => {
-            const plugins = data.profiles[profileId].settings.plugins;
-            plugins[pluginId] = { ...(plugins[pluginId] ?? {}), mode, userConfigured: true };
-        });
-        const lazyEngine = this.features.get(LazyEngineFeature);
-        await lazyEngine!.applyPluginState(pluginId);
+        await this.features.get(LazyEngineFeature)!.setPluginMode(pluginId, mode);
     }
 
     async applyStartupPolicyAndRestart(pluginIds?: string[]) {
@@ -231,6 +254,38 @@ export default class OnDemandPlugin extends Plugin {
         if (policyFeature) {
             await policyFeature.applyWithProgress(null, pluginIds);
         }
+    }
+
+    async applyPolicies(pluginIds: string[], options?: { externalChangesConfirmed?: boolean }) {
+        await this.events.emit(FeatureEvents.APPLY_POLICIES_REQUESTED, { pluginIds, externalChangesConfirmed: options?.externalChangesConfirmed });
+    }
+
+    async confirmExternalOverwrite(): Promise<boolean> {
+        const drift = this.features.get(CommunityPluginsDriftFeature);
+        return !drift || (await drift.confirmOverwrite());
+    }
+
+    async detectExternalChanges(): Promise<CommunityPluginsDrift | null> {
+        try {
+            return (await this.features.get(CommunityPluginsDriftFeature)?.detect()) ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    async rebuildPluginCaches(pluginId: string): Promise<boolean> {
+        const startupPolicy = this.features.get(StartupPolicyFeature);
+        if (!startupPolicy) return false;
+        await startupPolicy.rebuildPluginCaches(pluginId);
+        return true;
+    }
+
+    async createBackup() {
+        await this.features.get(BackupFeature)?.createBackup();
+    }
+
+    get maintenance(): MaintenanceOperations | undefined {
+        return this.features.get(MaintenanceFeature);
     }
 
     async rebuildAndApplyCommandCache(options?: { force?: boolean; externalChangesConfirmed?: boolean }) {

@@ -7,8 +7,8 @@
  */
 import type { PluginContext } from "src/core/plugin-context";
 import { DEFAULT_DEVICE_SETTINGS, PLUGIN_MODE } from "src/core/types";
-import { patchPluginEnableDisable } from "src/patches/plugin-enable-disable";
 import { PluginRegistry } from "src/services/registry/plugin-registry";
+import type { SettingsHost } from "src/services/settings/settings-service";
 import { SettingsService } from "src/services/settings/settings-service";
 
 export class CoreContainer {
@@ -18,16 +18,13 @@ export class CoreContainer {
     readonly registry: PluginRegistry;
     readonly settingsService: SettingsService;
 
-    constructor(ctx: PluginContext) {
+    constructor(ctx: PluginContext, settingsHost: SettingsHost) {
         this.ctx = ctx;
         // 1. Registry (no service deps)
         this.registry = new PluginRegistry(ctx.app, ctx.obsidianPlugins);
 
         // 2. Settings (no service deps)
-        this.settingsService = new SettingsService(
-            // SettingsService expects a Plugin, we pass it through the context adapter
-            ctx._plugin,
-        );
+        this.settingsService = new SettingsService(settingsHost);
     }
 
     /**
@@ -36,13 +33,10 @@ export class CoreContainer {
      */
     async initialize() {
         // Load enabled-plugins list from disk
-        await this.registry.loadEnabledPluginsFromDisk(this.settingsService.data.showConsoleLog);
+        await this.registry.loadEnabledPluginsFromDisk();
 
         // Handle initial load profile creation & backups
         await this.handleInstallationAndBackups();
-
-        // Apply monkey-patches
-        patchPluginEnableDisable(this.ctx);
     }
 
     private async handleInstallationAndBackups() {
@@ -74,7 +68,7 @@ export class CoreContainer {
 
         // Version update backup check
 
-        const currentVersion = this.ctx._plugin.manifest.version;
+        const currentVersion = this.ctx.manifest.version;
         const savedVersion = this.settingsService.data.lastLazyPluginVersion;
 
         if (savedVersion !== currentVersion) {

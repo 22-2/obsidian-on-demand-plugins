@@ -31,7 +31,23 @@ class FakeObsidian {
         writeConfigJson: async (name: string, value: unknown) => {
             this.files.set(name, structuredClone(value));
         },
+        getConfigFile: (name: string) => `.obsidian/${name}.json`,
+        adapter: {
+            exists: async (path: string) => this.files.has(FakeObsidian.configName(path)),
+            write: async (path: string, data: string) => {
+                this.files.set(FakeObsidian.configName(path), JSON.parse(data));
+            },
+            process: async (path: string, fn: (data: string) => string) => {
+                const data = fn(JSON.stringify(this.files.get(FakeObsidian.configName(path))));
+                this.files.set(FakeObsidian.configName(path), JSON.parse(data));
+                return data;
+            },
+        },
     };
+
+    private static configName(path: string) {
+        return path.replace(/^\.obsidian\//, "").replace(/\.json$/, "");
+    }
 
     readonly workspace = { onLayoutReady: (callback: () => void) => callback() };
 
@@ -113,18 +129,18 @@ function setup(modes: Record<string, PluginMode>) {
         getData: () => ({ showConsoleLog: false }),
         getSettings: () => settings,
         register: (unload: () => void) => fake.register(unload),
-        _plugin: {
-            updatePluginSettings: async (id: string, mode: PluginMode) => {
-                settings.plugins[id] = { ...settings.plugins[id], mode, userConfigured: true };
-                await saveSettings();
-            },
-            features: { get: () => ({ commandCache: { syncCommandWrappersForPlugin: vi.fn() } }) },
-        },
     } as unknown as PluginContext;
+    const enableDisableHooks = {
+        setPluginMode: async (id: string, mode: PluginMode) => {
+            settings.plugins[id] = { ...settings.plugins[id], mode, userConfigured: true };
+            await saveSettings();
+        },
+        syncCommandWrappers: vi.fn(),
+    };
 
     const loadOnDemand = async () => {
         await registry.loadEnabledPluginsFromDisk();
-        patchPluginEnableDisable(ctx);
+        patchPluginEnableDisable(ctx, enableDisableHooks);
         const feature = new CommunityPluginsDriftFeature();
         feature.onload(ctx, { registry } as never, {} as never, {} as never);
         // onLayoutReady runs the startup check synchronously in this fake; let it settle.

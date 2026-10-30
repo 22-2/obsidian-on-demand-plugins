@@ -2,7 +2,7 @@ import { FileSystemAdapter, Notice, Platform } from "obsidian";
 import { openSystemPath } from "src/core/external-open";
 import { PLUGIN_MODE, PluginModes } from "src/core/types";
 import type OnDemandPlugin from "src/main";
-import { addModeOptions, enabledBadgeText, getPluginStatistics, openBackupDirectory, openPluginDirectory, pluginManagementSummary, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+import { addModeOptions, currentLazyOptions, enabledBadgeText, getPluginStatistics, openBackupDirectory, openPluginDirectory, pluginManagementSummary, pluginModeLabel, pluginStatisticsText, stageLazyOptions, stagePluginMode } from "src/ui/settings/helpers";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("src/core/external-open", () => ({ openSystemPath: vi.fn() }));
@@ -122,5 +122,59 @@ describe("settings helpers", () => {
         expect(addModeOptions(dropdown as never)).toBe(dropdown);
         expect(dropdown.addOption).toHaveBeenCalledTimes(Object.keys(PluginModes).length);
         expect(dropdown.addOption).toHaveBeenCalledWith(PLUGIN_MODE.ALWAYS_ENABLED, PluginModes[PLUGIN_MODE.ALWAYS_ENABLED]);
+    });
+});
+
+function createLazyPlugin(settings: Partial<{ plugins: Record<string, unknown>; lazyOnViews: Record<string, string[]>; lazyOnFiles: Record<string, object> }> = {}) {
+    return {
+        settings: { plugins: {}, lazyOnViews: {}, lazyOnFiles: {}, ...settings },
+        getPluginMode: () => PLUGIN_MODE.LAZY,
+    } as unknown as OnDemandPlugin;
+}
+
+describe("lazy option helpers", () => {
+    const none = { useView: false, viewTypes: [], useFile: false, fileCriteria: {} };
+
+    it("reads saved options, legacy view rules and the Excalidraw default", () => {
+        const saved = { useView: true, viewTypes: ["graph"], useFile: false, fileCriteria: {} };
+        expect(currentLazyOptions(createLazyPlugin({ plugins: { foo: { mode: "lazy", lazyOptions: saved } } }), "foo")).toEqual(saved);
+        expect(currentLazyOptions(createLazyPlugin({ plugins: { foo: { mode: "lazy" } }, lazyOnViews: { foo: ["kanban"] } }), "foo")).toEqual({ ...none, useView: true, viewTypes: ["kanban"] });
+        expect(currentLazyOptions(createLazyPlugin(), "obsidian-excalidraw-plugin")).toEqual({
+            useView: false,
+            viewTypes: [],
+            useFile: true,
+            fileCriteria: { suffixes: [".excalidraw"], frontmatterKeys: ["excalidraw-plugin"] },
+        });
+        expect(currentLazyOptions(createLazyPlugin(), "foo")).toEqual(none);
+    });
+
+    it("stages changed options and skips unchanged ones", () => {
+        const plugin = createLazyPlugin();
+        expect(stageLazyOptions(plugin, "foo", none)).toBe(false);
+        expect(stageLazyOptions(plugin, "foo", { ...none, useFile: true })).toBe(true);
+        expect(plugin.settings.plugins.foo).toEqual({ mode: PLUGIN_MODE.LAZY, userConfigured: false, lazyOptions: { ...none, useFile: true } });
+    });
+
+    it("writes the legacy rule maps only when the rule actually changes", () => {
+        const plugin = createLazyPlugin();
+        stageLazyOptions(plugin, "foo", { ...none, useFile: true });
+        // An empty rule means the same as none, so nothing is written for it.
+        expect(plugin.settings.lazyOnViews).toEqual({});
+        expect(plugin.settings.lazyOnFiles).toEqual({});
+
+        stageLazyOptions(plugin, "foo", { ...none, useFile: true, fileCriteria: { suffixes: [".md"] }, useView: true, viewTypes: ["graph"] });
+        expect(plugin.settings.lazyOnViews).toEqual({ foo: ["graph"] });
+        expect(plugin.settings.lazyOnFiles).toEqual({ foo: { suffixes: [".md"] } });
+
+        stageLazyOptions(plugin, "foo", none);
+        expect(plugin.settings.lazyOnViews).toEqual({ foo: [] });
+        expect(plugin.settings.lazyOnFiles).toEqual({ foo: {} });
+    });
+
+    it("stages a mode only when it changes the effective mode", () => {
+        const plugin = createLazyPlugin();
+        expect(stagePluginMode(plugin, "foo", PLUGIN_MODE.LAZY)).toBe(false);
+        expect(stagePluginMode(plugin, "foo", PLUGIN_MODE.ALWAYS_ENABLED)).toBe(true);
+        expect(plugin.settings.plugins.foo).toEqual({ mode: PLUGIN_MODE.ALWAYS_ENABLED, userConfigured: true });
     });
 });

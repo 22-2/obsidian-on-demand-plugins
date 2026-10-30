@@ -5,12 +5,12 @@ import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
 import { loadLocalStorage, saveLocalStorage } from "src/core/storage";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
-import type OnDemandPlugin from "src/main";
 import { LazyOptionsModal } from "src/ui/modals/lazy-options-modal";
 import { addPluginRowMenuItems } from "src/ui/plugin-row-menu";
 import { showInCommunityPlugins } from "src/ui/show-in-community-plugins";
 import type { SettingsTab } from "src/ui/settings-tab";
-import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText } from "src/ui/settings/helpers";
+import type { SettingsUiHost } from "src/ui/settings-ui-host";
+import { addModeOptions, enabledBadgeText, getPluginStatistics, openPluginDirectory, pluginModeLabel, pluginStatisticsText, stagePluginMode } from "src/ui/settings/helpers";
 import { createSettingsNotice } from "src/ui/settings/settings-notice";
 
 const logger = log.getLogger("OnDemandPlugin/PluginPage");
@@ -47,14 +47,15 @@ export class PluginPage extends SettingPage {
     // Kept in vault-scoped local storage, not in the staged settings draft, so it saves at once.
     private compact = false;
     private app: App;
-    private plugin: OnDemandPlugin;
+    private plugin: SettingsUiHost;
     private tab: SettingsTab;
     private infiniteScrollObserver?: IntersectionObserver;
     private loadedCount = 0;
+    private rowCache = new Map<string, HTMLElement>();
     private savedCommunityPluginIds?: Set<string>;
     private communityPluginReadId = 0;
     private loadStateRef?: EventRef;
-    constructor(app: App, plugin: OnDemandPlugin, tab: SettingsTab) {
+    constructor(app: App, plugin: SettingsUiHost, tab: SettingsTab) {
         super();
         this.app = app;
         this.plugin = plugin;
@@ -63,6 +64,7 @@ export class PluginPage extends SettingPage {
     }
     display() {
         this.disconnectInfiniteScroll();
+        this.rowCache.clear();
         this.tab.offerRestoreOnPageOpen("plugin-management");
         this.watchPluginLoadState();
         // Plugin installations can happen while the settings modal is open.
@@ -80,6 +82,10 @@ export class PluginPage extends SettingPage {
             .setName(pluginStatisticsText(this.plugin))
             .setDesc(`${getPluginStatistics(this.plugin).total} plugins total · disabled / on demand / on layout ready / enabled`)
             .setClass("lazy-plugin-statistics");
+        new Setting(this.containerEl)
+            .setName("Plugin table")
+            .setDesc("Edit modes in a sortable table. Unsaved changes carry over.")
+            .addButton((button) => button.setButtonText("Open table").onClick(() => void this.openPluginTable()));
         // Phones show the refresh control on the heading's right; desktop shows it beside the filters (see CSS).
         new Setting(this.containerEl)
             .setName("Plugins")
@@ -89,7 +95,7 @@ export class PluginPage extends SettingPage {
                 button
                     .setIcon("refresh-cw")
                     .setTooltip("Refresh plugin list")
-                    .onClick(() => this.refreshList());
+                    .onClick(() => void this.refreshList());
             });
         // No row name: the placeholder already says what the field is, and a name column only leaves a gap.
         const filterSetting = new Setting(this.containerEl);
@@ -118,19 +124,33 @@ export class PluginPage extends SettingPage {
                 button
                     .setIcon("refresh-cw")
                     .setTooltip("Refresh plugin list")
-                    .onClick(() => this.refreshList());
+                    .onClick(() => void this.refreshList());
             });
         this.containerEl.createDiv({ cls: "lazy-plugin-infinite-host" });
         this.renderInfiniteList();
     }
-    private refreshList() {
+    /**
+     * Opens the table before closing settings: the draft is set aside only when its last
+     * surface closes, so the open table keeps it live instead of prompting to restore it.
+     */
+    private async openPluginTable() {
+        await this.plugin.openPluginTable();
+        this.app.setting.close();
+    }
+    private async refreshList() {
+        new Notice("Refreshing plugin list…");
+        // Plugins copied into the plugins folder are only known to Obsidian after it rescans the disk.
+        await this.app.plugins.loadManifests();
         this.plugin.updateManifests();
         void this.refreshCommunityPluginSnapshot();
+        this.rowCache.clear();
+        this.containerEl.querySelector<HTMLElement>(".lazy-plugin-infinite-host")?.empty();
         // Re-render the list directly: tab.update() does not
         // guarantee the open page is re-displayed, so relying
         // on it leaves live badges (e.g. Enabled after an
         // on-demand load) stale.
         this.renderInfiniteList();
+        new Notice("Plugin list refreshed");
     }
     hide() {
         this.disconnectInfiniteScroll();
@@ -143,29 +163,36 @@ export class PluginPage extends SettingPage {
         this.disconnectInfiniteScroll();
         const host = this.containerEl.querySelector<HTMLElement>(".lazy-plugin-infinite-host");
         if (!host) return;
-        host.empty();
         // Mobile keyboards often append a space after a completed name; normalize
         // only the query so typing and internal spaces in plugin names stay intact.
         const query = this.filter.trim().toLowerCase();
         const plugins = this.plugin.manifests.filter((manifest) => (!query || manifest.name.toLowerCase().includes(query)) && (!this.mode || this.plugin.getPluginMode(manifest.id) === this.mode));
         // The compact toggle sits at the right edge of the count line. It has no visible label,
         // so its tooltip supplies the accessible name.
-        const toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
-        const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
-        compactControl.createSpan({ text: "Compact list" });
-        new ToggleComponent(compactControl)
-            .setValue(this.compact)
-            .setTooltip("Compact list")
-            .onChange((value) => {
-                this.compact = value;
-                saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
-                this.renderInfiniteList();
-            });
-        toolbar.createDiv({ cls: "lazy-plugin-results-count", text: `${plugins.length} plugins` });
-        const listEl = host.createDiv({ cls: "lazy-plugin-list-body" });
+        let toolbar = host.querySelector<HTMLElement>(".lazy-plugin-list-toolbar");
+        if (!toolbar) {
+            toolbar = host.createDiv({ cls: "lazy-plugin-list-toolbar" });
+            const compactControl = toolbar.createDiv({ cls: "lazy-plugin-compact-control" });
+            compactControl.createSpan({ text: "Compact list" });
+            new ToggleComponent(compactControl)
+                .setValue(this.compact)
+                .setTooltip("Compact list")
+                .onChange((value) => {
+                    this.compact = value;
+                    saveLocalStorage(this.app, COMPACT_LIST_STORAGE_KEY, value);
+                    host.querySelector<HTMLElement>(".lazy-plugin-list-body")?.toggleClass("is-compact", value);
+                });
+            toolbar.createDiv({ cls: "lazy-plugin-results-count" });
+            host.createDiv({ cls: "lazy-plugin-list-body" });
+        }
+        toolbar.querySelector<HTMLElement>(".lazy-plugin-results-count")?.setText(`${plugins.length} plugins`);
+        const listEl = host.querySelector<HTMLElement>(".lazy-plugin-list-body")!;
         listEl.toggleClass("is-compact", this.compact);
         this.loadedCount = Math.min(PluginPage.PAGE_SIZE, plugins.length);
+        const visible = new Set(plugins.slice(0, this.loadedCount).map((manifest) => manifest.id));
+        for (const [id, row] of this.rowCache) if (!visible.has(id)) row.remove();
         this.appendPluginRows(listEl, plugins, 0, this.loadedCount);
+        host.querySelector(".lazy-plugin-infinite-sentinel")?.remove();
         if (this.loadedCount >= plugins.length) return;
         const sentinel = host.createDiv({ cls: "lazy-plugin-infinite-sentinel", attr: { "aria-hidden": "true" } });
         const activeWindow = host.ownerDocument.defaultView;
@@ -185,10 +212,20 @@ export class PluginPage extends SettingPage {
         );
         this.infiniteScrollObserver.observe(sentinel);
     }
-    private appendPluginRows(listEl: HTMLElement, plugins: OnDemandPlugin["manifests"], start: number, end: number) {
+    private appendPluginRows(listEl: HTMLElement, plugins: SettingsUiHost["manifests"], start: number, end: number) {
         plugins.slice(start, end).forEach((manifest) => {
             if (!manifest) return;
+            const cached = this.rowCache.get(manifest.id);
+            if (cached) {
+                if (!cached.isConnected) {
+                    const badge = cached.querySelector<HTMLElement>(".lazy-plugin-enabled-badge");
+                    if (badge) setEnabledBadgeState(badge, this.app, manifest.id, this.savedCommunityPluginIds);
+                    listEl.append(cached);
+                }
+                return;
+            }
             const setting = new Setting(listEl).setName(manifest.name);
+            this.rowCache.set(manifest.id, setting.settingEl);
             setting.setClass("lazy-plugin-mode-row");
             // Give variable-length descriptions their own line so metadata
             // always starts at a predictable position within each row.
@@ -261,6 +298,12 @@ export class PluginPage extends SettingPage {
                 button.buttonEl.addClass("lazy-plugin-row-actions-mobile");
             });
         });
+        let next: Element | null = null;
+        for (let i = end - 1; i >= start; i--) {
+            const row = this.rowCache.get(plugins[i].id)!;
+            if (row.nextElementSibling !== next) listEl.insertBefore(row, next);
+            next = row;
+        }
     }
     /**
      * Enables or disables the plugin in memory only. Unlike a mode change, this does
@@ -281,17 +324,7 @@ export class PluginPage extends SettingPage {
     }
 
     private applyRowModeChange(pluginId: string, mode: PLUGIN_MODE, modeBadge: HTMLElement, enabledBadge: HTMLElement) {
-        // Selecting the effective mode changes nothing semantically, so skip creating
-        // an explicit entry just to flip userConfigured and keep the draft clean.
-        const current = this.plugin.settings.plugins[pluginId];
-        if (this.plugin.getPluginMode(pluginId) === mode && (current?.mode === undefined || current.mode === mode)) return;
-        // Changing the mode should preserve advanced lazy options so
-        // users can temporarily disable a plugin without reconfiguring it.
-        this.plugin.settings.plugins[pluginId] = {
-            ...(this.plugin.settings.plugins[pluginId] ?? {}),
-            mode,
-            userConfigured: true,
-        };
+        if (!stagePluginMode(this.plugin, pluginId, mode)) return;
         this.tab.pendingPluginIds.add(pluginId);
         this.tab.markDirty();
         // Update only the badges in place so the row stays where it is even

@@ -1,23 +1,21 @@
 import type { WorkspaceLeaf } from "obsidian";
-import PQueue from "p-queue";
 import { PLUGIN_LOAD_STATE_CHANGED_EVENT } from "src/core/constants";
-import type { EventBus } from "src/core/event-bus";
 import type { AppFeature } from "src/core/feature";
-import type { FeatureManager } from "src/core/feature-manager";
 import type { PluginContext } from "src/core/plugin-context";
 import { PLUGIN_MODE } from "src/core/types";
 import { isPluginLoaded } from "src/core/utils";
 import { CommandCacheService } from "src/features/lazy-engine/command-cache/command-cache-service";
+import { LayoutReadyLoader } from "src/features/lazy-engine/layout-ready-loader";
 import { FileLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/file-lazy-loader";
 import { LeafLockManager, LeafViewLockStrategy } from "src/features/lazy-engine/lazy-loader/loaders/internal/leaf-lock";
 import { ViewLazyLoader } from "src/features/lazy-engine/lazy-loader/loaders/view-lazy-loader";
 import { LazyCommandRunner } from "src/features/lazy-engine/lazy-runner/lazy-command-runner";
+import { patchPluginEnableDisable } from "src/patches/plugin-enable-disable";
 import { patchPluginLoad } from "src/patches/plugin-load";
 import { patchPluginInitialization } from "src/patches/plugin-initialization";
 import { patchRibbonReorder } from "src/patches/ribbon-reorder";
 import { patchPluginRegisterView } from "src/patches/view-registry";
 import { patchSetViewState } from "src/patches/view-state";
-import type { CoreContainer } from "src/services/core-container";
 
 export class LazyEngineFeature implements AppFeature {
     public commandCache!: CommandCacheService;
@@ -25,20 +23,19 @@ export class LazyEngineFeature implements AppFeature {
 
     private viewLoader!: ViewLazyLoader;
     private fileLoader!: FileLazyLoader;
-    private layoutReadyQueue!: PQueue;
+    private layoutReadyLoader?: LayoutReadyLoader;
     private ctx!: PluginContext;
-    private events!: EventBus;
 
-    onload(ctx: PluginContext, core: CoreContainer, features: FeatureManager, events: EventBus) {
+    onload(ctx: PluginContext) {
+        this.layoutReadyLoader?.stop();
         this.ctx = ctx;
-        this.events = events;
 
         // 1. Core Engine parts
-        this.lazyRunner = new LazyCommandRunner(ctx);
-        this.commandCache = new CommandCacheService(ctx, this.lazyRunner);
-
-        // Wire up setter injection
-        this.lazyRunner.setCommandRegistry(this.commandCache);
+        // The cache only needs a way to run a wrapped command, so it takes a callback
+        // and the runner can receive the finished cache in its constructor. Wrappers
+        // fire only after onload returns, by which time lazyRunner is assigned.
+        this.commandCache = new CommandCacheService(ctx, (commandId) => this.lazyRunner.runLazyCommand(commandId));
+        this.lazyRunner = new LazyCommandRunner(ctx, this.commandCache);
 
         // 2. Loaders setup
         const lockManager = new LeafLockManager();
@@ -47,6 +44,10 @@ export class LazyEngineFeature implements AppFeature {
         this.fileLoader = new FileLazyLoader(ctx, this.lazyRunner, { lock: (leaf: WorkspaceLeaf) => lockManager.lock(leaf, "leaf-generic") });
 
         // 3. Patches and Subscriptions
+        patchPluginEnableDisable(ctx, {
+            setPluginMode: (pluginId, mode) => this.setPluginMode(pluginId, mode),
+            syncCommandWrappers: (pluginId) => this.commandCache.syncCommandWrappersForPlugin(pluginId),
+        });
         ctx.register(patchPluginLoad(ctx.obsidianPlugins, (pluginId) => ctx.app.workspace.trigger(PLUGIN_LOAD_STATE_CHANGED_EVENT, pluginId)));
         ctx.register(patchPluginInitialization());
         patchSetViewState({
@@ -61,8 +62,6 @@ export class LazyEngineFeature implements AppFeature {
         this.viewLoader.registerActiveLeafReload();
         this.fileLoader.register();
 
-        this.layoutReadyQueue = new PQueue({ concurrency: 3, interval: 100 });
-
         // 4. Initialize cache BEFORE hooking onLayoutReady: when the plugin is
         // (re)loaded after the workspace is already ready, onLayoutReady fires the
         // callback synchronously, and the stale-cache refresh would then run against
@@ -70,46 +69,27 @@ export class LazyEngineFeature implements AppFeature {
         this.commandCache.loadFromData();
         this.commandCache.registerCachedCommands();
 
-        this.registerLayoutReadyLoader();
+        this.layoutReadyLoader = new LayoutReadyLoader(ctx, this.lazyRunner, this.commandCache);
+        this.layoutReadyLoader.start();
     }
 
     onunload() {
+        this.layoutReadyLoader?.stop();
         this.commandCache?.clear();
         this.lazyRunner?.clear();
-        this.layoutReadyQueue?.clear();
     }
 
-    private registerLayoutReadyLoader() {
-        this.ctx.app.workspace.onLayoutReady(() => {
-            void this.onLayoutReady();
+    /**
+     * Save a user-chosen mode for a plugin, then apply it.
+     */
+    async setPluginMode(pluginId: string, mode: PLUGIN_MODE) {
+        // Mode changes must not erase the plugin's advanced lazy rules; those
+        // rules are independent of whether the plugin is currently enabled.
+        await this.ctx.saveSettingsChange((data, profileId) => {
+            const plugins = data.profiles[profileId].settings.plugins;
+            plugins[pluginId] = { ...(plugins[pluginId] ?? {}), mode, userConfigured: true };
         });
-    }
-
-    private async onLayoutReady() {
-        const manifests = this.ctx.getManifests();
-
-        const toLoad = manifests.filter((m) => this.ctx.getPluginMode(m.id) === PLUGIN_MODE.LAZY_ON_LAYOUT_READY);
-
-        if (toLoad.length > 0) {
-            const tasks = toLoad.map((manifest) => this.layoutReadyQueue.add(() => this.lazyRunner.ensurePluginLoaded(manifest.id).catch((err) => console.error("Failed loading plugin onLayoutReady", manifest.id, err))));
-
-            await Promise.all(tasks);
-            this.commandCache.registerCachedCommands();
-        }
-
-        // Stale caches (built for an older plugin version) were skipped at startup to
-        // avoid registering wrappers for command IDs that may no longer exist (issue #6).
-        // Rebuild them here, after layout-ready plugins are loaded, so the wasEnabled
-        // check inside refreshStaleCacheForPlugin sees the final enabled state.
-        await this.refreshStaleCommandCaches();
-    }
-
-    private async refreshStaleCommandCaches() {
-        const staleIds = this.commandCache.getStaleCachedPluginIds();
-        if (staleIds.length === 0) return;
-
-        const tasks = staleIds.map((pluginId) => this.layoutReadyQueue.add(() => this.commandCache.refreshStaleCacheForPlugin(pluginId).catch((err) => console.error("Failed refreshing stale command cache", pluginId, err))));
-        await Promise.all(tasks);
+        await this.applyPluginState(pluginId);
     }
 
     /**

@@ -13,7 +13,7 @@ describe("MaintenanceFeature", () => {
         getSettings: () => typeof settingsState;
         getPluginMode: (id: string) => string | undefined;
         saveSettings: ReturnType<typeof vi.fn>;
-        _plugin: { manifest: { id: string } };
+        manifest: { id: string };
         obsidianPlugins: { enabledPlugins: Set<string> };
     };
     let mockRegistry: {
@@ -47,7 +47,7 @@ describe("MaintenanceFeature", () => {
             getSettings: () => settingsState,
             getPluginMode: (id) => mockCtx.getSettings().plugins[id]?.mode,
             saveSettings: vi.fn().mockResolvedValue(undefined),
-            _plugin: { manifest: { id: "on-demand-plugins" } },
+            manifest: { id: "on-demand-plugins" },
             obsidianPlugins: { enabledPlugins: new Set(["plugin-1", "on-demand-plugins"]) },
         };
 
@@ -112,7 +112,7 @@ describe("MaintenanceFeature", () => {
             const result = await feature.executeSync("lazyToCore");
 
             expect(result.changed).toBe(1);
-            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(expect.arrayContaining(["plugin-2", "on-demand-plugins"]), false);
+            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(expect.arrayContaining(["plugin-2", "on-demand-plugins"]));
             // Obsidian's own config save writes this set back, so it must match the file.
             expect([...mockCtx.obsidianPlugins.enabledPlugins].sort()).toEqual(["on-demand-plugins", "plugin-2"]);
         });
@@ -123,7 +123,7 @@ describe("MaintenanceFeature", () => {
             const result = await feature.executeSync("lazyToCore");
 
             expect(result.changed).toBe(1);
-            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "plugin-2"], false);
+            expect(mockRegistry.writeCommunityPluginsFile).toHaveBeenCalledWith(["desktop-only", "on-demand-plugins", "plugin-2"]);
         });
 
         it("previews no removal for entries this device does not manage", async () => {

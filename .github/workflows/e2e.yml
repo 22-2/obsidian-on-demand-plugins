@@ -102,6 +102,11 @@ jobs:
             - name: Build plugin under test
               run: pnpm run build
 
+            # The toolkit validates its assets while Playwright loads the config,
+            # before globalSetup gets a chance to download them on a cache miss.
+            - name: Prepare Obsidian assets
+              run: node node_modules/obsidian-e2e-toolkit/scripts/setup.mjs
+
             - name: Run E2E tests
               env:
                   CI: true
