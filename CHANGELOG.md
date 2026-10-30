@@ -1,5 +1,51 @@
 # Changelog
 
+## [3.9.0](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.8.0...3.9.0) (2026-10-30)
+
+### ✨ Features
+
+* add a plugin table view for editing loading modes ([acea61d](https://github.com/22-2/obsidian-on-demand-plugins/commit/acea61d837aa132d21cc027963f19231c3a59ba4))
+* add an optional uninstall action to the plugin table menu ([d72dcbd](https://github.com/22-2/obsidian-on-demand-plugins/commit/d72dcbd406609d168066c8a69d9818a0d2dfb0c4))
+* allow changing plugin load state from the table ([ec79a5d](https://github.com/22-2/obsidian-on-demand-plugins/commit/ec79a5d662006973674cf4c235c77010fe6d06c5))
+* filter loaded plugins by whether they are saved or in memory only ([75f3b67](https://github.com/22-2/obsidian-on-demand-plugins/commit/75f3b679f0970d5fddf3473ffde5e515a646db11))
+* keep only the loaded state's tooltip in the plugin table ([c9b6722](https://github.com/22-2/obsidian-on-demand-plugins/commit/c9b67222a5083e539e51f270c7f3b60503b9ab57))
+* list On-Demand itself in the plugin table ([5e65576](https://github.com/22-2/obsidian-on-demand-plugins/commit/5e65576d92de889fe4e069a882209e63dd6bda35))
+* notify when a plugin uninstall starts ([2df1dbe](https://github.com/22-2/obsidian-on-demand-plugins/commit/2df1dbeae33ecfd8ea768e0cb9c128125839088b))
+* notify when the plugin list refresh starts and ends ([54571af](https://github.com/22-2/obsidian-on-demand-plugins/commit/54571af6cf9098bdbcf6d6460afbaa8bfe6683c8))
+* open the plugin table from plugin management ([f203537](https://github.com/22-2/obsidian-on-demand-plugins/commit/f2035376f6061ace9209c67f366cb6dc784ac1b2))
+* place the lazy settings gear after the mode dropdown ([da90f16](https://github.com/22-2/obsidian-on-demand-plugins/commit/da90f16a65611c09ed3350e2b0a2852024654792))
+* quiet the plugin table's repeated controls ([5fa4a7e](https://github.com/22-2/obsidian-on-demand-plugins/commit/5fa4a7ea7d6ceae4b15a4be32ea236e9fc4d2cc0))
+* show mode counts in the table's mode filter options ([4f6703e](https://github.com/22-2/obsidian-on-demand-plugins/commit/4f6703eede2f9ef3b22d2e2ae26381c248473b1c))
+* show the plugin table's cell tooltips with Obsidian's tooltip ([9d2101e](https://github.com/22-2/obsidian-on-demand-plugins/commit/9d2101e1a3a6a8ebecb1b352a98fb1bda6caaabe))
+* simplify the plugin table's columns and let it scroll sideways ([fcc8fc7](https://github.com/22-2/obsidian-on-demand-plugins/commit/fcc8fc7f3da7957fdcc89e940eeb3383e759beb6))
+* use icon controls on phones ([3daeba8](https://github.com/22-2/obsidian-on-demand-plugins/commit/3daeba8ebff31fa0443a81be074ca663c15c0d80))
+
+### 🎨 Styles
+
+* clarify columns and sort indicators ([f012c88](https://github.com/22-2/obsidian-on-demand-plugins/commit/f012c88881c0123afb6e497f82173df6cc2ff2c2))
+* hide author names on phones ([6fba1ce](https://github.com/22-2/obsidian-on-demand-plugins/commit/6fba1ce25de7580ae416b475e3fe7f5a56e8c0d4))
+
+### 🛡 Bug Fixes
+
+* align loaded status controls ([817df34](https://github.com/22-2/obsidian-on-demand-plugins/commit/817df344cf8ea5da79009391a38e6135466c9085))
+* always log plugin load and command errors ([1a39ddb](https://github.com/22-2/obsidian-on-demand-plugins/commit/1a39ddb9a874d765cfa8634267e5d41c878ddcd0))
+* **ci:** prepare Obsidian before loading Playwright config ([7410218](https://github.com/22-2/obsidian-on-demand-plugins/commit/7410218b208bc9d1b8aa54d9ea1fd525532b6559))
+* clean up command readiness waits ([158f8ec](https://github.com/22-2/obsidian-on-demand-plugins/commit/158f8ec5f3e6574789f1e257fd7095621b542c50))
+* keep plugin table scroll position on refresh ([2f4ab41](https://github.com/22-2/obsidian-on-demand-plugins/commit/2f4ab410fb9b783e951843a8d3e315116c711722))
+* reload view caches along with commands from the per-plugin cache button ([9c37320](https://github.com/22-2/obsidian-on-demand-plugins/commit/9c3732099ce9d195a0e9e3f02911c7744f14cff9))
+* replace layout-ready plugin queue ([a20c553](https://github.com/22-2/obsidian-on-demand-plugins/commit/a20c553b279a4a1bd9e1505443a4dc54f79bdc0b))
+* rescan the plugins folder when refreshing the plugin list ([abb69f3](https://github.com/22-2/obsidian-on-demand-plugins/commit/abb69f31ff96e742fbc67b93a4f5bde64f4977f7))
+* save the plugin table's layout when it closes mid-debounce ([9314f44](https://github.com/22-2/obsidian-on-demand-plugins/commit/9314f4496aa152e78a1f0d5058e8c5980be59126))
+* set 22-2 as the author and keep the plugin name as On-Demand ([33536d4](https://github.com/22-2/obsidian-on-demand-plugins/commit/33536d4cfa76d11415f62a780cbaaec214b1d9f9))
+* stop listing untouched activation rules when lazy options change ([7976574](https://github.com/22-2/obsidian-on-demand-plugins/commit/7976574447f9741ce3727040546503182d4f7100))
+* stop the plugin table's filters and mode dropdowns showing tooltips ([77be8cf](https://github.com/22-2/obsidian-on-demand-plugins/commit/77be8cf86556d14d7a7268d20e5d22a77d10e101))
+* wait for saved plugin state before refreshing the table ([f60be2f](https://github.com/22-2/obsidian-on-demand-plugins/commit/f60be2f865ce2483383685e9068364af825f414d))
+* write data.json and community-plugins.json through adapter.process ([062fb79](https://github.com/22-2/obsidian-on-demand-plugins/commit/062fb79d0dae24135b1573970342aa1451accb9e))
+
+### 🤖 Build
+
+* align ESLint dependencies and use TypeScript 6 directly ([93dcfc8](https://github.com/22-2/obsidian-on-demand-plugins/commit/93dcfc8c88b7e6ae065e74cf7e5d5e63df861dbf))
+
 ## [3.8.0](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.7.0...3.8.0) (2026-10-15)
 
 ### ✨ Features
