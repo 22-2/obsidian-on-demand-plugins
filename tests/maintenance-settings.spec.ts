@@ -22,6 +22,9 @@ test("ordinary settings and profiles save immediately without committing or disc
     await expect(page.locator(".lazy-plugin-save-controls")).toBeVisible();
 
     const behaviour = await obsidian.openSettings(pluginUnderTestId, { subPage: "Behaviour" });
+    const loadNotifications = behaviour.locator(".setting-item").filter({ hasText: "Automatic loading notifications" }).locator(".checkbox-container");
+    await loadNotifications.click();
+    await expect.poll(async () => (await readSaved()).showAutomaticLoadNotifications).toBe(false);
     const nextDefault = original.profiles[profileId].settings.defaultMode === "lazy" ? "lazyOnLayoutReady" : "lazy";
     await behaviour.locator(".setting-item").filter({ hasText: "Default mode for newly discovered plugins." }).getByRole("combobox").selectOption(nextDefault);
     await expect.poll(async () => (await readSaved()).profiles[profileId].settings.defaultMode).toBe(nextDefault);
@@ -48,6 +51,7 @@ test("ordinary settings and profiles save immediately without committing or disc
     const saved = await readSaved();
     expect(saved.profiles[profileId].settings.defaultMode).toBe(nextDefault);
     expect(saved.showConsoleLog).toBe(!original.showConsoleLog);
+    expect(saved.showAutomaticLoadNotifications).toBe(false);
     expect(Object.values(saved.profiles).some((profile) => profile.name === "Autosaved profile")).toBe(true);
 });
 

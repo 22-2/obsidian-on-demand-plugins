@@ -52,6 +52,8 @@ Mode changes stay a draft until you click **Review & save…**. Moving between O
 
 Instead of loading the plugin code at startup, this project registers "dummy commands" that cache command metadata. The actual plugin is loaded only when its command or a configured view/file is used. Internally it monkey-patches parts of Obsidian's core, so updates to Obsidian may break behavior.
 
+To hide command-triggered loading and success notices, turn off **Behaviour → Automatic loading notifications**. Errors and confirmations for the in-memory enable and disable commands remain visible.
+
 ---
 
 This project is based on the work by Alan Grainger: https://github.com/alangrainger/obsidian-lazy-plugins

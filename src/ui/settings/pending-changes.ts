@@ -38,7 +38,7 @@ export type DraftStash = {
 };
 
 /** Top-level keys described explicitly; any other differing key is reported generically so nothing pending stays hidden. */
-const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog", "restoreDraftBehavior", "showUninstallInTableMenu"]);
+const DESCRIBED_ROOT_KEYS = new Set<string>(["profiles", "desktopProfileId", "mobileProfileId", "showConsoleLog", "restoreDraftBehavior", "showUninstallInTableMenu", "showAutomaticLoadNotifications"]);
 const DESCRIBED_DEVICE_KEYS = new Set<string>(["plugins", "defaultMode", "pruneUninstalledEntries"]);
 const DEVICE_KEY_LABELS: Record<string, string> = {
     lazyOnViews: "View activation rules",
@@ -305,6 +305,15 @@ function describeDeviceSettings(current: DeviceSettings, saved: DeviceSettings):
 
 function describeRootSettings(data: LazySettings, baseline: LazySettings): PendingChange[] {
     const changes: PendingChange[] = [];
+    if (data.showAutomaticLoadNotifications !== baseline.showAutomaticLoadNotifications) {
+        changes.push({
+            group: "settings",
+            label: "Automatic loading notifications",
+            from: onOff(baseline.showAutomaticLoadNotifications),
+            to: onOff(data.showAutomaticLoadNotifications),
+            revert: () => (data.showAutomaticLoadNotifications = baseline.showAutomaticLoadNotifications),
+        });
+    }
     if (data.showConsoleLog !== baseline.showConsoleLog) {
         changes.push({
             group: "settings",

@@ -231,6 +231,32 @@ describe("LazyCommandRunner", () => {
             expect(messages).toEqual(["Loading Test Plugin…", "Test Plugin loaded"]);
         });
 
+        it("suppresses loading and success notices when disabled, but still executes the command", async () => {
+            mockCtx.getData.mockReturnValue({ showAutomaticLoadNotifications: false });
+            mockRegistry.getCachedCommand.mockReturnValue({ id: "cmd1", pluginId: "test-plugin" });
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
+            vi.spyOn(runner, "ensurePluginLoaded").mockResolvedValue(true);
+            vi.spyOn(runner, "waitForCommand").mockResolvedValue(true);
+            const executor = (runner as unknown as { commandExecutor: { executeCommand: (id: string, event: unknown) => boolean } }).commandExecutor;
+            const execute = vi.spyOn(executor, "executeCommand").mockReturnValue(true);
+
+            await runner.runLazyCommand("cmd1");
+
+            expect((Notice as unknown as { messages: string[] }).messages).toEqual([]);
+            expect(execute).toHaveBeenCalledOnce();
+        });
+
+        it("reports load failures even when automatic notifications are disabled", async () => {
+            mockCtx.getData.mockReturnValue({ showAutomaticLoadNotifications: false });
+            mockRegistry.getCachedCommand.mockReturnValue({ id: "cmd1", pluginId: "test-plugin" });
+            vi.mocked(utilsMs.isPluginLoaded).mockReturnValue(false);
+            vi.spyOn(runner, "ensurePluginLoaded").mockResolvedValue(false);
+
+            await runner.runLazyCommand("cmd1");
+
+            expect((Notice as unknown as { messages: string[] }).messages).toEqual(["Failed to load test-plugin"]);
+        });
+
         it("should log and swallow command readiness errors even when console logging is disabled", async () => {
             const errorSpy = vi.spyOn(log.getLogger("OnDemandPlugin/LazyCommandRunner"), "error").mockImplementation(() => {});
             mockRegistry.getCachedCommand.mockReturnValue({ id: "cmd1", pluginId: "test-plugin" });

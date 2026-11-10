@@ -79,6 +79,7 @@ export interface Profile {
 // Global settings for the plugin
 export interface LazySettings {
     showConsoleLog: boolean;
+    showAutomaticLoadNotifications: boolean;
     /** How to handle an unsaved draft when its settings page is reopened; shared by all profiles. */
     restoreDraftBehavior: RestoreDraftBehavior;
     /** Whether the plugin table's row menu offers a destructive uninstall action; shared by all profiles. */
@@ -109,6 +110,7 @@ export const SETTINGS_SCHEMA_VERSION = 1;
 
 export const DEFAULT_SETTINGS: LazySettings = {
     showConsoleLog: false,
+    showAutomaticLoadNotifications: true,
     restoreDraftBehavior: "ask",
     showUninstallInTableMenu: false,
     profiles: {
