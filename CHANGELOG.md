@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.10.0](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.9.0...3.10.0) (2026-11-15)
+
+### ✨ Features
+
+* add a toggle for automatic loading notifications ([81b6d4f](https://github.com/22-2/obsidian-on-demand-plugins/commit/81b6d4fa926eb2a53bef8b84d8208afcf54007db))
+
 ## [3.9.0](https://github.com/22-2/obsidian-on-demand-plugins/compare/3.8.0...3.9.0) (2026-10-30)
 
 ### ✨ Features
