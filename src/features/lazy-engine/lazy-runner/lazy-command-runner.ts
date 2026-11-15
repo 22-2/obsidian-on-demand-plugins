@@ -56,10 +56,12 @@ export class LazyCommandRunner implements PluginLoader {
         }
 
         // Loading a plugin can take seconds, and the command looks ignored until it runs.
-        const loadNotice = isPluginLoaded(this.ctx.app, cached.pluginId) ? null : new PluginLoadNotice(getPluginDisplayName(this.ctx, cached.pluginId));
+        const name = getPluginDisplayName(this.ctx, cached.pluginId);
+        const loadNotice = !isPluginLoaded(this.ctx.app, cached.pluginId) && this.ctx.getData().showAutomaticLoadNotifications !== false ? new PluginLoadNotice(name) : null;
         const success = await this.ensurePluginLoaded(cached.pluginId);
         if (!success) {
-            loadNotice?.fail();
+            if (loadNotice) loadNotice.fail();
+            else new Notice(`Failed to load ${name}`);
             return;
         }
         loadNotice?.succeed();

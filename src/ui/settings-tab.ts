@@ -151,6 +151,19 @@ export class SettingsTab extends PluginSettingTab {
                         heading: "Shared across profiles",
                         items: [
                             {
+                                name: "Automatic loading notifications",
+                                desc: "Show loading and success notifications when a command loads a plugin. Errors and manual toggle confirmations are always shown.",
+                                render: (setting) => {
+                                    setting.addToggle((toggle) =>
+                                        toggle.setValue(this.plugin.data.showAutomaticLoadNotifications !== false).onChange(async (value) => {
+                                            await this.saveImmediateChanges((data) => {
+                                                data.showAutomaticLoadNotifications = value;
+                                            });
+                                        }),
+                                    );
+                                },
+                            },
+                            {
                                 name: "Unsaved draft prompt",
                                 desc: "What to do with unsaved plugin changes when you return to plugin management or maintenance.",
                                 // A render rather than a control: controls read and write the active profile, and this setting is shared.
